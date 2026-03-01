@@ -129,6 +129,8 @@ Casey reviews → Rating X/10 + approval status
      ├─→ Changes requested?
      │       OpenCode calls /implement [address Casey's feedback]
      │       Sam fixes → OpenCode calls /review again
+     │       Casey re-reviews → must reach Approved before proceeding
+     │       (loop until Casey approves, no exceptions)
      │
      └─→ Approved?
              OpenCode runs full test suite
