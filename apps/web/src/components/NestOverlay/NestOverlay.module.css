@@ -1,0 +1,51 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 24px 16px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.title { font-size: 1.2rem; font-weight: 700; }
+.subtitle { color: #888; font-size: 0.9rem; margin-top: -8px; }
+
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 380px;
+}
+
+.confirmBtn {
+  padding: 10px 32px;
+  border-radius: 10px;
+  border: 2px solid #555;
+  background: #333;
+  color: #888;
+  font-size: 1rem;
+  cursor: not-allowed;
+  transition: all 0.15s;
+}
+
+.confirmBtn.ready {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #1a1a2e;
+  cursor: pointer;
+  font-weight: 700;
+}

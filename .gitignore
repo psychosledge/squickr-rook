@@ -26,3 +26,9 @@ Thumbs.db
 # PWA
 sw.js
 workbox-*.js
+
+# OpenCode internal agent tooling
+.opencode/
+
+# Windows artifacts
+nul

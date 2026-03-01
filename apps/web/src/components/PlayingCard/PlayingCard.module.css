@@ -1,0 +1,66 @@
+.card {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: 6px;
+  border: 2px solid;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  position: relative;
+  transition: transform 0.1s, opacity 0.15s;
+}
+
+.card:hover:not(.unplayable) {
+  transform: translateY(-4px);
+}
+
+.unplayable {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.selected {
+  transform: translateY(-10px) !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+}
+
+.faceDown {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    45deg,
+    #1a2744,
+    #1a2744 4px,
+    #0d1b38 4px,
+    #0d1b38 8px
+  );
+  border: 2px solid #2a3f6f;
+  flex-shrink: 0;
+}
+
+.topLeft {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  align-self: flex-start;
+}
+
+.center {
+  font-size: 1.1rem;
+  font-weight: 900;
+  text-align: center;
+  align-self: center;
+}
+
+.bottomRight {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  align-self: flex-end;
+  transform: rotate(180deg);
+}

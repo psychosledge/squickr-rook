@@ -1,0 +1,80 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  gap: 24px;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  letter-spacing: -1px;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: #888;
+  margin-top: -16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+}
+
+.difficultyPicker {
+  display: flex;
+  gap: 8px;
+}
+
+.diffBtn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.diffBtn:hover {
+  border-color: var(--color-accent);
+}
+
+.diffBtn.active {
+  border-color: var(--color-accent);
+  background: #2a1f0a;
+  color: var(--color-accent);
+}
+
+.startBtn {
+  padding: 14px 48px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-accent);
+  color: #1a1a2e;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+
+.startBtn:hover {
+  opacity: 0.9;
+}

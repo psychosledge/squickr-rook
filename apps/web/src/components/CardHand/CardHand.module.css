@@ -1,0 +1,10 @@
+.hand {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 4px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+  -webkit-overflow-scrolling: touch;
+}

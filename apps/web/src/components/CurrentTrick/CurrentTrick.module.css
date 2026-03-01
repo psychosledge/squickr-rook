@@ -1,0 +1,27 @@
+.trick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  padding: 8px;
+}
+
+.play {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.seatLabel {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.empty {
+  color: #555;
+  font-size: 0.85rem;
+  font-style: italic;
+}

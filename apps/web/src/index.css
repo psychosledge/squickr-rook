@@ -1,0 +1,30 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-bg: #1a1a2e;
+  --color-surface: #16213e;
+  --color-border: #0f3460;
+  --color-text: #e0e0e0;
+  --color-accent: #f39c12;
+  --color-black-card: #2d2d2d;
+  --color-red-card: #c0392b;
+  --color-green-card: #27ae60;
+  --color-yellow-card: #f39c12;
+  --color-rook-card: #6c3483;
+  --card-w: 56px;
+  --card-h: 80px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
