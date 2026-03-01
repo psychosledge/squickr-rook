@@ -21,7 +21,7 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
         <PlayerSeat seat="S" cards={hands["S"] ?? []} faceDown isActive={activePlayer === "S"} />
       </div>
 
-      {/* Opponent E — left (clockwise from N at bottom) */}
+      {/* Opponent E — screen-left (N=bottom, clockwise: N→E→S→W, so E is to N's left) */}
       <div className={styles.left}>
         <PlayerSeat seat="E" cards={hands["E"] ?? []} faceDown isActive={activePlayer === "E"} />
       </div>
@@ -31,7 +31,7 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
         <CurrentTrick trick={currentTrick} trump={trump} />
       </div>
 
-      {/* Opponent W — right (clockwise from N at bottom) */}
+      {/* Opponent W — screen-right (N=bottom, clockwise: N→E→S→W, so W is to N's right) */}
       <div className={styles.right}>
         <PlayerSeat seat="W" cards={hands["W"] ?? []} faceDown isActive={activePlayer === "W"} />
       </div>

@@ -110,9 +110,11 @@ export const useGameStore = create<AppStore>((set, get) => ({
         const gs = get().gameState;
         if (gs) {
           const takeResult = validateCommand(gs, { type: "TakeNest", seat: HUMAN_SEAT }, gs.rules);
-          if (takeResult.ok) {
-            get()._applyEvents(takeResult.events);
+          if (!takeResult.ok) {
+            console.error("Unexpected TakeNest failure:", takeResult.error);
+            return;
           }
+          get()._applyEvents(takeResult.events);
         }
         set({ overlay: "nest" });
       } else if (phase === "trump") {
@@ -124,7 +126,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
     }
 
     // Bot's turn — schedule with delay only for playing phase
-    const delay = phase === "playing" ? (gameState.rules.botDelayMs ?? 500) : 0;
+    const delay = phase === "playing" ? (gameState.rules.botDelayMs ?? 1000) : 0;
     const id = setTimeout(() => get()._dispatchBotTurn(), delay);
     set({ botTimeoutId: id });
   },
@@ -158,7 +160,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       const postEvents = result.events.slice(trickCompletedIdx);
       get()._applyEvents(preEvents);
       set({ botTimeoutId: null });
-      const delay = get().gameState?.rules.botDelayMs ?? 800;
+      const delay = get().gameState?.rules.botDelayMs ?? 1000;
       const id = setTimeout(() => {
         get()._applyEvents(postEvents);
         set({ botTimeoutId: null });
@@ -194,11 +196,13 @@ export const useGameStore = create<AppStore>((set, get) => ({
       const preEvents = result.events.slice(0, trickCompletedIdx);
       const postEvents = result.events.slice(trickCompletedIdx);
       get()._applyEvents(preEvents);
-      const delay = get().gameState?.rules.botDelayMs ?? 800;
-      setTimeout(() => {
+      const delay = get().gameState?.rules.botDelayMs ?? 1000;
+      const id = setTimeout(() => {
         get()._applyEvents(postEvents);
+        set({ botTimeoutId: null });
         get()._scheduleNextTurn();
       }, delay);
+      set({ botTimeoutId: id });
     } else {
       get()._applyEvents(result.events);
       get()._scheduleNextTurn();
@@ -220,24 +224,12 @@ export const useGameStore = create<AppStore>((set, get) => ({
     const { gameState, pendingDiscards } = get();
     if (!gameState || pendingDiscards.length !== 5) return;
 
-    // First, issue TakeNest if nest is still available
     let gs = gameState;
     const allEvents: GameEvent[] = [];
 
     if (gs.nest.length > 0) {
-      const takeResult = validateCommand(
-        gs,
-        { type: "TakeNest", seat: HUMAN_SEAT },
-        gs.rules,
-      );
-      if (!takeResult.ok) {
-        console.error("TakeNest failed:", takeResult.error);
-        return;
-      }
-      for (const ev of takeResult.events) {
-        gs = applyEvent(gs, ev);
-      }
-      allEvents.push(...takeResult.events);
+      console.error("confirmDiscards: nest should already be empty (TakeNest should have been issued in _scheduleNextTurn)");
+      return;
     }
 
     for (const cardId of pendingDiscards) {
