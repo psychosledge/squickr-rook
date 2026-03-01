@@ -87,11 +87,11 @@ describe("offSuitRank", () => {
 });
 
 describe("trumpRank", () => {
-  it("ROOK is highest trump (13)", () => {
-    expect(trumpRank("ROOK", "Black")).toBe(13);
+  it("ROOK is lowest trump (0)", () => {
+    expect(trumpRank("ROOK", "Black")).toBe(0);
   });
 
-  it("1 of trump color is second highest (12)", () => {
+  it("1 of trump color is highest regular trump (12)", () => {
     expect(trumpRank("B1", "Black")).toBe(12);
   });
 
@@ -99,8 +99,27 @@ describe("trumpRank", () => {
     expect(trumpRank("R5", "Black")).toBe(-1);
   });
 
-  it("5 of trump color ranks 2", () => {
+  it("5 of trump color ranks 2 (lowest regular trump)", () => {
     expect(trumpRank("B5", "Black")).toBe(2);
+  });
+
+  it("ROOK is still identified as a trump card (rank >= 0)", () => {
+    expect(trumpRank("ROOK", "Red")).toBeGreaterThanOrEqual(0);
+  });
+
+  it("ROOK loses to any regular trump card (5 is lowest regular trump)", () => {
+    // ROOK rank=0, B5 rank=2 — B5 should beat ROOK
+    expect(trumpRank("B5", "Black")).toBeGreaterThan(trumpRank("ROOK", "Black"));
+  });
+
+  it("ROOK loses to trump 1 (highest regular trump)", () => {
+    expect(trumpRank("B1", "Black")).toBeGreaterThan(trumpRank("ROOK", "Black"));
+  });
+
+  it("ROOK trump rank is 0 regardless of trump color", () => {
+    expect(trumpRank("ROOK", "Red")).toBe(0);
+    expect(trumpRank("ROOK", "Green")).toBe(0);
+    expect(trumpRank("ROOK", "Yellow")).toBe(0);
   });
 });
 
@@ -111,10 +130,29 @@ describe("compareTrickCards", () => {
     expect(result).toBeGreaterThan(0); // B1 wins
   });
 
-  it("Rook beats all trump", () => {
-    // ROOK vs B1 (trump), trump=Black, lead=Black
+  it("Rook loses to regular trump (Rook is LOWEST trump)", () => {
+    // ROOK vs B1 (trump), trump=Black, lead=Black — B1 should win
     const result = compareTrickCards("ROOK", "B1", "Black", "Black");
-    expect(result).toBeGreaterThan(0); // ROOK wins
+    expect(result).toBeLessThan(0); // B1 wins, Rook loses
+  });
+
+  it("Rook loses to lowest regular trump (5)", () => {
+    // ROOK vs B5 (lowest regular trump), trump=Black
+    const result = compareTrickCards("ROOK", "B5", "Black", "Black");
+    expect(result).toBeLessThan(0); // B5 wins, Rook loses
+  });
+
+  it("Rook beats off-suit cards (Rook is still trump)", () => {
+    // ROOK vs R1 (off-suit, lead=Red), trump=Black
+    const result = compareTrickCards("ROOK", "R1", "Red", "Black");
+    expect(result).toBeGreaterThan(0); // ROOK wins over off-suit
+  });
+
+  it("Rook is still a trump card — beats non-trump lead color card", () => {
+    // R5 (lead color, no trump involved vs ROOK trump)
+    // trump=Black, ROOK is trump, R5 is not trump
+    const result = compareTrickCards("ROOK", "R5", "Red", "Black");
+    expect(result).toBeGreaterThan(0); // ROOK (trump) beats R5 (off-suit)
   });
 
   it("1 beats 14 in same suit (off-suit)", () => {
@@ -152,9 +190,17 @@ describe("compareTrickCards", () => {
     expect(result).toBeLessThan(0); // B5 wins
   });
 
-  it("Rook beats trump when trump established (Rook-led trick)", () => {
+  it("Rook loses to regular trump in Rook-led trick (leadColor=null)", () => {
     // ROOK vs B1 when lead was ROOK (leadColor=null), trump=Black
+    // Both are trump, ROOK rank=0 vs B1 rank=12 → B1 wins
     const result = compareTrickCards("ROOK", "B1", null, "Black");
-    expect(result).toBeGreaterThan(0);
+    expect(result).toBeLessThan(0); // B1 wins
+  });
+
+  it("Rook with trump=null cannot beat a led colour card", () => {
+    // When no trump is established, Rook is not trump and has offSuitRank=-1
+    // so it loses to any led-colour card
+    const result = compareTrickCards("ROOK", "R1", "Red", null);
+    expect(result).toBeLessThan(0);
   });
 });

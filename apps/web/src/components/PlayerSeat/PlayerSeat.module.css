@@ -22,3 +22,13 @@
 .name { color: #ccc; }
 .count { color: #888; font-size: 0.75rem; }
 .indicator { color: var(--color-accent); font-size: 0.6rem; }
+.bidBadge {
+  color: #f0c040;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(240, 192, 64, 0.12);
+  border: 1px solid rgba(240, 192, 64, 0.3);
+  border-radius: 3px;
+  padding: 0 3px;
+}

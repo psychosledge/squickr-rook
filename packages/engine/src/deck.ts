@@ -109,16 +109,18 @@ export function offSuitRank(cardId: CardId): number {
 
 /**
  * Trump rank: higher = stronger trump card.
- * ROOK=13, 1=12, 14=11, 13=10, 12=9, 11=8, 10=7, 9=6, 8=5, 7=4, 6=3, 5=2
+ * 1=12, 14=11, 13=10, 12=9, 11=8, 10=7, 9=6, 8=5, 7=4, 6=3, 5=2, ROOK=0
+ * Rank 1 is intentionally unused (gap between ROOK=0 and 5=2).
+ * ROOK is lowest trump — beats all off-suit but loses to any regular trump card.
  * Returns -1 if the card is NOT a trump card (not rook, not trump color).
  */
 export function trumpRank(cardId: CardId, trump: Color): number {
-  if (cardId === "ROOK") return 13; // Rook is always highest trump when trump is established
+  if (cardId === "ROOK") return 0; // lowest trump — beats off-suit but loses to all regular trump
   const card = cardFromId(cardId);
   if (card.kind !== "regular") return -1;
   if (card.color !== trump) return -1;
   switch (card.value) {
-    case 1:  return 12;
+    case 1:  return 12;  // highest regular trump
     case 14: return 11;
     case 13: return 10;
     case 12: return 9;
@@ -128,7 +130,7 @@ export function trumpRank(cardId: CardId, trump: Color): number {
     case 8:  return 5;
     case 7:  return 4;
     case 6:  return 3;
-    case 5:  return 2;
+    case 5:  return 2;   // lowest regular trump — still beats Rook
     default: return -1;
   }
 }
@@ -139,7 +141,7 @@ export function trumpRank(cardId: CardId, trump: Color): number {
  *
  * Rules:
  * - Trump beats off-suit (trump only meaningful when trump has been established)
- * - Rook Bird beats all trump cards
+ * - Rook Bird is the LOWEST trump — beats off-suit but loses to any regular trump card
  * - Must-follow: if a card is not trump AND not the lead color, it cannot win
  * - Lead color: the color of the first card played (null if ROOK was led)
  */
