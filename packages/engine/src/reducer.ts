@@ -120,7 +120,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         version: state.version + 1,
         trump: event.color,
         phase: "playing",
-        activePlayer: leftOf(state.dealer),
+        activePlayer: leftOf(leftOf(state.dealer)),
       };
     }
 

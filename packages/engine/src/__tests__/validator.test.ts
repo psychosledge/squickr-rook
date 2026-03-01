@@ -267,15 +267,15 @@ describe("validateCommand - PlayCard must-follow", () => {
     // Create a state where trump=Black, lead is Black, but player has Black cards and ROOK
     // We need to manually craft a state where this is testable
     let state = stateAfterTrumpSelected(42, "N");
-    const leader = state.activePlayer!; // leftOf(N) = E
+    const leader = state.activePlayer!; // leftOf(leftOf(N)) = S
 
-    // First play: E leads with a Black card if possible
-    const eHand = state.hands[leader]!;
-    const blackCard = eHand.find((c) => c !== "ROOK" && c.startsWith("B"));
+    // First play: leader leads with a Black card if possible
+    const leaderHand = state.hands[leader]!;
+    const blackCard = leaderHand.find((c) => c !== "ROOK" && c.startsWith("B"));
 
     if (!blackCard) return; // skip if no black card
 
-    // E leads with Black
+    // Leader leads with Black
     state = applyEvent(state, {
       type: "CardPlayed",
       seat: leader,
@@ -285,8 +285,8 @@ describe("validateCommand - PlayCard must-follow", () => {
       timestamp: 5000,
     });
 
-    // Now next player (leftOf E = S) must follow Black if they have it
-    const nextSeat: Seat = "S";
+    // Now next player (leftOf leader) must follow Black if they have it
+    const nextSeat: Seat = leftOf(leader);
     const nextHand = state.hands[nextSeat]!;
     
     // If next player has ROOK, they should always be able to play it
@@ -346,32 +346,31 @@ describe("validateCommand - PlayCard must-follow", () => {
   it("invalid when not following suit (has lead color)", () => {
     // Create a state where we KNOW the player has the lead color but plays something else
     let state = stateAfterTrumpSelected(42, "N");
-    const leader = state.activePlayer!; // E
+    const leader = state.activePlayer!; // leftOf(leftOf(N)) = S
 
-    // Find a card E has by color, then find if next player S has same color + a different color
-    const eHand = state.hands[leader]!;
+    // Find a card leader has by color, then find if next player has same color + a different color
+    const leaderHand = state.hands[leader]!;
     
     // Try to find a lead color that the next player also has
-    const seats: Seat[] = ["N", "E", "S", "W"];
-    const nextSeat: Seat = "S";
-    const sHand = state.hands[nextSeat]!;
+    const nextSeat: Seat = leftOf(leader);
+    const nextHand = state.hands[nextSeat]!;
 
-    // Find a color that both E and S have non-ROOK cards for
+    // Find a color that both leader and next player have non-ROOK cards for
     const colors = ["B", "R", "G", "Y"];
     let leadCardId: string | null = null;
     let offColorCardId: string | null = null;
 
     for (const color of colors) {
-      const eHasColor = eHand.some(c => c !== "ROOK" && c.startsWith(color));
-      const sHasColor = sHand.some(c => c !== "ROOK" && c.startsWith(color));
-      const sHasOther = sHand.some(c => c !== "ROOK" && !c.startsWith(color));
+      const leaderHasColor = leaderHand.some(c => c !== "ROOK" && c.startsWith(color));
+      const nextHasColor = nextHand.some(c => c !== "ROOK" && c.startsWith(color));
+      const nextHasOther = nextHand.some(c => c !== "ROOK" && !c.startsWith(color));
 
-      if (eHasColor && sHasColor && sHasOther) {
-        leadCardId = eHand.find(c => c !== "ROOK" && c.startsWith(color))!;
-        // Get an off-color card from S
-        const offColorInitial = colors.find(c2 => c2 !== color && sHand.some(c => c !== "ROOK" && c.startsWith(c2)));
+      if (leaderHasColor && nextHasColor && nextHasOther) {
+        leadCardId = leaderHand.find(c => c !== "ROOK" && c.startsWith(color))!;
+        // Get an off-color card from next player
+        const offColorInitial = colors.find(c2 => c2 !== color && nextHand.some(c => c !== "ROOK" && c.startsWith(c2)));
         if (offColorInitial) {
-          offColorCardId = sHand.find(c => c !== "ROOK" && c.startsWith(offColorInitial))!;
+          offColorCardId = nextHand.find(c => c !== "ROOK" && c.startsWith(offColorInitial))!;
         }
         break;
       }
@@ -382,7 +381,7 @@ describe("validateCommand - PlayCard must-follow", () => {
       return;
     }
 
-    // E leads
+    // Leader leads
     state = applyEvent(state, {
       type: "CardPlayed",
       seat: leader,
@@ -392,7 +391,7 @@ describe("validateCommand - PlayCard must-follow", () => {
       timestamp: 5000,
     });
 
-    // S tries to play off-color while having lead color
+    // Next player tries to play off-color while having lead color
     const result = validateCommand(
       state,
       { type: "PlayCard", seat: nextSeat, cardId: offColorCardId },

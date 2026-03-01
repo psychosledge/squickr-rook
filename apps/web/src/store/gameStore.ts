@@ -106,6 +106,14 @@ export const useGameStore = create<AppStore>((set, get) => ({
     // Human's turn
     if (activePlayer === HUMAN_SEAT) {
       if (phase === "nest") {
+        // Issue TakeNest immediately so the hand has all 15 cards before overlay opens
+        const gs = get().gameState;
+        if (gs) {
+          const takeResult = validateCommand(gs, { type: "TakeNest", seat: HUMAN_SEAT }, gs.rules);
+          if (takeResult.ok) {
+            get()._applyEvents(takeResult.events);
+          }
+        }
         set({ overlay: "nest" });
       } else if (phase === "trump") {
         set({ overlay: "trump" });
@@ -142,9 +150,26 @@ export const useGameStore = create<AppStore>((set, get) => ({
       return;
     }
 
-    get()._applyEvents(result.events);
-    set({ botTimeoutId: null });
-    get()._scheduleNextTurn();
+    const trickCompletedIdx = result.events.findIndex((e) => e.type === "TrickCompleted");
+
+    if (trickCompletedIdx !== -1) {
+      // Split: apply up to and including CardPlayed first, then after a delay apply the rest
+      const preEvents = result.events.slice(0, trickCompletedIdx);
+      const postEvents = result.events.slice(trickCompletedIdx);
+      get()._applyEvents(preEvents);
+      set({ botTimeoutId: null });
+      const delay = get().gameState?.rules.botDelayMs ?? 800;
+      const id = setTimeout(() => {
+        get()._applyEvents(postEvents);
+        set({ botTimeoutId: null });
+        get()._scheduleNextTurn();
+      }, delay);
+      set({ botTimeoutId: id });
+    } else {
+      get()._applyEvents(result.events);
+      set({ botTimeoutId: null });
+      get()._scheduleNextTurn();
+    }
   },
 
   humanPlayCard: (cardId) => {
@@ -162,8 +187,22 @@ export const useGameStore = create<AppStore>((set, get) => ({
       return;
     }
 
-    get()._applyEvents(result.events);
-    get()._scheduleNextTurn();
+    const trickCompletedIdx = result.events.findIndex((e) => e.type === "TrickCompleted");
+
+    if (trickCompletedIdx !== -1) {
+      // Apply pre-trick events immediately (shows 4th card), then rest after delay
+      const preEvents = result.events.slice(0, trickCompletedIdx);
+      const postEvents = result.events.slice(trickCompletedIdx);
+      get()._applyEvents(preEvents);
+      const delay = get().gameState?.rules.botDelayMs ?? 800;
+      setTimeout(() => {
+        get()._applyEvents(postEvents);
+        get()._scheduleNextTurn();
+      }, delay);
+    } else {
+      get()._applyEvents(result.events);
+      get()._scheduleNextTurn();
+    }
   },
 
   toggleDiscard: (cardId) => {

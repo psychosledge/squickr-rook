@@ -39,7 +39,7 @@ export const DEFAULT_RULES: GameRules = {
   winThreshold: 500,
   bustThreshold: -500,
   autoBidAmount: 100,
-  botDelayMs: 500,
+  botDelayMs: 1000,
   nestAssignment: "left-of-dealer",
 };
 

@@ -229,7 +229,7 @@ describe("applyEvent - TrumpSelected", () => {
     expect(state.trump).toBe("Black");
   });
 
-  it("activePlayer is leftOf(dealer) after TrumpSelected", () => {
+  it("activePlayer is leftOf(leftOf(dealer)) after TrumpSelected", () => {
     let state = setupBeforeTrump();
     const nestPlayer = leftOf(state.dealer);
     state = applyEvent(state, {
@@ -239,7 +239,7 @@ describe("applyEvent - TrumpSelected", () => {
       handNumber: 0,
       timestamp: 4000,
     });
-    expect(state.activePlayer).toBe(leftOf(state.dealer));
+    expect(state.activePlayer).toBe(leftOf(leftOf(state.dealer)));
   });
 });
 
@@ -293,7 +293,7 @@ describe("applyEvent - CardPlayed and TrickCompleted", () => {
   it("after TrickCompleted, currentTrick is cleared and capturedCards updated", () => {
     const { startState } = buildFullTrick();
     let state = startState;
-    const seats: Seat[] = ["E", "S", "W", "N"]; // leftOf N = E leads
+    const seats: Seat[] = ["S", "W", "N", "E"]; // leftOf(leftOf(N)) = S leads
 
     const trick: Array<{ seat: Seat; cardId: string }> = [];
     for (const seat of seats) {
