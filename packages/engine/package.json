@@ -1,0 +1,23 @@
+{
+  "name": "@rook/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test":       "vitest run",
+    "test:watch": "vitest",
+    "typecheck":  "tsc --noEmit",
+    "build":      "tsc -p tsconfig.build.json"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^3.0.0",
+    "vitest":     "^3.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "pure-rand": "^6.1.0"
+  }
+}

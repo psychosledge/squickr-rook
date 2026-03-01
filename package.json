@@ -1,0 +1,20 @@
+{
+  "name": "squickr-rook",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev":        "pnpm --filter @rook/web dev",
+    "build":      "pnpm --filter @rook/engine build && pnpm --filter @rook/web build",
+    "test":       "pnpm --filter @rook/engine test",
+    "test:watch": "pnpm --filter @rook/engine test:watch",
+    "typecheck":  "pnpm -r typecheck",
+    "lint":       "pnpm -r lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}
