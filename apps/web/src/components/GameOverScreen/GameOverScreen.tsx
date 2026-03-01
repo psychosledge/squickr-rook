@@ -1,4 +1,5 @@
 import type { Team } from "@rook/engine";
+import { getTeamLabel } from "@/utils/seatLabel";
 import styles from "./GameOverScreen.module.css";
 
 type Props = {
@@ -20,17 +21,17 @@ export default function GameOverScreen({ winner, finalScores, reason, onPlayAgai
         </h1>
         <p className={styles.reason}>
           {reason === "bust"
-            ? `${winner === "NS" ? "EW" : "NS"} team went bust`
-            : `${winner} reached 500 points`}
+            ? `${getTeamLabel(winner === "NS" ? "EW" : "NS")} team went bust`
+            : `${getTeamLabel(winner)} reached 500 points`}
         </p>
 
         <div className={styles.scores}>
           <div className={`${styles.scoreBox} ${winner === "NS" ? styles.winner : ""}`}>
-            <span className={styles.teamLabel}>NS (You + South)</span>
+            <span className={styles.teamLabel}>{getTeamLabel("NS")}</span>
             <span className={styles.scoreVal}>{finalScores.NS}</span>
           </div>
           <div className={`${styles.scoreBox} ${winner === "EW" ? styles.winner : ""}`}>
-            <span className={styles.teamLabel}>EW (East + West)</span>
+            <span className={styles.teamLabel}>{getTeamLabel("EW")}</span>
             <span className={styles.scoreVal}>{finalScores.EW}</span>
           </div>
         </div>

@@ -7,6 +7,7 @@ import NestOverlay from "@/components/NestOverlay/NestOverlay";
 import TrumpPicker from "@/components/TrumpPicker/TrumpPicker";
 import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay";
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
+import { sortHand } from "@/utils/sortHand";
 import styles from "./GamePage.module.css";
 
 export default function GamePage() {
@@ -41,7 +42,7 @@ export default function GamePage() {
 
       {overlay === "nest" && (
         <NestOverlay
-          hand={(gameState.hands["N"] ?? []).filter((c) => c !== "ROOK")}
+          hand={sortHand(gameState.hands["N"] ?? [], gameState.trump).filter((c) => c !== "ROOK")}
           pendingDiscards={pendingDiscards}
           onToggleDiscard={toggleDiscard}
           onConfirm={confirmDiscards}

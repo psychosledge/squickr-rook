@@ -36,9 +36,14 @@ export default function ScoreBar({ gameState }: Props) {
         {phase === "playing" && activePlayer && (
           <span className={styles.active}>{activeName}&apos;s turn</span>
         )}
-        {(phase === "nest" || phase === "trump") && (
+        {phase === "nest" && (
           <span className={styles.active}>
-            {activeName} sorting…
+            {activeName} picking nest…
+          </span>
+        )}
+        {phase === "trump" && (
+          <span className={styles.active}>
+            {activeName} picking trump…
           </span>
         )}
       </div>

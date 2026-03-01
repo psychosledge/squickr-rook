@@ -1,4 +1,5 @@
 import type { HandScore, Team } from "@rook/engine";
+import { getTeamLabel } from "@/utils/seatLabel";
 import styles from "./HandResultOverlay.module.css";
 
 type Props = {
@@ -20,7 +21,7 @@ export default function HandResultOverlay({ score, runningScores, onContinue }: 
 
         <div className={styles.bidResult}>
           <span className={bidWon ? styles.won : styles.lost}>
-            {bidderTeam} bid {bidAmount} — {bidWon ? "MADE IT" : "SET!"}
+            {getTeamLabel(bidderTeam)} bid {bidAmount} — {bidWon ? "MADE IT" : "SET!"}
           </span>
         </div>
 
@@ -35,7 +36,7 @@ export default function HandResultOverlay({ score, runningScores, onContinue }: 
           </thead>
           <tbody>
             <tr>
-              <td>NS</td>
+              <td>{getTeamLabel("NS")}</td>
               <td>{nsTotal}</td>
               <td className={nsDelta >= 0 ? styles.pos : styles.neg}>
                 {nsDelta >= 0 ? "+" : ""}{nsDelta}
@@ -43,7 +44,7 @@ export default function HandResultOverlay({ score, runningScores, onContinue }: 
               <td><strong>{runningScores.NS}</strong></td>
             </tr>
             <tr>
-              <td>EW</td>
+              <td>{getTeamLabel("EW")}</td>
               <td>{ewTotal}</td>
               <td className={ewDelta >= 0 ? styles.pos : styles.neg}>
                 {ewDelta >= 0 ? "+" : ""}{ewDelta}

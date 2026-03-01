@@ -37,9 +37,9 @@ export const useGameStore = create<AppStore>((set, get) => ({
       dealer: "N",
       players: [
         { seat: "N", name: "You",   kind: "human" },
-        { seat: "E", name: "East",  kind: "bot", botProfile: profiles },
-        { seat: "S", name: "South", kind: "bot", botProfile: profiles },
-        { seat: "W", name: "West",  kind: "bot", botProfile: profiles },
+        { seat: "E", name: "P2", kind: "bot", botProfile: profiles },
+        { seat: "S", name: "P3", kind: "bot", botProfile: profiles },
+        { seat: "W", name: "P4", kind: "bot", botProfile: profiles },
       ],
       rules: DEFAULT_RULES,
       timestamp: Date.now(),
