@@ -32,3 +32,22 @@
 
 .status { font-size: 0.75rem; color: #888; min-width: 80px; text-align: right; }
 .active { color: var(--color-accent); }
+
+@media (max-width: 600px) {
+  .bar {
+    padding: 6px 10px;
+    min-height: 40px;
+  }
+
+  .status {
+    display: none;
+  }
+
+  .scores {
+    font-size: 0.85rem;
+  }
+
+  .center {
+    font-size: 0.8rem;
+  }
+}

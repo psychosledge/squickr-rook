@@ -14,8 +14,10 @@
   transition: transform 0.1s, opacity 0.15s;
 }
 
-.card:hover:not(.unplayable) {
-  transform: translateY(-4px);
+@media (hover: hover) {
+  .card:hover:not(.unplayable) {
+    transform: translateY(-4px);
+  }
 }
 
 .unplayable {
@@ -63,4 +65,11 @@
   line-height: 1;
   align-self: flex-end;
   transform: rotate(180deg);
+}
+
+@media (max-width: 600px) {
+  .card,
+  .faceDown {
+    scroll-snap-align: start;
+  }
 }

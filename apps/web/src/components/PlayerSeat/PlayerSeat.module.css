@@ -32,3 +32,43 @@
   border-radius: 3px;
   padding: 0 3px;
 }
+
+.handWrap {
+  display: contents;
+}
+
+@media (max-width: 600px) {
+  .seat[data-seat="E"] .handWrap,
+  .seat[data-seat="W"] .handWrap {
+    display: none;
+  }
+
+  .seat[data-seat="E"],
+  .seat[data-seat="W"] {
+    padding: 2px 4px;
+    gap: 2px;
+    justify-content: flex-start;
+  }
+
+  .seat[data-seat="E"] .nameRow,
+  .seat[data-seat="W"] .nameRow {
+    font-size: 0.7rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .seat[data-seat="S"] {
+    padding: 2px 4px;
+  }
+
+  .seat[data-seat="N"] {
+    padding: 4px 0;
+    width: 100%;
+  }
+
+  .seat[data-seat="N"] .nameRow {
+    font-size: 0.85rem;
+    padding: 0 8px;
+  }
+}

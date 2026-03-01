@@ -8,3 +8,16 @@
   scrollbar-color: #333 transparent;
   -webkit-overflow-scrolling: touch;
 }
+
+@media (max-width: 600px) {
+  .hand {
+    gap: 6px;
+    padding: 6px 12px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .hand::-webkit-scrollbar {
+    display: none;
+  }
+}

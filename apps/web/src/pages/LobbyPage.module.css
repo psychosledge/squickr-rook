@@ -52,8 +52,10 @@
   transition: border-color 0.15s, background 0.15s;
 }
 
-.diffBtn:hover {
-  border-color: var(--color-accent);
+@media (hover: hover) {
+  .diffBtn:hover {
+    border-color: var(--color-accent);
+  }
 }
 
 .diffBtn.active {
@@ -75,6 +77,26 @@
   transition: opacity 0.15s;
 }
 
-.startBtn:hover {
-  opacity: 0.9;
+@media (hover: hover) {
+  .startBtn:hover {
+    opacity: 0.9;
+  }
+}
+
+@media (max-width: 600px) {
+  .title {
+    font-size: 2rem;
+  }
+
+  .diffBtn {
+    padding: 10px 20px;
+    min-height: 44px;
+  }
+
+  .startBtn {
+    min-height: 56px;
+    width: 100%;
+    max-width: 280px;
+    font-size: 1.1rem;
+  }
 }

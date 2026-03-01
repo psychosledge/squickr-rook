@@ -28,3 +28,14 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+@media (max-width: 600px) {
+  :root {
+    --card-w: 52px;
+    --card-h: 74px;
+  }
+}
+
+button {
+  touch-action: manipulation;
+}

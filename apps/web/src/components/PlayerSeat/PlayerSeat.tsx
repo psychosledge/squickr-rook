@@ -29,12 +29,14 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
         {faceDown && <span className={styles.count}>{cards.length}</span>}
         {isActive && <span className={styles.indicator}>●</span>}
       </div>
-      <CardHand
-        cards={cards}
-        faceDown={faceDown}
-        legalCardIds={!faceDown ? legalCards : undefined}
-        onCardClick={!faceDown ? onCardClick : undefined}
-      />
+      <div className={styles.handWrap}>
+        <CardHand
+          cards={cards}
+          faceDown={faceDown}
+          legalCardIds={!faceDown ? legalCards : undefined}
+          onCardClick={!faceDown ? onCardClick : undefined}
+        />
+      </div>
     </div>
   );
 }
