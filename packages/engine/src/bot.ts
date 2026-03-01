@@ -1,5 +1,6 @@
 import type { GameCommand } from "./commands.js";
 import { compareTrickCards, cardFromId, offSuitRank, trumpRank } from "./deck.js";
+import { pointValue } from "./scoring.js";
 import { legalCommands } from "./validator.js";
 import type { BotProfile, CardId, Color, GameState, Seat } from "./types.js";
 import { SEAT_TEAM } from "./types.js";
@@ -89,7 +90,7 @@ function chooseBestDiscard(
   const scored = discardCommands.map((cmd) => {
     if (cmd.type !== "DiscardCard") return { cmd, score: 0 };
     const cardId = cmd.cardId;
-    const pts = getCardPoints(cardId);
+    const pts = pointValue(cardId);
     const isTrump = trump !== null && trumpRank(cardId, trump) >= 0;
     const isHighValue = isHighValueCard(cardId);
 
@@ -105,17 +106,6 @@ function chooseBestDiscard(
   // Sort ascending (lower score = discard first)
   scored.sort((a, b) => a.score - b.score);
   return scored[0]!.cmd;
-}
-
-function getCardPoints(cardId: CardId): number {
-  if (cardId === "ROOK") return 20;
-  const card = cardFromId(cardId);
-  if (card.kind !== "regular") return 0;
-  if (card.value === 1) return 15;
-  if (card.value === 5) return 5;
-  if (card.value === 10) return 10;
-  if (card.value === 14) return 10;
-  return 0;
 }
 
 function isHighValueCard(cardId: CardId): boolean {
@@ -169,7 +159,7 @@ function chooseBestTrump(
     if (cardId === "ROOK") continue;
     const card = cardFromId(cardId);
     if (card.kind === "regular") {
-      colorWeights[card.color] += 1 + getCardPoints(cardId) * 0.1;
+      colorWeights[card.color] += 1 + pointValue(cardId) * 0.1;
     }
   }
   let bestColor: Color = "Black";
@@ -293,7 +283,7 @@ function chooseFollowCard(
 function chooseHighestPointCard(playCommands: GameCommand[]): GameCommand {
   return playCommands.reduce((best, cmd) => {
     if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-    return getCardPoints(cmd.cardId) > getCardPoints(best.cardId) ? cmd : best;
+    return pointValue(cmd.cardId) > pointValue(best.cardId) ? cmd : best;
   });
 }
 
@@ -313,7 +303,7 @@ function chooseLowestWinningCard(
 function chooseLowestCard(playCommands: GameCommand[]): GameCommand {
   const nonPointCards = playCommands.filter((c) => {
     if (c.type !== "PlayCard") return false;
-    return getCardPoints(c.cardId) === 0;
+    return pointValue(c.cardId) === 0;
   });
 
   if (nonPointCards.length > 0) {
@@ -327,7 +317,7 @@ function chooseLowestCard(playCommands: GameCommand[]): GameCommand {
   // All are point cards — play lowest
   return playCommands.reduce((best, cmd) => {
     if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-    return getCardPoints(cmd.cardId) < getCardPoints(best.cardId) ? cmd : best;
+    return pointValue(cmd.cardId) < pointValue(best.cardId) ? cmd : best;
   });
 }
 

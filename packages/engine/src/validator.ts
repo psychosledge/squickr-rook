@@ -108,10 +108,17 @@ export function validateCommand(
         return { ok: false, error: `PlayCard: card ${command.cardId} not in hand` };
       }
 
-      // Must-follow rule
-      const mustFollowError = checkMustFollow(state, command.seat, command.cardId);
-      if (mustFollowError !== null) {
-        return { ok: false, error: mustFollowError };
+      // Must-follow rule — single source of truth via getLegalCards
+      const legalCards = getLegalCards(state, command.seat, hand);
+      if (!legalCards.includes(command.cardId)) {
+        const leadPlay = state.currentTrick[0];
+        const leadCard = leadPlay ? cardFromId(leadPlay.cardId) : null;
+        const leadColor: Color | null =
+          leadCard?.kind === "regular" ? leadCard.color : null;
+        return {
+          ok: false,
+          error: `Must follow suit: have ${leadColor} cards, played ${command.cardId}`,
+        };
       }
 
       const events: GameEvent[] = [];
@@ -244,53 +251,6 @@ export function validateCommand(
       return { ok: false, error: "Unknown command" };
     }
   }
-}
-
-/**
- * Check must-follow rule.
- * Returns an error string if the card violates must-follow, or null if OK.
- */
-function checkMustFollow(
-  state: GameState,
-  seat: Seat,
-  cardId: CardId,
-): string | null {
-  // If no cards played yet in trick, anything goes
-  if (state.currentTrick.length === 0) return null;
-
-  const leadPlay = state.currentTrick[0]!;
-  const leadCard = cardFromId(leadPlay.cardId);
-
-  // If lead was ROOK (leadColor = null), any card is legal
-  if (leadCard.kind === "rook") return null;
-
-  // Rook Bird can always be played
-  if (cardId === "ROOK") return null;
-
-  const leadColor = leadCard.color;
-  const hand = state.hands[seat] ?? [];
-
-  // Check if player has any card of lead color (excluding ROOK)
-  const hasLeadColor = hand.some((c) => {
-    if (c === "ROOK") return false;
-    const card = cardFromId(c);
-    return card.kind === "regular" && card.color === leadColor;
-  });
-
-  if (!hasLeadColor) return null; // Can play anything
-
-  // Player has lead color — must follow suit
-  const playedCard = cardFromId(cardId);
-  if (playedCard.kind === "regular" && playedCard.color === leadColor) {
-    return null; // Following suit correctly
-  }
-
-  // Check if played card is trump — trump can be played even when you have lead color? 
-  // Actually per standard Rook rules: must follow lead suit. Trump can ONLY be played if you 
-  // don't have lead color. But Rook Bird is always legal.
-  // The spec says "If you have a card of the lead color, you must follow suit"
-  // So playing trump when you have lead color is NOT legal (unless it's the ROOK Bird).
-  return `Must follow suit: have ${leadColor} cards, played ${cardId}`;
 }
 
 /**

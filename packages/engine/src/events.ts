@@ -1,12 +1,11 @@
-import type { CardId, Color, Seat, Team } from "./types.js";
-import type { HandScore } from "./types.js";
+import type { BotProfile, CardId, Color, GameRules, HandScore, Seat, Team } from "./types.js";
 
 export type GameStarted = {
   type: "GameStarted";
   seed: number;
   dealer: Seat;
-  players: Array<{ seat: Seat; name: string; kind: "human" | "bot"; botProfile?: import("./types.js").BotProfile }>;
-  rules: import("./types.js").GameRules;
+  players: Array<{ seat: Seat; name: string; kind: "human" | "bot"; botProfile?: BotProfile }>;
+  rules: GameRules;
   timestamp: number;
 };
 
