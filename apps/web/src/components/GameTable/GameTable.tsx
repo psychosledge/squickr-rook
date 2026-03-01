@@ -8,7 +8,7 @@ type Props = {
   onPlayCard: (cardId: CardId) => void;
 };
 
-const HUMAN: "N" = "N";
+const HUMAN = "N" as const;
 
 export default function GameTable({ gameState, onPlayCard }: Props) {
   const { hands, activePlayer, currentTrick, trump, phase } = gameState;

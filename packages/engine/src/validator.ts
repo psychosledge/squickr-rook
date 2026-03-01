@@ -248,6 +248,7 @@ export function validateCommand(
 
     default: {
       const _exhaustive: never = command;
+      void _exhaustive;
       return { ok: false, error: "Unknown command" };
     }
   }
@@ -308,7 +309,7 @@ export function legalCommands(state: GameState, seat: Seat): GameCommand[] {
 /**
  * Get the legal cards a player can play given the current trick.
  */
-function getLegalCards(state: GameState, seat: Seat, hand: CardId[]): CardId[] {
+function getLegalCards(state: GameState, _seat: Seat, hand: CardId[]): CardId[] {
   if (state.currentTrick.length === 0) {
     // Leading — any card is legal
     return [...hand];

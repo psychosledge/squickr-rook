@@ -41,7 +41,7 @@ export default function GamePage() {
 
       {overlay === "nest" && (
         <NestOverlay
-          hand={gameState.hands["N"] ?? []}
+          hand={(gameState.hands["N"] ?? []).filter((c) => c !== "ROOK")}
           pendingDiscards={pendingDiscards}
           onToggleDiscard={toggleDiscard}
           onConfirm={confirmDiscards}
@@ -65,8 +65,8 @@ export default function GamePage() {
           winner={gameState.winner}
           finalScores={gameState.scores}
           reason={
-            gameState.scores.NS < gameState.rules.bustThreshold ||
-            gameState.scores.EW < gameState.rules.bustThreshold
+            gameState.scores.NS <= gameState.rules.bustThreshold ||
+            gameState.scores.EW <= gameState.rules.bustThreshold
               ? "bust"
               : "threshold-reached"
           }

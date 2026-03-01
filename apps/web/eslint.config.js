@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import globals from "globals";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
@@ -10,6 +11,9 @@ export default [
     languageOptions: {
       parser: tsParser,
       parserOptions: { project: "./tsconfig.json" },
+      globals: {
+        ...globals.browser,
+      },
     },
     plugins: {
       "@typescript-eslint": tsPlugin,

@@ -1,5 +1,4 @@
 import type { GameState } from "@rook/engine";
-import { leftOf } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./ScoreBar.module.css";
 
@@ -13,7 +12,7 @@ const TRUMP_COLORS: Record<string, string> = {
 };
 
 export default function ScoreBar({ gameState }: Props) {
-  const { scores, handNumber, trump, phase, activePlayer, dealer } = gameState;
+  const { scores, handNumber, trump, phase, activePlayer } = gameState;
   const activeName = activePlayer ? getSeatLabel(activePlayer) : "";
 
   return (
@@ -39,7 +38,7 @@ export default function ScoreBar({ gameState }: Props) {
         )}
         {(phase === "nest" || phase === "trump") && (
           <span className={styles.active}>
-            {getSeatLabel(leftOf(dealer))} sorting…
+            {activeName} sorting…
           </span>
         )}
       </div>

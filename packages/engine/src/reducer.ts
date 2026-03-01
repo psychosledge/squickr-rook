@@ -1,7 +1,6 @@
 import { deriveDeal } from "./deal.js";
 import type { GameEvent } from "./events.js";
-import { scoreHand, checkWinCondition } from "./scoring.js";
-import type { CardId, GameState, Seat, Team } from "./types.js";
+import type { GameState, Team } from "./types.js";
 import {
   DEFAULT_RULES,
   SEAT_TEAM,
@@ -194,6 +193,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     default: {
       // exhaustive check
       const _exhaustive: never = event;
+      void _exhaustive;
       return state;
     }
   }

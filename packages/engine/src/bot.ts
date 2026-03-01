@@ -79,8 +79,8 @@ export function botChooseCommand(
 function chooseBestDiscard(
   discardCommands: GameCommand[],
   state: GameState,
-  seat: Seat,
-  profile: BotProfile,
+  _seat: Seat,
+  _profile: BotProfile,
 ): GameCommand {
   // Score each card: lower score = better to discard
   // Prefer discarding: zero-point non-trump cards, then low-point cards
@@ -201,8 +201,8 @@ function chooseBestPlay(
 function chooseLeadCard(
   playCommands: GameCommand[],
   state: GameState,
-  seat: Seat,
-  profile: BotProfile,
+  _seat: Seat,
+  _profile: BotProfile,
 ): GameCommand {
   const trump = state.trump;
 

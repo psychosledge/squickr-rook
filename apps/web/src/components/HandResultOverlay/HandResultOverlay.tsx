@@ -10,7 +10,8 @@ type Props = {
 export default function HandResultOverlay({ score, runningScores, onContinue }: Props) {
   const { bidder, bidAmount, nsDelta, ewDelta, nsTotal, ewTotal } = score;
   const bidderTeam: Team = ["N", "S"].includes(bidder) ? "NS" : "EW";
-  const bidWon = bidderTeam === "NS" ? nsDelta > 0 : ewDelta > 0;
+  const bidderPoints = bidderTeam === "NS" ? nsTotal : ewTotal;
+  const bidWon = bidderPoints >= bidAmount;
 
   return (
     <div className={styles.overlay}>
