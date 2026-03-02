@@ -39,6 +39,7 @@ export default function LobbyPage() {
       <button className={styles.startBtn} onClick={handleStart}>
         New Game
       </button>
+      <span className={styles.version}>v{__APP_VERSION__}</span>
     </div>
   );
 }

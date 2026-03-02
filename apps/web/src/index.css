@@ -11,8 +11,9 @@
   --color-green-card: #27ae60;
   --color-yellow-card: #f39c12;
   --color-rook-card: #6c3483;
-  --card-w: 56px;
-  --card-h: 80px;
+  /* mobile-first: base = mobile */
+  --card-w: 48px;
+  --card-h: 68px;
 }
 
 body {
@@ -29,10 +30,19 @@ body {
   flex-direction: column;
 }
 
-@media (max-width: 600px) {
+/* tablet */
+@media (min-width: 601px) {
   :root {
     --card-w: 52px;
     --card-h: 74px;
+  }
+}
+
+/* desktop */
+@media (min-width: 901px) {
+  :root {
+    --card-w: 56px;
+    --card-h: 80px;
   }
 }
 

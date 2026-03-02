@@ -38,6 +38,11 @@ export default function GamePage() {
   return (
     <div className={styles.page}>
       <ScoreBar gameState={gameState} />
+
+      {overlay === "trump" && (
+        <TrumpPicker onSelect={humanSelectTrump} />
+      )}
+
       <GameTable gameState={gameState} onPlayCard={humanPlayCard} />
 
       {overlay === "nest" && (
@@ -47,10 +52,6 @@ export default function GamePage() {
           onToggleDiscard={toggleDiscard}
           onConfirm={confirmDiscards}
         />
-      )}
-
-      {overlay === "trump" && (
-        <TrumpPicker onSelect={humanSelectTrump} />
       )}
 
       {overlay === "hand-result" && pendingHandScore && (

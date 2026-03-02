@@ -1,39 +1,44 @@
 .table {
   flex: 1;
   display: grid;
+  /* mobile-first: cardinal layout at all sizes — E/W on sides, S top, N bottom */
   grid-template-areas:
     ". top ."
     "left center right"
-    ". bottom .";
-  grid-template-columns: auto 1fr auto;
+    "bottom bottom bottom";
+  grid-template-columns: minmax(44px, auto) 1fr minmax(44px, auto);
   grid-template-rows: auto 1fr auto;
-  overflow: hidden;
-  padding: 4px;
-  gap: 4px;
+  overflow: visible;
+  padding: 4px 4px 18px;
+  gap: 2px;
 }
 
 .top    { grid-area: top;    display: flex; justify-content: center; }
-.left   { grid-area: left;   display: flex; align-items: center; }
-.center { grid-area: center; display: flex; align-items: center; justify-content: center; }
-.right  { grid-area: right;  display: flex; align-items: center; }
+.left   { grid-area: left;   display: flex; align-items: center; padding: 2px; }
+.right  { grid-area: right;  display: flex; align-items: center; padding: 2px; }
+.center { grid-area: center; display: flex; align-items: center; justify-content: center; min-height: 0; }
 .bottom { grid-area: bottom; display: flex; justify-content: center; }
 
-@media (max-width: 600px) {
+/* tablet: same layout, slightly more breathing room */
+@media (min-width: 601px) {
+  .table {
+    gap: 4px;
+  }
+}
+
+/* desktop: traditional cardinal layout — N in center column only */
+@media (min-width: 901px) {
   .table {
     grid-template-areas:
-      "left top right"
-      "center center center"
-      "bottom bottom bottom";
+      ". top ."
+      "left center right"
+      ". bottom .";
     grid-template-columns: auto 1fr auto;
     grid-template-rows: auto 1fr auto;
+    gap: 4px;
     padding: 4px;
-    gap: 2px;
   }
 
-  .left  { align-items: flex-start; padding: 2px; }
-  .right { align-items: flex-start; padding: 2px; }
-
-  .center {
-    min-height: 0;
-  }
+  .left  { align-items: center; padding: 4px; }
+  .right { align-items: center; padding: 4px; }
 }

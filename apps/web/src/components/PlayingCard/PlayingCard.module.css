@@ -11,7 +11,8 @@
   user-select: none;
   flex-shrink: 0;
   position: relative;
-  transition: transform 0.1s, opacity 0.15s;
+  transition: transform 0.1s, filter 0.15s;
+  margin-left: -15px;
 }
 
 @media (hover: hover) {
@@ -21,13 +22,14 @@
 }
 
 .unplayable {
-  opacity: 0.4;
+  filter: grayscale(1) brightness(0.75);
   cursor: default;
 }
 
 .selected {
   transform: translateY(-10px) !important;
   box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+  z-index: 999;
 }
 
 .faceDown {
@@ -43,6 +45,16 @@
   );
   border: 2px solid #2a3f6f;
   flex-shrink: 0;
+  margin-left: -15px;
+}
+
+@media (min-width: 901px) {
+  .card {
+    margin-left: 0;
+  }
+  .faceDown {
+    margin-left: 0;
+  }
 }
 
 .topLeft {
@@ -65,11 +77,4 @@
   line-height: 1;
   align-self: flex-end;
   transform: rotate(180deg);
-}
-
-@media (max-width: 600px) {
-  .card,
-  .faceDown {
-    scroll-snap-align: start;
-  }
 }

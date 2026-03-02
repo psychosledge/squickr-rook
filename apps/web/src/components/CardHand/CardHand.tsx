@@ -12,13 +12,14 @@ type Props = {
 export default function CardHand({ cards, faceDown, legalCardIds, onCardClick }: Props) {
   return (
     <div className={styles.hand}>
-      {cards.map((cardId) => (
+      {cards.map((cardId, index) => (
         <PlayingCard
           key={cardId}
           cardId={cardId}
           faceDown={faceDown}
           isPlayable={faceDown ? false : (legalCardIds ? legalCardIds.includes(cardId) : true)}
           onClick={onCardClick ? () => onCardClick(cardId) : undefined}
+          style={{ zIndex: index, ...(index === 0 ? { marginLeft: 0 } : {}) }}
         />
       ))}
     </div>

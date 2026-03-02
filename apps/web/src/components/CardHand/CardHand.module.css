@@ -1,23 +1,36 @@
+/* Base: mobile — fan/overlap layout, all cards visible without scrolling */
 .hand {
   display: flex;
   flex-direction: row;
-  gap: 4px;
-  overflow-x: auto;
-  padding: 4px 8px;
-  scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
-  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
+  justify-content: center;
+  padding: 4px 16px 14px;
+  overflow: visible;
+  position: relative;
 }
 
-@media (max-width: 600px) {
+/* tablet: same fan layout */
+@media (min-width: 601px) {
   .hand {
-    gap: 6px;
-    padding: 6px 12px;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
+    padding: 4px 16px 14px;
+  }
+}
+
+/* desktop: natural scroll layout */
+@media (min-width: 901px) {
+  .hand {
+    gap: 4px;
+    justify-content: flex-start;
+    padding: 4px 8px;
+    overflow-x: auto;
+    overflow-y: visible;
+    position: static;
+    scroll-snap-type: none;
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
   }
 
   .hand::-webkit-scrollbar {
-    display: none;
+    display: revert;
   }
 }

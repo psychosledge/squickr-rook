@@ -113,11 +113,15 @@ export function validateCommand(
       if (!legalCards.includes(command.cardId)) {
         const leadPlay = state.currentTrick[0];
         const leadCard = leadPlay ? cardFromId(leadPlay.cardId) : null;
-        const leadColor: Color | null =
-          leadCard?.kind === "regular" ? leadCard.color : null;
+        const ledSuit: Color | null =
+          leadCard?.kind === "rook"
+            ? state.trump
+            : leadCard?.kind === "regular"
+            ? leadCard.color
+            : null;
         return {
           ok: false,
-          error: `Must follow suit: have ${leadColor} cards, played ${command.cardId}`,
+          error: `Must follow suit: have ${ledSuit} cards, played ${command.cardId}`,
         };
       }
 
@@ -310,35 +314,47 @@ export function legalCommands(state: GameState, seat: Seat): GameCommand[] {
  * Get the legal cards a player can play given the current trick.
  */
 function getLegalCards(state: GameState, _seat: Seat, hand: CardId[]): CardId[] {
+  // Leading — any card is legal
   if (state.currentTrick.length === 0) {
-    // Leading — any card is legal
     return [...hand];
   }
 
-  const leadPlay = state.currentTrick[0]!;
-  const leadCard = cardFromId(leadPlay.cardId);
+  const leadCard = cardFromId(state.currentTrick[0]!.cardId);
+  const trump = state.trump!; // always set in playing phase
 
-  // If Rook was led, any card is legal
-  if (leadCard.kind === "rook") return [...hand];
+  // Effective led suit: Rook led → trump (Rook is lowest trump)
+  const ledSuit: Color =
+    leadCard.kind === "rook" ? trump : leadCard.color;
 
-  const leadColor = leadCard.color;
+  const trumpWasLed = ledSuit === trump;
 
-  // Check if player has lead color (non-ROOK)
-  const leadColorCards = hand.filter((c) => {
+  // Regular cards matching the led suit
+  const regularLedCards = hand.filter((c) => {
     if (c === "ROOK") return false;
     const card = cardFromId(c);
-    return card.kind === "regular" && card.color === leadColor;
+    return card.kind === "regular" && card.color === ledSuit;
   });
 
-  if (leadColorCards.length > 0) {
-    // Must follow suit — but ROOK can always be played
-    const rookInHand = hand.includes("ROOK");
-    if (rookInHand) {
-      return [...leadColorCards, "ROOK"];
-    }
-    return leadColorCards;
+  const rookInHand = hand.includes("ROOK");
+
+  // Determine if the player is void in the led suit.
+  // When trump was led: Rook counts as trump (in-suit).
+  // When non-trump was led: Rook is trump-coloured (not led-suit-coloured),
+  //   so only regular led-suit cards determine void.
+  const hasLedSuit = trumpWasLed
+    ? regularLedCards.length > 0 || rookInHand
+    : regularLedCards.length > 0;
+
+  if (!hasLedSuit) {
+    // Void in led suit — any card is legal
+    return [...hand];
   }
 
-  // No lead color — any card is legal
-  return [...hand];
+  // Player has led-suit cards — must follow.
+  // Rook is always a legal co-play:
+  //   - trump led: Rook is in-suit
+  //   - non-trump led: Rook is a legal trump escape
+  const legal = [...regularLedCards];
+  if (rookInHand) legal.push("ROOK");
+  return legal;
 }

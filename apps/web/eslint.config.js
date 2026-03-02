@@ -13,6 +13,7 @@ export default [
       parserOptions: { project: "./tsconfig.json" },
       globals: {
         ...globals.browser,
+        __APP_VERSION__: "readonly",
       },
     },
     plugins: {

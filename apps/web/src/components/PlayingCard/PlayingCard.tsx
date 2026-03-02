@@ -1,5 +1,6 @@
 import { getCardDisplay } from "@/utils/cardDisplay";
 import type { CardId } from "@rook/engine";
+import type { CSSProperties } from "react";
 import styles from "./PlayingCard.module.css";
 
 type Props = {
@@ -8,6 +9,7 @@ type Props = {
   isPlayable?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
+  style?: CSSProperties;
 };
 
 export default function PlayingCard({
@@ -16,9 +18,10 @@ export default function PlayingCard({
   isPlayable = true,
   isSelected = false,
   onClick,
+  style,
 }: Props) {
   if (faceDown) {
-    return <div className={styles.faceDown} />;
+    return <div className={styles.faceDown} style={style} />;
   }
 
   const display = getCardDisplay(cardId);
@@ -30,6 +33,7 @@ export default function PlayingCard({
         backgroundColor: display.bgColor,
         borderColor: isSelected ? "#ffffff" : display.borderColor,
         color: display.textColor,
+        ...style,
       }}
       onClick={isPlayable && onClick ? onClick : undefined}
       role={onClick && isPlayable ? "button" : undefined}

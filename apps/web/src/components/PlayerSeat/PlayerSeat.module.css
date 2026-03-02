@@ -19,9 +19,10 @@
   font-size: 0.8rem;
 }
 
-.name { color: #ccc; }
-.count { color: #888; font-size: 0.75rem; }
+.name     { color: #ccc; }
+.count    { color: #888; font-size: 0.75rem; }
 .indicator { color: var(--color-accent); font-size: 0.6rem; }
+
 .bidBadge {
   color: #f0c040;
   font-size: 0.65rem;
@@ -33,42 +34,56 @@
   padding: 0 3px;
 }
 
+/* Real block box so overflow-x: auto on .hand actually works.
+   min-width: 0 prevents flex/grid min-width: auto expansion that blocks scroll. */
 .handWrap {
-  display: contents;
+  display: block;
+  width: 100%;
+  min-width: 0;
 }
 
-@media (max-width: 600px) {
-  .seat[data-seat="E"] .handWrap,
-  .seat[data-seat="W"] .handWrap {
-    display: none;
-  }
+/* S, E, W: never show the hand — always faceDown, badge conveys all needed info */
+.seat[data-seat="S"] .handWrap,
+.seat[data-seat="E"] .handWrap,
+.seat[data-seat="W"] .handWrap {
+  display: none;
+}
 
-  .seat[data-seat="E"],
-  .seat[data-seat="W"] {
-    padding: 2px 4px;
-    gap: 2px;
-    justify-content: flex-start;
-  }
+/* E/W: compact badge layout for side columns at all sizes */
+.seat[data-seat="E"],
+.seat[data-seat="W"] {
+  padding: 2px 4px;
+  gap: 2px;
+  justify-content: flex-start;
+}
 
-  .seat[data-seat="E"] .nameRow,
-  .seat[data-seat="W"] .nameRow {
-    font-size: 0.7rem;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
+.seat[data-seat="E"] .nameRow,
+.seat[data-seat="W"] .nameRow {
+  font-size: 0.7rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
 
+/* S: compact padding — sits in top row */
+.seat[data-seat="S"] {
+  padding: 2px 4px;
+}
+
+/* N: full width — fills the bottom row */
+.seat[data-seat="N"] {
+  padding: 4px 0;
+  width: 100%;
+}
+
+.seat[data-seat="N"] .nameRow {
+  font-size: 0.85rem;
+  padding: 0 8px;
+}
+
+/* desktop: S gets normal padding */
+@media (min-width: 901px) {
   .seat[data-seat="S"] {
-    padding: 2px 4px;
-  }
-
-  .seat[data-seat="N"] {
-    padding: 4px 0;
-    width: 100%;
-  }
-
-  .seat[data-seat="N"] .nameRow {
-    font-size: 0.85rem;
-    padding: 0 8px;
+    padding: 4px;
   }
 }

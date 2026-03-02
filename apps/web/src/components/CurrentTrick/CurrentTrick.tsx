@@ -18,7 +18,7 @@ export default function CurrentTrick({ trick, trump }: Props) {
       )}
       {trick.map(({ seat, cardId }) => (
         <div key={seat} className={styles.play}>
-          <PlayingCard cardId={cardId} isPlayable={false} />
+          <PlayingCard cardId={cardId} />
           <span className={styles.seatLabel}>{getSeatLabel(seat)}</span>
         </div>
       ))}

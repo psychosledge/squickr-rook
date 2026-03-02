@@ -262,85 +262,137 @@ describe("validateCommand - PlayCard", () => {
   });
 });
 
+// Helper: build a minimal playing-phase GameState with controlled hands and trick.
+// Starts from a real post-trump-selected state and overrides what we need.
+function makeTrickState(opts: {
+  trump: import("../types.js").Color;
+  activePlayer: Seat;
+  activePlayerHand: import("../types.js").CardId[];
+  trickLead: { seat: Seat; cardId: import("../types.js").CardId };
+}): GameState {
+  // Get a real playing-phase state as the base so all required fields are populated
+  const base = stateAfterTrumpSelected(42, "N");
+  return {
+    ...base,
+    trump: opts.trump,
+    activePlayer: opts.activePlayer,
+    hands: {
+      ...base.hands,
+      [opts.activePlayer]: opts.activePlayerHand,
+    },
+    currentTrick: [opts.trickLead],
+  };
+}
+
 describe("validateCommand - PlayCard must-follow", () => {
-  it("Rook Bird can always be played even when following is required", () => {
-    // Create a state where trump=Black, lead is Black, but player has Black cards and ROOK
-    // We need to manually craft a state where this is testable
-    let state = stateAfterTrumpSelected(42, "N");
-    const leader = state.activePlayer!; // leftOf(leftOf(N)) = S
-
-    // First play: leader leads with a Black card if possible
-    const leaderHand = state.hands[leader]!;
-    const blackCard = leaderHand.find((c) => c !== "ROOK" && c.startsWith("B"));
-
-    if (!blackCard) return; // skip if no black card
-
-    // Leader leads with Black
-    state = applyEvent(state, {
-      type: "CardPlayed",
-      seat: leader,
-      cardId: blackCard,
-      trickIndex: 0,
-      handNumber: 0,
-      timestamp: 5000,
+  it("ROOK is forced when trump is led and player holds only the Rook (no other trump)", () => {
+    // Trump = Black, lead is a Black card, active player has ROOK + non-trump only
+    const state = makeTrickState({
+      trump: "Black",
+      activePlayer: "E",
+      trickLead: { seat: "N", cardId: "B9" },
+      activePlayerHand: ["ROOK", "R5", "G3"],
     });
 
-    // Now next player (leftOf leader) must follow Black if they have it
-    const nextSeat: Seat = leftOf(leader);
-    const nextHand = state.hands[nextSeat]!;
-    
-    // If next player has ROOK, they should always be able to play it
-    if (nextHand.includes("ROOK")) {
-      const result = validateCommand(
-        state,
-        { type: "PlayCard", seat: nextSeat, cardId: "ROOK" },
-        DEFAULT_RULES,
-      );
-      expect(result.ok).toBe(true);
-    }
-  });
-
-  it("any card legal when Rook Bird was led", () => {
-    // Create a state where ROOK is played first
-    let state = stateAfterTrumpSelected(42, "N");
-    
-    // Find who has ROOK and play it as leader
-    const leader = state.activePlayer!;
-    const leaderHand = state.hands[leader]!;
-    
-    if (!leaderHand.includes("ROOK")) {
-      // ROOK might not be in leader's hand — find who has it and give it to them
-      // For this test, find any seat with ROOK
-      const rookHolder = (["N", "E", "S", "W"] as Seat[]).find(s => 
-        state.hands[s]!.includes("ROOK")
-      );
-      if (!rookHolder) return;
-      
-      // Skip if leader doesn't have ROOK (we can't force the lead)
-      return;
-    }
-
-    // Lead with ROOK
-    state = applyEvent(state, {
-      type: "CardPlayed",
-      seat: leader,
-      cardId: "ROOK",
-      trickIndex: 0,
-      handNumber: 0,
-      timestamp: 5000,
-    });
-
-    // Next player should be able to play ANY card
-    const nextSeat = leftOf(leader);
-    const nextHand = state.hands[nextSeat]!;
-    const anyCard = nextHand[0]!;
-    
-    const result = validateCommand(
+    // ROOK must be legal (it counts as trump)
+    const rookResult = validateCommand(
       state,
-      { type: "PlayCard", seat: nextSeat, cardId: anyCard },
+      { type: "PlayCard", seat: "E", cardId: "ROOK" },
       DEFAULT_RULES,
     );
-    expect(result.ok).toBe(true);
+    expect(rookResult.ok).toBe(true);
+
+    // A non-trump card is illegal because player has trump (the Rook)
+    const offResult = validateCommand(
+      state,
+      { type: "PlayCard", seat: "E", cardId: "R5" },
+      DEFAULT_RULES,
+    );
+    expect(offResult.ok).toBe(false);
+    if (!offResult.ok) expect(offResult.error).toContain("Must follow suit");
+  });
+
+  it("ROOK counts as trump when trump is led and is included alongside trump cards", () => {
+    // Trump = Black, lead is a Black card, active player has B5, ROOK, R3
+    const state = makeTrickState({
+      trump: "Black",
+      activePlayer: "E",
+      trickLead: { seat: "N", cardId: "B9" },
+      activePlayerHand: ["B5", "ROOK", "R3"],
+    });
+
+    const legal = legalCommands(state, "E");
+    const legalCardIds = legal.map((c) => (c as { cardId: string }).cardId).sort();
+    expect(legalCardIds).toEqual(["B5", "ROOK"].sort());
+
+    // R3 should be illegal
+    const r3Result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "E", cardId: "R3" },
+      DEFAULT_RULES,
+    );
+    expect(r3Result.ok).toBe(false);
+  });
+
+  it("ROOK is a legal trump escape when non-trump is led and player holds led-colour", () => {
+    // Trump = Black, lead is a Red card, active player has R7, ROOK, G4
+    const state = makeTrickState({
+      trump: "Black",
+      activePlayer: "E",
+      trickLead: { seat: "N", cardId: "R9" },
+      activePlayerHand: ["R7", "ROOK", "G4"],
+    });
+
+    const legal = legalCommands(state, "E");
+    const legalCardIds = legal.map((c) => (c as { cardId: string }).cardId).sort();
+    expect(legalCardIds).toEqual(["R7", "ROOK"].sort());
+
+    // G4 is illegal (player has led-suit red cards)
+    const g4Result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "E", cardId: "G4" },
+      DEFAULT_RULES,
+    );
+    expect(g4Result.ok).toBe(false);
+  });
+
+  it("all cards legal when Rook is led and active player is void in trump", () => {
+    // Trump = Black, lead is ROOK (counts as trump), active player has no Black cards
+    const state = makeTrickState({
+      trump: "Black",
+      activePlayer: "E",
+      trickLead: { seat: "N", cardId: "ROOK" },
+      activePlayerHand: ["R5", "G3", "Y7"],
+    });
+
+    const legal = legalCommands(state, "E");
+    const legalCardIds = legal.map((c) => (c as { cardId: string }).cardId).sort();
+    expect(legalCardIds).toEqual(["R5", "G3", "Y7"].sort());
+  });
+
+  it("trump must-follow applies when Rook is led — cannot play non-trump", () => {
+    // Trump = Black, lead is ROOK (counts as trump), active player has B5 and R3
+    const state = makeTrickState({
+      trump: "Black",
+      activePlayer: "E",
+      trickLead: { seat: "N", cardId: "ROOK" },
+      activePlayerHand: ["B5", "R3"],
+    });
+
+    const legal = legalCommands(state, "E");
+    const legalCardIds = legal.map((c) => (c as { cardId: string }).cardId);
+    expect(legalCardIds).toEqual(["B5"]);
+
+    // R3 is illegal (player has trump and trump was led)
+    const r3Result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "E", cardId: "R3" },
+      DEFAULT_RULES,
+    );
+    expect(r3Result.ok).toBe(false);
+    if (!r3Result.ok) {
+      expect(r3Result.error).toContain("Must follow suit");
+    }
   });
 
   it("invalid when not following suit (has lead color)", () => {

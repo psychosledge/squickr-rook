@@ -1,11 +1,12 @@
+/* Base: mobile */
 .trick {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: center;
   align-items: center;
-  min-height: 100px;
-  padding: 8px;
+  min-height: 0;
+  padding: 6px;
 }
 
 .play {
@@ -26,10 +27,11 @@
   font-style: italic;
 }
 
-@media (max-width: 600px) {
+/* desktop: trick area can afford a minimum height */
+@media (min-width: 901px) {
   .trick {
-    min-height: 0;
-    gap: 6px;
-    padding: 6px;
+    min-height: 100px;
+    gap: 8px;
+    padding: 8px;
   }
 }
