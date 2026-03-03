@@ -27,12 +27,12 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
     <div className={styles.table}>
       {/* Partner S — top center */}
       <div className={styles.top}>
-        <PlayerSeat seat="S" cards={hands["S"] ?? []} faceDown isActive={activePlayer === "S"} isBidder={bidder === "S"} phase={phase} />
+        <PlayerSeat seat="S" cards={hands["S"] ?? []} faceDown isActive={activePlayer === "S"} isBidder={bidder === "S"} isDealer={dealer === "S"} phase={phase} />
       </div>
 
       {/* Opponent E — screen-left (N=bottom, clockwise: N→E→S→W, so E is to N's left) */}
       <div className={styles.left}>
-        <PlayerSeat seat="E" cards={hands["E"] ?? []} faceDown isActive={activePlayer === "E"} isBidder={bidder === "E"} phase={phase} />
+        <PlayerSeat seat="E" cards={hands["E"] ?? []} faceDown isActive={activePlayer === "E"} isBidder={bidder === "E"} isDealer={dealer === "E"} phase={phase} />
       </div>
 
       {/* Center trick area */}
@@ -42,7 +42,7 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
 
       {/* Opponent W — screen-right (N=bottom, clockwise: N→E→S→W, so W is to N's right) */}
       <div className={styles.right}>
-        <PlayerSeat seat="W" cards={hands["W"] ?? []} faceDown isActive={activePlayer === "W"} isBidder={bidder === "W"} phase={phase} />
+        <PlayerSeat seat="W" cards={hands["W"] ?? []} faceDown isActive={activePlayer === "W"} isBidder={bidder === "W"} isDealer={dealer === "W"} phase={phase} />
       </div>
 
       {/* Human N — bottom */}
@@ -53,6 +53,7 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
           faceDown={false}
           isActive={activePlayer === HUMAN}
           isBidder={bidder === "N"}
+          isDealer={dealer === "N"}
           phase={phase}
           onCardClick={isHumanTurn ? onPlayCard : undefined}
         />

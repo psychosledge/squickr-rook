@@ -16,6 +16,7 @@ vi.mock("./PlayerSeat.module.css", () => ({
     name: "name",
     indicator: "indicator",
     bidBadge: "bidBadge",
+    dealerBadge: "dealerBadge",
     handWrap: "handWrap",
   },
 }));
@@ -46,6 +47,57 @@ const baseProps = {
 };
 
 describe("PlayerSeat", () => {
+  describe("dealer badge", () => {
+    it("renders a dealer badge when isDealer is true", () => {
+      const element = PlayerSeat({ ...baseProps, isDealer: true });
+      const elements = flattenElements(element);
+
+      const dealerBadges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("dealerBadge")
+        );
+      });
+
+      expect(dealerBadges).toHaveLength(1);
+      expect((dealerBadges[0].props as Record<string, unknown>).children).toBe("D");
+    });
+
+    it("does not render a dealer badge when isDealer is false", () => {
+      const element = PlayerSeat({ ...baseProps, isDealer: false });
+      const elements = flattenElements(element);
+
+      const dealerBadges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("dealerBadge")
+        );
+      });
+
+      expect(dealerBadges).toHaveLength(0);
+    });
+
+    it("does not render a dealer badge when isDealer is omitted", () => {
+      const element = PlayerSeat(baseProps);
+      const elements = flattenElements(element);
+
+      const dealerBadges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("dealerBadge")
+        );
+      });
+
+      expect(dealerBadges).toHaveLength(0);
+    });
+  });
+
   describe("card count display", () => {
     it("does not render a count span for a face-down player", () => {
       const element = PlayerSeat(baseProps);

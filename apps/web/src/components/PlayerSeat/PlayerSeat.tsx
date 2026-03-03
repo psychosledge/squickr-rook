@@ -10,13 +10,14 @@ type Props = {
   faceDown: boolean;
   isActive: boolean;
   isBidder?: boolean;
+  isDealer?: boolean;
   phase: GamePhase;
   onCardClick?: (cardId: CardId) => void;
 };
 
 const BIDDER_PHASES: GamePhase[] = ["nest", "trump", "playing", "scoring"];
 
-export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, phase, onCardClick }: Props) {
+export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, onCardClick }: Props) {
   const legalCards = useLegalCards(seat);
   const label = getSeatLabel(seat);
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
@@ -25,6 +26,7 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
     <div className={`${styles.seat} ${isActive ? styles.active : ""}`} data-seat={seat}>
       <div className={styles.nameRow}>
         <span className={styles.name}>{label}</span>
+        {isDealer && <span className={styles.dealerBadge} aria-label="Dealer">D</span>}
         {showBidBadge && <span className={styles.bidBadge} aria-label="Bidder">★ BID</span>}
         {isActive && <span className={styles.indicator}>●</span>}
       </div>

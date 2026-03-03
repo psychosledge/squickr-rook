@@ -33,6 +33,17 @@
   padding: 0 3px;
 }
 
+.dealerBadge {
+  color: #5dade2;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(93, 173, 226, 0.12);
+  border: 1px solid rgba(93, 173, 226, 0.3);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
 /* Real block box so overflow-x: auto on .hand actually works.
    min-width: 0 prevents flex/grid min-width: auto expansion that blocks scroll. */
 .handWrap {
