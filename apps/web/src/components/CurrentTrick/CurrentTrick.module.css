@@ -1,12 +1,22 @@
-/* Base: mobile */
+/* Trick card size custom properties — ~15-20% larger than hand cards */
 .trick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
+  --trick-card-w: calc(var(--card-w) * 1.18);
+  --trick-card-h: calc(var(--card-h) * 1.18);
+
+  display: grid;
+  grid-template-areas:
+    ". top ."
+    "left info right"
+    ". bottom .";
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: 1fr auto 1fr;
+  width: 100%;
+  height: 100%;
   align-items: center;
+  justify-items: center;
   min-height: 0;
   padding: 6px;
+  gap: 4px;
 }
 
 .play {
@@ -16,22 +26,49 @@
   gap: 4px;
 }
 
+/* Empty seat slot — invisible but holds grid space */
+.placeholder {
+  /* no visual content; holds its grid cell */
+}
+
 .seatLabel {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #888;
+  letter-spacing: 0.02em;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px;
+}
+
+.trump {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ccc;
+  white-space: nowrap;
 }
 
 .empty {
   color: #555;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-style: italic;
 }
 
-/* desktop: trick area can afford a minimum height */
+/* desktop: slightly more breathing room */
 @media (min-width: 901px) {
   .trick {
-    min-height: 100px;
-    gap: 8px;
     padding: 8px;
+    gap: 6px;
+    --trick-card-w: calc(var(--card-w) * 1.2);
+    --trick-card-h: calc(var(--card-h) * 1.2);
+  }
+
+  .seatLabel {
+    font-size: 0.7rem;
   }
 }
