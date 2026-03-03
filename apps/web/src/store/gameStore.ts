@@ -7,10 +7,27 @@ import {
   applyEvent,
   validateCommand,
   botChooseCommand,
+  leftOf,
 } from "@rook/engine";
-import type { GameEvent, GameState, Seat } from "@rook/engine";
+import type { GameEvent, GameState, GameRules, Seat } from "@rook/engine";
+import { getSeatLabel } from "@/utils/seatLabel";
 
 const HUMAN_SEAT: Seat = "N";
+
+/**
+ * Returns an announcement string for events that warrant one, or null otherwise.
+ * Pure function — safe to test independently.
+ */
+function buildAnnouncementFromEvent(ev: GameEvent, rules: GameRules): string | null {
+  if (ev.type === "GameStarted" || ev.type === "HandStarted") {
+    const bidderSeat: Seat = leftOf(ev.dealer);
+    return `${getSeatLabel(bidderSeat)} won the bid at ${rules.autoBidAmount}`;
+  }
+  if (ev.type === "TrumpSelected") {
+    return `${getSeatLabel(ev.seat)} chose ${ev.color} as trump`;
+  }
+  return null;
+}
 
 export const useGameStore = create<AppStore>((set, get) => ({
   // ── Initial state ──────────────────────────────────────────────────────────
@@ -21,6 +38,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   pendingHandScore: null,
   botTimeoutId: null,
   botDifficulty: "normal",
+  announcement: null,
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -46,6 +64,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
     };
 
     const newState = applyEvent(INITIAL_STATE, gameStartedEvent);
+    const announcement = buildAnnouncementFromEvent(gameStartedEvent, DEFAULT_RULES);
 
     set({
       gameState: newState,
@@ -55,6 +74,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       pendingHandScore: null,
       botTimeoutId: null,
       botDifficulty: difficulty,
+      announcement,
     });
 
     get()._scheduleNextTurn();
@@ -70,6 +90,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       pendingDiscards: [],
       pendingHandScore: null,
       botTimeoutId: null,
+      announcement: null,
     });
   },
 
@@ -77,11 +98,14 @@ export const useGameStore = create<AppStore>((set, get) => ({
     set((s) => {
       let gs: GameState = s.gameState ?? INITIAL_STATE;
       let pendingHandScore = s.pendingHandScore;
+      let announcement = s.announcement;
       for (const ev of events) {
         gs = applyEvent(gs, ev);
         if (ev.type === "HandScored") pendingHandScore = ev.score;
+        const next = buildAnnouncementFromEvent(ev, gs.rules);
+        if (next !== null) announcement = next;
       }
-      return { gameState: gs, eventLog: [...s.eventLog, ...events], pendingHandScore };
+      return { gameState: gs, eventLog: [...s.eventLog, ...events], pendingHandScore, announcement };
     });
   },
 
@@ -282,4 +306,6 @@ export const useGameStore = create<AppStore>((set, get) => ({
   },
 
   setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
+
+  clearAnnouncement: () => set({ announcement: null }),
 }));

@@ -10,6 +10,7 @@ export type AppState = {
   pendingHandScore: HandScore | null;
   botTimeoutId: ReturnType<typeof setTimeout> | null;
   botDifficulty: BotDifficulty;
+  announcement: string | null;
 };
 
 export type AppActions = {
@@ -21,6 +22,7 @@ export type AppActions = {
   humanSelectTrump: (color: Color) => void;
   acknowledgeHandResult: () => void;
   setBotDifficulty: (difficulty: BotDifficulty) => void;
+  clearAnnouncement: () => void;
   _applyEvents: (events: GameEvent[]) => void;
   _scheduleNextTurn: () => void;
   _dispatchBotTurn: () => void;

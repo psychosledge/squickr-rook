@@ -1,0 +1,40 @@
+.banner {
+  position: fixed;
+  top: 60px; /* below any top bar / score bar */
+  left: 50%;
+  z-index: 100;
+
+  background: rgba(10, 10, 20, 0.88);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 0.65rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+
+  /* Slide-in on mount */
+  animation: slideIn 0.3s ease forwards;
+
+  /* Transition for slide-out */
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.exiting {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-100%);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-50%) translateY(-200%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}

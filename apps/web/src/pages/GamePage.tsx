@@ -7,6 +7,7 @@ import NestOverlay from "@/components/NestOverlay/NestOverlay";
 import TrumpPicker from "@/components/TrumpPicker/TrumpPicker";
 import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay";
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
+import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
 import { sortHand } from "@/utils/sortHand";
 import styles from "./GamePage.module.css";
 
@@ -38,6 +39,8 @@ export default function GamePage() {
   return (
     <div className={styles.page}>
       <ScoreBar gameState={gameState} />
+
+      <AnnouncementBanner />
 
       {overlay === "trump" && (
         <TrumpPicker onSelect={humanSelectTrump} />
