@@ -10,16 +10,26 @@ vi.mock("./CurrentTrick.module.css", () => ({
     play: "play",
     placeholder: "placeholder",
     seatLabel: "seatLabel",
-    info: "info",
-    trump: "trump",
-    empty: "empty",
   },
 }));
 
 // Mock PlayingCard so we don't need the full card display chain
 vi.mock("@/components/PlayingCard/PlayingCard", () => ({
-  default: ({ cardId }: { cardId: string }) => (
-    <div data-testid={`playing-card-${cardId}`} data-card-id={cardId} />
+  default: ({
+    cardId,
+    isDisplay,
+    isPlayable,
+  }: {
+    cardId: string;
+    isDisplay?: boolean;
+    isPlayable?: boolean;
+  }) => (
+    <div
+      data-testid={`playing-card-${cardId}`}
+      data-card-id={cardId}
+      data-is-display={isDisplay ? "true" : undefined}
+      data-is-playable={isPlayable === false ? "false" : undefined}
+    />
   ),
 }));
 
@@ -223,61 +233,60 @@ describe("CurrentTrick — spatial 3×3 grid layout", () => {
         expect(slotHasCard(slot!)).toBe(true);
       }
     });
+
+    it("played cards in the trick are rendered with isDisplay=true (Bug 1 fix)", () => {
+      const trick: PlayedCard[] = [{ seat: "S", cardId: "R5" }];
+      const element = CurrentTrick({ trick, trump: null });
+      const { elements } = collectTree(element);
+
+      // Find the PlayingCard element for R5 — in the React element tree,
+      // it has a `cardId` prop (not yet rendered by mock)
+      const card = elements.find((el) => {
+        const p = el.props as Record<string, unknown>;
+        return p["cardId"] === "R5";
+      });
+
+      expect(card).toBeDefined();
+      const p = card!.props as Record<string, unknown>;
+      expect(p["isDisplay"]).toBe(true);
+    });
   });
 
-  describe("center info cell — trump indicator", () => {
-    it("shows trump color text when trick has cards and trump is set", () => {
+  describe("center info cell — removed (Bug 2 fix)", () => {
+    it("does NOT render the trick-info cell (center info removed)", () => {
       const trick: PlayedCard[] = [{ seat: "S", cardId: "R5" }];
       const trump: Color = "Red";
       const element = CurrentTrick({ trick, trump });
       const { elements } = collectTree(element);
       const info = findInfoCell(elements);
 
-      expect(info).toBeDefined();
-      const text = collectText(info!);
-      expect(text).toContain("Red");
+      expect(info).toBeUndefined();
     });
 
-    it("shows trump info even when trump is null but trick has cards", () => {
-      const trick: PlayedCard[] = [{ seat: "S", cardId: "R5" }];
-      const element = CurrentTrick({ trick, trump: null });
-      const { elements } = collectTree(element);
-      const info = findInfoCell(elements);
+    it("does NOT show trump text in the center area", () => {
+      const trump: Color = "Black";
+      const element = CurrentTrick({ trick: [], trump });
+      const { strings } = collectTree(element);
+      // No string should contain "Trump:" prefix
+      const hasTrumpLabel = strings.some((s) => s.includes("Trump:"));
+      expect(hasTrumpLabel).toBe(false);
+    });
 
-      // Info cell should exist regardless
-      expect(info).toBeDefined();
+    it("does NOT show 'Waiting...' text when trick is empty and no trump", () => {
+      const element = CurrentTrick({ trick: [], trump: null });
+      const { strings } = collectTree(element);
+      const hasWaiting = strings.some((s) => s.includes("Waiting"));
+      expect(hasWaiting).toBe(false);
     });
   });
 
   describe("center info cell — empty state", () => {
-    it("renders the info cell when trick is empty", () => {
+    it("does NOT render an info cell when trick is empty", () => {
       const element = CurrentTrick({ trick: [], trump: null });
       const { elements } = collectTree(element);
       const info = findInfoCell(elements);
 
-      expect(info).toBeDefined();
-    });
-
-    it("info cell shows empty/waiting state when trick is empty and no trump", () => {
-      const element = CurrentTrick({ trick: [], trump: null });
-      const { elements } = collectTree(element);
-      const info = findInfoCell(elements);
-      expect(info).toBeDefined();
-
-      // Should contain some non-empty text
-      const text = collectText(info!);
-      expect(text.trim().length).toBeGreaterThan(0);
-    });
-
-    it("info cell shows trump when trick is empty but trump is set", () => {
-      const trump: Color = "Black";
-      const element = CurrentTrick({ trick: [], trump });
-      const { elements } = collectTree(element);
-      const info = findInfoCell(elements);
-      expect(info).toBeDefined();
-
-      const text = collectText(info!);
-      expect(text).toContain("Black");
+      expect(info).toBeUndefined();
     });
   });
 

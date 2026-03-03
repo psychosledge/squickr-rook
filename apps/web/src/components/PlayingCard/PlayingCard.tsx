@@ -7,6 +7,7 @@ type Props = {
   cardId: CardId;
   faceDown?: boolean;
   isPlayable?: boolean;
+  isDisplay?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
@@ -16,6 +17,7 @@ export default function PlayingCard({
   cardId,
   faceDown = false,
   isPlayable = true,
+  isDisplay = false,
   isSelected = false,
   onClick,
   style,
@@ -28,15 +30,15 @@ export default function PlayingCard({
 
   return (
     <div
-      className={`${styles.card} ${!isPlayable ? styles.unplayable : ""} ${isSelected ? styles.selected : ""}`}
+      className={`${styles.card} ${!isPlayable && !isDisplay ? styles.unplayable : ""} ${isDisplay ? styles.displayOnly : ""} ${isSelected ? styles.selected : ""}`}
       style={{
         backgroundColor: display.bgColor,
         borderColor: isSelected ? "#ffffff" : display.borderColor,
         color: display.textColor,
         ...style,
       }}
-      onClick={isPlayable && onClick ? onClick : undefined}
-      role={onClick && isPlayable ? "button" : undefined}
+      onClick={!isDisplay && isPlayable && onClick ? onClick : undefined}
+      role={!isDisplay && onClick && isPlayable ? "button" : undefined}
       aria-label={`${display.label} ${display.colorName}`}
     >
       <span className={styles.topLeft}>{display.label}</span>

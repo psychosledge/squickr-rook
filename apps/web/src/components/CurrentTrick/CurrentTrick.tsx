@@ -19,7 +19,7 @@ const SEAT_AREA: Record<Seat, string> = {
 
 const ALL_SEATS: Seat[] = ["S", "E", "W", "N"];
 
-export default function CurrentTrick({ trick, trump }: Props) {
+export default function CurrentTrick({ trick, trump: _trump }: Props) {
   // Build a lookup: seat → cardId (only for played cards)
   const playedBySeat: Partial<Record<Seat, string>> = {};
   for (const { seat, cardId } of trick) {
@@ -42,7 +42,7 @@ export default function CurrentTrick({ trick, trump }: Props) {
               <>
                 <PlayingCard
                   cardId={cardId}
-                  isPlayable={false}
+                  isDisplay={true}
                   style={{ width: "var(--trick-card-w)", height: "var(--trick-card-h)" }}
                 />
                 <span className={styles.seatLabel}>{getSeatLabel(seat)}</span>
@@ -51,19 +51,6 @@ export default function CurrentTrick({ trick, trump }: Props) {
           </div>
         );
       })}
-
-      {/* Center info cell */}
-      <div
-        data-testid="trick-info"
-        className={styles.info}
-        style={{ gridArea: "info" }}
-      >
-        {trump ? (
-          <span className={styles.trump}>Trump: {trump}</span>
-        ) : (
-          <span className={styles.empty}>Waiting...</span>
-        )}
-      </div>
     </div>
   );
 }
