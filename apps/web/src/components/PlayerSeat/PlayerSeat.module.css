@@ -19,8 +19,7 @@
   font-size: 0.8rem;
 }
 
-.name     { color: #ccc; }
-.count    { color: #888; font-size: 0.75rem; }
+.name      { color: #ccc; }
 .indicator { color: var(--color-accent); font-size: 0.6rem; }
 
 .bidBadge {

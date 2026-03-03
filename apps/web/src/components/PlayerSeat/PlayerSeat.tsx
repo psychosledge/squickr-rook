@@ -26,7 +26,6 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
       <div className={styles.nameRow}>
         <span className={styles.name}>{label}</span>
         {showBidBadge && <span className={styles.bidBadge} aria-label="Bidder">★ BID</span>}
-        {faceDown && <span className={styles.count}>{cards.length}</span>}
         {isActive && <span className={styles.indicator}>●</span>}
       </div>
       <div className={styles.handWrap}>
