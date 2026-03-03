@@ -113,15 +113,15 @@ export const useGameStore = create<AppStore>((set, get) => ({
     const { gameState, pendingHandScore } = get();
     if (!gameState) return;
 
-    // Game finished
-    if (gameState.phase === "finished") {
-      set({ overlay: "game-over" });
+    // Hand just scored — show result overlay before continuing (even if the game just ended)
+    if (pendingHandScore !== null) {
+      set({ overlay: "hand-result" });
       return;
     }
 
-    // Hand just scored — show result overlay before continuing
-    if (pendingHandScore !== null) {
-      set({ overlay: "hand-result" });
+    // Game finished (and no pending hand score)
+    if (gameState.phase === "finished") {
+      set({ overlay: "game-over" });
       return;
     }
 
@@ -301,8 +301,14 @@ export const useGameStore = create<AppStore>((set, get) => ({
   },
 
   acknowledgeHandResult: () => {
-    set({ overlay: "none", pendingHandScore: null });
-    get()._scheduleNextTurn();
+    set({ pendingHandScore: null });
+    const { gameState } = get();
+    if (gameState?.phase === "finished") {
+      set({ overlay: "game-over" });
+    } else {
+      set({ overlay: "none" });
+      get()._scheduleNextTurn();
+    }
   },
 
   setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
