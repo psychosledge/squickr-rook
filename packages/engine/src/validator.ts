@@ -351,10 +351,10 @@ function getLegalCards(state: GameState, _seat: Seat, hand: CardId[]): CardId[] 
   }
 
   // Player has led-suit cards — must follow.
-  // Rook is always a legal co-play:
-  //   - trump led: Rook is in-suit
-  //   - non-trump led: Rook is a legal trump escape
+  // Rook is only a legal co-play when trump was led (Rook is in-suit as lowest trump).
+  // When non-trump was led and the player holds led-suit cards, the Rook is trump
+  // (not the led suit) and is therefore NOT a legal play.
   const legal = [...regularLedCards];
-  if (rookInHand) legal.push("ROOK");
+  if (rookInHand && trumpWasLed) legal.push("ROOK");
   return legal;
 }

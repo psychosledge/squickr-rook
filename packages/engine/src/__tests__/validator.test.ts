@@ -334,8 +334,9 @@ describe("validateCommand - PlayCard must-follow", () => {
     expect(r3Result.ok).toBe(false);
   });
 
-  it("ROOK is a legal trump escape when non-trump is led and player holds led-colour", () => {
+  it("ROOK is not playable when non-trump is led and player holds led-colour", () => {
     // Trump = Black, lead is a Red card, active player has R7, ROOK, G4
+    // Rook is trump (not red), so player must follow Red — only R7 is legal
     const state = makeTrickState({
       trump: "Black",
       activePlayer: "E",
@@ -345,7 +346,16 @@ describe("validateCommand - PlayCard must-follow", () => {
 
     const legal = legalCommands(state, "E");
     const legalCardIds = legal.map((c) => (c as { cardId: string }).cardId).sort();
-    expect(legalCardIds).toEqual(["R7", "ROOK"].sort());
+    expect(legalCardIds).toEqual(["R7"]);
+
+    // ROOK is illegal (player has led-suit red cards; Rook is trump, not red)
+    const rookResult = validateCommand(
+      state,
+      { type: "PlayCard", seat: "E", cardId: "ROOK" },
+      DEFAULT_RULES,
+    );
+    expect(rookResult.ok).toBe(false);
+    if (!rookResult.ok) expect(rookResult.error).toContain("Must follow suit");
 
     // G4 is illegal (player has led-suit red cards)
     const g4Result = validateCommand(
