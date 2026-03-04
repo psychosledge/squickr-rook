@@ -9,7 +9,9 @@ import BiddingOverlay from "@/components/BiddingOverlay/BiddingOverlay";
 import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay";
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
+import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
 import { sortHand } from "@/utils/sortHand";
+import { buildHandHistoryRows } from "@/utils/handHistory";
 import styles from "./GamePage.module.css";
 
 export default function GamePage() {
@@ -28,6 +30,9 @@ export default function GamePage() {
   const humanPassBid = useGameStore((s) => s.humanPassBid);
   const humanShootMoon = useGameStore((s) => s.humanShootMoon);
   const gameOverReason = useGameStore((s) => s.gameOverReason);
+  const historyModalOpen = useGameStore((s) => s.historyModalOpen);
+  const openHistoryModal = useGameStore((s) => s.openHistoryModal);
+  const closeHistoryModal = useGameStore((s) => s.closeHistoryModal);
 
   // Redirect to lobby if no game active
   useEffect(() => {
@@ -43,9 +48,16 @@ export default function GamePage() {
 
   return (
     <div className={styles.page}>
-      <ScoreBar gameState={gameState} />
+      <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} />
 
       <AnnouncementBanner />
+
+      {historyModalOpen && (
+        <HandHistoryModal
+          rows={buildHandHistoryRows(gameState.handHistory)}
+          onClose={closeHistoryModal}
+        />
+      )}
 
       {overlay === "bidding" && (
         <BiddingOverlay
