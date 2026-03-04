@@ -40,6 +40,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   botDifficulty: "normal",
   announcement: null,
   gameOverReason: null,
+  historyModalOpen: false,
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       botDifficulty: difficulty,
       announcement: null,
       gameOverReason: null,
+      historyModalOpen: false,
     });
 
     get()._scheduleNextTurn();
@@ -93,6 +95,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       botTimeoutId: null,
       announcement: null,
       gameOverReason: null,
+      historyModalOpen: false,
     });
   },
 
@@ -379,4 +382,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
 
   clearAnnouncement: () => set({ announcement: null }),
+
+  openHistoryModal: () => set({ historyModalOpen: true }),
+  closeHistoryModal: () => set({ historyModalOpen: false }),
 }));

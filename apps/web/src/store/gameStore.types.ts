@@ -12,6 +12,7 @@ export type AppState = {
   botDifficulty: BotDifficulty;
   announcement: string | null;
   gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
+  historyModalOpen: boolean;
 };
 
 export type AppActions = {
@@ -27,6 +28,8 @@ export type AppActions = {
   acknowledgeHandResult: () => void;
   setBotDifficulty: (difficulty: BotDifficulty) => void;
   clearAnnouncement: () => void;
+  openHistoryModal: () => void;
+  closeHistoryModal: () => void;
   _applyEvents: (events: GameEvent[]) => void;
   _scheduleNextTurn: () => void;
   _dispatchBotTurn: () => void;
