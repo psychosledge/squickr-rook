@@ -4,6 +4,15 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v0.4.2] — 2026-03-04
+
+### New Features
+- **Bot bid pacing** — bots now pause for the same `botDelayMs` delay during bidding that they use when playing cards, making the bidding phase feel more natural
+- **Bidding overlay stays open** — the overlay no longer flashes closed between bids; it remains visible throughout the entire bidding round and closes only when bidding is complete
+- **"Thinking…" indicator** — while a bot is deciding its bid, the waiting message changes from "P2 is bidding…" to "P2 is thinking…" with a subtle opacity pulse animation
+
+---
+
 ## [v0.4.1] — 2026-03-04
 
 ### New Features
