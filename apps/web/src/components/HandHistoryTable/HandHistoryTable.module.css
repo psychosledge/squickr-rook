@@ -1,0 +1,39 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th,
+.table td {
+  padding: 4px 8px;
+  text-align: right;
+  border-bottom: 1px solid #333;
+}
+
+.table th:first-child,
+.table td:first-child,
+.table th:nth-child(2),
+.table td:nth-child(2),
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  text-align: left;
+}
+
+.pos {
+  color: #4caf50;
+}
+
+.neg {
+  color: #f44336;
+}
+
+.highlighted {
+  background-color: rgba(255, 255, 100, 0.15);
+}
+
+.empty {
+  text-align: center;
+  color: #888;
+  padding: 1rem;
+}
