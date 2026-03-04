@@ -1,0 +1,146 @@
+/* BiddingOverlay.module.css */
+.overlay {
+  position: static;
+  background: none;
+  display: block;
+  width: 100%;
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.currentBid {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.bidTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+}
+
+.bidTable td {
+  padding: 2px 8px 2px 0;
+}
+
+.seatName {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bidVal {
+  color: var(--color-text);
+}
+
+.passed {
+  color: #888;
+  font-style: italic;
+}
+
+.activeRow td {
+  color: var(--color-accent, #4a9eff);
+  font-weight: 700;
+}
+
+.bidButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.bidBtn {
+  padding: 6px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.bidBtn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.passBtn {
+  flex: 1;
+  padding: 8px;
+  background: #555;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.moonBtn {
+  flex: 2;
+  padding: 8px;
+  background: #2c3e7a;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.waiting {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+@media (min-width: 601px) {
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .panel {
+    border-radius: 16px;
+    border-bottom: 1px solid var(--color-border);
+    padding: 24px;
+    width: 340px;
+    max-width: 90vw;
+  }
+
+  .title {
+    font-size: 1.2rem;
+  }
+
+  .bidButtons {
+    max-height: 160px;
+  }
+}

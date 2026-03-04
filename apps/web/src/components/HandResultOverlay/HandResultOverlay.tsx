@@ -23,6 +23,9 @@ export default function HandResultOverlay({ score, runningScores, onContinue }: 
           <span className={bidWon ? styles.won : styles.lost}>
             {getTeamLabel(bidderTeam)} bid {bidAmount} — {bidWon ? "MADE IT" : "SET!"}
           </span>
+          {score.shotMoon && (
+            <div className={styles.moon}>🌙 Shoot the Moon!</div>
+          )}
         </div>
 
         <table className={styles.table}>

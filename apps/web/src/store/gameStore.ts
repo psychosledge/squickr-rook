@@ -7,7 +7,6 @@ import {
   applyEvent,
   validateCommand,
   botChooseCommand,
-  leftOf,
 } from "@rook/engine";
 import type { GameEvent, GameState, GameRules, Seat } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
@@ -18,10 +17,11 @@ const HUMAN_SEAT: Seat = "N";
  * Returns an announcement string for events that warrant one, or null otherwise.
  * Pure function — safe to test independently.
  */
-function buildAnnouncementFromEvent(ev: GameEvent, rules: GameRules): string | null {
-  if (ev.type === "GameStarted" || ev.type === "HandStarted") {
-    const bidderSeat: Seat = leftOf(ev.dealer);
-    return `${getSeatLabel(bidderSeat)} won the bid at ${rules.autoBidAmount}`;
+function buildAnnouncementFromEvent(ev: GameEvent, _rules: GameRules): string | null {
+  if (ev.type === "BiddingComplete") {
+    const label = getSeatLabel(ev.winner);
+    const moon = ev.shotMoon ? " — SHOOT THE MOON!" : "";
+    return `${label} won the bid at ${ev.amount}${moon}`;
   }
   if (ev.type === "TrumpSelected") {
     return `${getSeatLabel(ev.seat)} chose ${ev.color} as trump`;
@@ -64,7 +64,6 @@ export const useGameStore = create<AppStore>((set, get) => ({
     };
 
     const newState = applyEvent(INITIAL_STATE, gameStartedEvent);
-    const announcement = buildAnnouncementFromEvent(gameStartedEvent, DEFAULT_RULES);
 
     set({
       gameState: newState,
@@ -74,7 +73,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       pendingHandScore: null,
       botTimeoutId: null,
       botDifficulty: difficulty,
-      announcement,
+      announcement: null,
     });
 
     get()._scheduleNextTurn();
@@ -129,7 +128,9 @@ export const useGameStore = create<AppStore>((set, get) => ({
 
     // Human's turn
     if (activePlayer === HUMAN_SEAT) {
-      if (phase === "nest") {
+      if (phase === "bidding") {
+        set({ overlay: "bidding" });
+      } else if (phase === "nest") {
         // Issue TakeNest immediately so the hand has all 15 cards before overlay opens
         const gs = get().gameState;
         if (gs) {
@@ -231,6 +232,57 @@ export const useGameStore = create<AppStore>((set, get) => ({
       get()._applyEvents(result.events);
       get()._scheduleNextTurn();
     }
+  },
+
+  humanPlaceBid: (amount) => {
+    const { gameState } = get();
+    if (!gameState) return;
+    const result = validateCommand(
+      gameState,
+      { type: "PlaceBid", seat: HUMAN_SEAT, amount },
+      gameState.rules,
+    );
+    if (!result.ok) {
+      console.warn("Illegal PlaceBid:", result.error);
+      return;
+    }
+    get()._applyEvents(result.events);
+    set({ overlay: "none" });
+    get()._scheduleNextTurn();
+  },
+
+  humanPassBid: () => {
+    const { gameState } = get();
+    if (!gameState) return;
+    const result = validateCommand(
+      gameState,
+      { type: "PassBid", seat: HUMAN_SEAT },
+      gameState.rules,
+    );
+    if (!result.ok) {
+      console.warn("Illegal PassBid:", result.error);
+      return;
+    }
+    get()._applyEvents(result.events);
+    set({ overlay: "none" });
+    get()._scheduleNextTurn();
+  },
+
+  humanShootMoon: () => {
+    const { gameState } = get();
+    if (!gameState) return;
+    const result = validateCommand(
+      gameState,
+      { type: "ShootMoon", seat: HUMAN_SEAT },
+      gameState.rules,
+    );
+    if (!result.ok) {
+      console.warn("Illegal ShootMoon:", result.error);
+      return;
+    }
+    get()._applyEvents(result.events);
+    set({ overlay: "none" });
+    get()._scheduleNextTurn();
   },
 
   toggleDiscard: (cardId) => {

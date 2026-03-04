@@ -5,7 +5,7 @@ import styles from "./GameOverScreen.module.css";
 type Props = {
   winner: Team;
   finalScores: Record<Team, number>;
-  reason: "threshold-reached" | "bust";
+  reason: "threshold-reached" | "bust" | "moon-made" | "moon-set";
   onPlayAgain: () => void;
 };
 
@@ -22,6 +22,10 @@ export default function GameOverScreen({ winner, finalScores, reason, onPlayAgai
         <p className={styles.reason}>
           {reason === "bust"
             ? `${getTeamLabel(winner === "NS" ? "EW" : "NS")} team went bust`
+            : reason === "moon-made"
+            ? `${getTeamLabel(winner)} shot the Moon! 🌙`
+            : reason === "moon-set"
+            ? `${getTeamLabel(winner === "NS" ? "EW" : "NS")} failed to shoot the Moon`
             : `${getTeamLabel(winner)} reached 500 points`}
         </p>
 

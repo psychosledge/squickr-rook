@@ -33,6 +33,11 @@ export default function ScoreBar({ gameState }: Props) {
       </div>
 
       <div className={styles.status}>
+        {phase === "bidding" && activePlayer && (
+          <span className={styles.active}>
+            {activeName} bidding…
+          </span>
+        )}
         {phase === "playing" && activePlayer && (
           <span className={styles.active}>{activeName}&apos;s turn</span>
         )}

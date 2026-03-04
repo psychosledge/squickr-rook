@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import PlayerSeat from "@/components/PlayerSeat/PlayerSeat";
 import CurrentTrick from "@/components/CurrentTrick/CurrentTrick";
 import type { GameState, CardId } from "@rook/engine";
-import { leftOf } from "@rook/engine";
 import { sortHand } from "@/utils/sortHand";
 import styles from "./GameTable.module.css";
 
@@ -14,9 +13,8 @@ type Props = {
 const HUMAN = "N" as const;
 
 export default function GameTable({ gameState, onPlayCard }: Props) {
-  const { hands, activePlayer, currentTrick, trump, phase, dealer } = gameState;
+  const { hands, activePlayer, currentTrick, trump, phase, dealer, bidder } = gameState;
   const isHumanTurn = phase === "playing" && activePlayer === HUMAN;
-  const bidder = leftOf(dealer);
 
   const sortedNorthHand = useMemo(
     () => sortHand(hands["N"] ?? [], trump),

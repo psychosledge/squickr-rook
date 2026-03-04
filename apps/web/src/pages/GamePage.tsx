@@ -5,6 +5,7 @@ import ScoreBar from "@/components/ScoreBar/ScoreBar";
 import GameTable from "@/components/GameTable/GameTable";
 import NestOverlay from "@/components/NestOverlay/NestOverlay";
 import TrumpPicker from "@/components/TrumpPicker/TrumpPicker";
+import BiddingOverlay from "@/components/BiddingOverlay/BiddingOverlay";
 import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay";
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
@@ -23,6 +24,9 @@ export default function GamePage() {
   const humanSelectTrump = useGameStore((s) => s.humanSelectTrump);
   const acknowledgeHandResult = useGameStore((s) => s.acknowledgeHandResult);
   const resetGame = useGameStore((s) => s.resetGame);
+  const humanPlaceBid = useGameStore((s) => s.humanPlaceBid);
+  const humanPassBid = useGameStore((s) => s.humanPassBid);
+  const humanShootMoon = useGameStore((s) => s.humanShootMoon);
 
   // Redirect to lobby if no game active
   useEffect(() => {
@@ -41,6 +45,15 @@ export default function GamePage() {
       <ScoreBar gameState={gameState} />
 
       <AnnouncementBanner />
+
+      {overlay === "bidding" && (
+        <BiddingOverlay
+          gameState={gameState}
+          onPlaceBid={humanPlaceBid}
+          onPass={humanPassBid}
+          onShootMoon={humanShootMoon}
+        />
+      )}
 
       {overlay === "trump" && (
         <TrumpPicker onSelect={humanSelectTrump} />
@@ -70,8 +83,12 @@ export default function GamePage() {
           winner={gameState.winner}
           finalScores={gameState.scores}
           reason={
-            gameState.scores.NS <= gameState.rules.bustThreshold ||
-            gameState.scores.EW <= gameState.rules.bustThreshold
+            gameState.shotMoon
+              ? gameState.winner === "NS"
+                ? "moon-made"
+                : "moon-set"
+              : gameState.scores.NS <= gameState.rules.bustThreshold ||
+                gameState.scores.EW <= gameState.rules.bustThreshold
               ? "bust"
               : "threshold-reached"
           }

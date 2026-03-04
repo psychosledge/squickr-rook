@@ -35,8 +35,7 @@ describe("gameStore announcement state", () => {
   });
 
   describe("GameStarted event", () => {
-    it("sets announcement to bidder won bid — human (N) dealer means E won", () => {
-      // dealer=N → bidder=leftOf(N)=E → label "P2"
+    it("does NOT produce a bid announcement (bidding not yet complete)", () => {
       const event: GameEvent = {
         type: "GameStarted",
         seed: 42,
@@ -51,54 +50,12 @@ describe("gameStore announcement state", () => {
         timestamp: Date.now(),
       };
       useGameStore.getState()._applyEvents([event]);
-      const { announcement } = useGameStore.getState();
-      expect(announcement).toBe(`P2 won the bid at ${DEFAULT_RULES.autoBidAmount}`);
-    });
-
-    it("sets announcement to 'You won the bid' when human (N) is the bidder", () => {
-      // dealer=W → bidder=leftOf(W)=N → label "You"
-      const event: GameEvent = {
-        type: "GameStarted",
-        seed: 42,
-        dealer: "W",
-        players: [
-          { seat: "N", name: "You",   kind: "human" },
-          { seat: "E", name: "P2", kind: "bot" },
-          { seat: "S", name: "P3", kind: "bot" },
-          { seat: "W", name: "P4", kind: "bot" },
-        ],
-        rules: DEFAULT_RULES,
-        timestamp: Date.now(),
-      };
-      useGameStore.getState()._applyEvents([event]);
-      const { announcement } = useGameStore.getState();
-      expect(announcement).toBe(`You won the bid at ${DEFAULT_RULES.autoBidAmount}`);
-    });
-
-    it("sets correct label for S dealer (bidder = W = P4)", () => {
-      // dealer=S → bidder=leftOf(S)=W → label "P4"
-      const event: GameEvent = {
-        type: "GameStarted",
-        seed: 42,
-        dealer: "S",
-        players: [
-          { seat: "N", name: "You",   kind: "human" },
-          { seat: "E", name: "P2", kind: "bot" },
-          { seat: "S", name: "P3", kind: "bot" },
-          { seat: "W", name: "P4", kind: "bot" },
-        ],
-        rules: DEFAULT_RULES,
-        timestamp: Date.now(),
-      };
-      useGameStore.getState()._applyEvents([event]);
-      const { announcement } = useGameStore.getState();
-      expect(announcement).toBe(`P4 won the bid at ${DEFAULT_RULES.autoBidAmount}`);
+      expect(useGameStore.getState().announcement).toBeNull();
     });
   });
 
   describe("HandStarted event", () => {
-    it("sets announcement to bidder won bid — dealer E means bidder is S (P3)", () => {
-      // dealer=E → bidder=leftOf(E)=S → label "P3"
+    it("does NOT produce a bid announcement (bidding not yet complete)", () => {
       const event: GameEvent = {
         type: "HandStarted",
         handNumber: 2,
@@ -106,21 +63,51 @@ describe("gameStore announcement state", () => {
         timestamp: Date.now(),
       };
       useGameStore.getState()._applyEvents([event]);
-      const { announcement } = useGameStore.getState();
-      expect(announcement).toBe(`P3 won the bid at ${DEFAULT_RULES.autoBidAmount}`);
+      expect(useGameStore.getState().announcement).toBeNull();
     });
+  });
 
-    it("sets 'You won the bid' when human (N) is bidder — dealer=W", () => {
-      // dealer=W → bidder=leftOf(W)=N → label "You"
+  describe("BiddingComplete event", () => {
+    it("sets announcement when E wins the bid at 120", () => {
       const event: GameEvent = {
-        type: "HandStarted",
-        handNumber: 2,
-        dealer: "W",
+        type: "BiddingComplete",
+        winner: "E",
+        amount: 120,
+        forced: false,
+        shotMoon: false,
+        handNumber: 1,
         timestamp: Date.now(),
       };
       useGameStore.getState()._applyEvents([event]);
-      const { announcement } = useGameStore.getState();
-      expect(announcement).toBe(`You won the bid at ${DEFAULT_RULES.autoBidAmount}`);
+      expect(useGameStore.getState().announcement).toBe("P2 won the bid at 120");
+    });
+
+    it("sets 'You won the bid' when human (N) wins", () => {
+      const event: GameEvent = {
+        type: "BiddingComplete",
+        winner: "N",
+        amount: 105,
+        forced: false,
+        shotMoon: false,
+        handNumber: 1,
+        timestamp: Date.now(),
+      };
+      useGameStore.getState()._applyEvents([event]);
+      expect(useGameStore.getState().announcement).toBe("You won the bid at 105");
+    });
+
+    it("appends SHOOT THE MOON when shotMoon is true", () => {
+      const event: GameEvent = {
+        type: "BiddingComplete",
+        winner: "S",
+        amount: 200,
+        forced: false,
+        shotMoon: true,
+        handNumber: 1,
+        timestamp: Date.now(),
+      };
+      useGameStore.getState()._applyEvents([event]);
+      expect(useGameStore.getState().announcement).toBe("P3 won the bid at 200 — SHOOT THE MOON!");
     });
   });
 
@@ -201,11 +188,10 @@ describe("gameStore announcement state", () => {
   });
 
   describe("startGame", () => {
-    it("sets announcement for the opening bid (dealer=N → bidder=E → 'P2 won the bid')", () => {
-      // startGame hardcodes dealer: "N", so bidder = leftOf("N") = "E" → "P2"
+    it("does NOT set announcement immediately (bidding hasn't completed yet)", () => {
       useGameStore.getState().startGame("normal");
       const { announcement } = useGameStore.getState();
-      expect(announcement).toBe(`P2 won the bid at ${DEFAULT_RULES.autoBidAmount}`);
+      expect(announcement).toBeNull();
     });
   });
 

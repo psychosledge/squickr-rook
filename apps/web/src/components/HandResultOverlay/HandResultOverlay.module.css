@@ -25,6 +25,7 @@
 .bidResult { font-size: 1rem; }
 .won { color: #2ecc71; font-weight: 700; }
 .lost { color: #e74c3c; font-weight: 700; }
+.moon { font-weight: 700; text-align: center; color: #f1c40f; margin-top: 4px; font-size: 0.95rem; }
 
 .table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 .table th, .table td {
