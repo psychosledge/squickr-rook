@@ -76,6 +76,7 @@ export default function GamePage() {
           score={pendingHandScore}
           runningScores={gameState.scores}
           onContinue={acknowledgeHandResult}
+          handHistory={gameState.handHistory}
         />
       )}
 

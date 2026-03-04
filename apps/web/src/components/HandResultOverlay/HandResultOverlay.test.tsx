@@ -1,0 +1,297 @@
+import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import { HandResultOverlayView } from "./HandResultOverlay";
+import type { HandResultOverlayViewProps } from "./HandResultOverlay";
+import type { HandScore } from "@rook/engine";
+
+// Mock CSS modules
+vi.mock("./HandResultOverlay.module.css", () => ({
+  default: {
+    overlay: "overlay",
+    panel: "panel",
+    title: "title",
+    bidResult: "bidResult",
+    won: "won",
+    lost: "lost",
+    moon: "moon",
+    table: "table",
+    pos: "pos",
+    neg: "neg",
+    btn: "btn",
+    tabs: "tabs",
+    tab: "tab",
+    activeTab: "activeTab",
+  },
+}));
+
+// Mock seatLabel utility
+vi.mock("@/utils/seatLabel", () => ({
+  getTeamLabel: (team: string) => `Team-${team}`,
+}));
+
+// Mock HandHistoryTable
+vi.mock("@/components/HandHistoryTable/HandHistoryTable", () => ({
+  default: ({ rows, highlightLast }: { rows: unknown[]; highlightLast?: boolean }) =>
+    React.createElement("div", {
+      "data-testid": "hand-history-table",
+      "data-rows": rows.length,
+      "data-highlight": String(highlightLast),
+    }),
+}));
+
+// Mock buildHandHistoryRows
+vi.mock("@/utils/handHistory", () => ({
+  buildHandHistoryRows: (history: unknown[]) =>
+    history.map((_, i) => ({ handNumber: i + 1 })),
+}));
+
+// ---------------------------------------------------------------------------
+// Tree helpers (same pattern as BiddingOverlay / HandHistoryTable tests)
+// ---------------------------------------------------------------------------
+
+function flattenElements(node: React.ReactNode): React.ReactElement[] {
+  if (node == null || typeof node !== "object") return [];
+  if (!React.isValidElement(node)) return [];
+  const el = node as React.ReactElement;
+  const p = el.props as Record<string, unknown>;
+  const childrenProp = p.children as React.ReactNode | undefined;
+  const childNodes: React.ReactNode[] = Array.isArray(childrenProp)
+    ? childrenProp
+    : childrenProp != null
+    ? [childrenProp]
+    : [];
+  return [el, ...childNodes.flatMap(flattenElements)];
+}
+
+function flattenText(node: React.ReactNode): string {
+  if (node == null) return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (typeof node === "boolean") return "";
+  if (!React.isValidElement(node)) return "";
+  const el = node as React.ReactElement;
+  const p = el.props as Record<string, unknown>;
+  const childrenProp = p.children as React.ReactNode | undefined;
+  const childNodes: React.ReactNode[] = Array.isArray(childrenProp)
+    ? childrenProp
+    : childrenProp != null
+    ? [childrenProp]
+    : [];
+  return childNodes.map(flattenText).join("");
+}
+
+function findByClass(
+  elements: React.ReactElement[],
+  classMatch: string,
+): React.ReactElement[] {
+  return elements.filter((el) => {
+    const p = el.props as Record<string, unknown>;
+    return typeof p.className === "string" && p.className.includes(classMatch);
+  });
+}
+
+/** Find component elements by a prop name that they receive */
+function findByProp(
+  elements: React.ReactElement[],
+  propName: string,
+): React.ReactElement[] {
+  return elements.filter((el) => {
+    const p = el.props as Record<string, unknown>;
+    return propName in p;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+function makeHandScore(overrides: Partial<HandScore> = {}): HandScore {
+  return {
+    hand: 1,
+    bidder: "N",
+    bidAmount: 120,
+    nestCards: [],
+    discarded: [],
+    nsPointCards: 120,
+    ewPointCards: 0,
+    nsMostCardsBonus: 0,
+    ewMostCardsBonus: 0,
+    nsNestBonus: 0,
+    ewNestBonus: 0,
+    nsWonLastTrick: false,
+    ewWonLastTrick: false,
+    nsTotal: 120,
+    ewTotal: 0,
+    nsDelta: 120,
+    ewDelta: -120,
+    shotMoon: false,
+    moonShooterWentSet: false,
+    ...overrides,
+  };
+}
+
+const DEFAULT_RUNNING_SCORES = { NS: 120, EW: -120 };
+
+function makeViewProps(
+  overrides: Partial<HandResultOverlayViewProps> = {},
+): HandResultOverlayViewProps {
+  return {
+    score: makeHandScore(),
+    runningScores: DEFAULT_RUNNING_SCORES,
+    onContinue: vi.fn(),
+    activeTab: "result",
+    onTabChange: vi.fn(),
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("HandResultOverlay", () => {
+
+  // ── Test 1: No tabs when handHistory is undefined ────────────────────────
+  it("1. No tabs when handHistory is undefined — renders bidResult section, no tab bar", () => {
+    const tree = HandResultOverlayView(makeViewProps());
+    const all = flattenElements(tree);
+
+    // bidResult section should be present
+    const bidResultEls = findByClass(all, "bidResult");
+    expect(bidResultEls).toHaveLength(1);
+
+    // No tab bar
+    const tabsEls = findByClass(all, "tabs");
+    expect(tabsEls).toHaveLength(0);
+  });
+
+  // ── Test 2: No tabs when handHistory is empty array ──────────────────────
+  it("2. No tabs when handHistory is empty array — renders bidResult section, no tab bar", () => {
+    const tree = HandResultOverlayView(makeViewProps({ handHistory: [] }));
+    const all = flattenElements(tree);
+
+    // bidResult section should be present
+    const bidResultEls = findByClass(all, "bidResult");
+    expect(bidResultEls).toHaveLength(1);
+
+    // No tab bar
+    const tabsEls = findByClass(all, "tabs");
+    expect(tabsEls).toHaveLength(0);
+  });
+
+  // ── Test 3: Tabs appear when handHistory has entries ─────────────────────
+  it("3. Tabs appear when handHistory has entries — tab bar rendered with Result and History buttons", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()] }),
+    );
+    const all = flattenElements(tree);
+
+    // Tab bar present
+    const tabsEls = findByClass(all, "tabs");
+    expect(tabsEls).toHaveLength(1);
+
+    // Both tab buttons present
+    const tabButtons = findByClass(all, "tab");
+    expect(tabButtons.length).toBeGreaterThanOrEqual(2);
+
+    const allText = flattenText(tree);
+    expect(allText).toContain("Result");
+    expect(allText).toContain("History");
+  });
+
+  // ── Test 4: "Result" tab is active by default ────────────────────────────
+  it("4. Result tab has activeTab class when activeTab='result'", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()], activeTab: "result" }),
+    );
+    const all = flattenElements(tree);
+
+    // Find the tab buttons with activeTab class
+    const activeTabEls = findByClass(all, "activeTab");
+    expect(activeTabEls).toHaveLength(1);
+
+    // The active tab should say "Result"
+    const activeTabText = flattenText(activeTabEls[0]);
+    expect(activeTabText).toContain("Result");
+  });
+
+  // ── Test 5: "Next Hand" button always visible ────────────────────────────
+  it("5. Next Hand button is present on result tab (no history)", () => {
+    const tree = HandResultOverlayView(makeViewProps());
+    const all = flattenElements(tree);
+
+    const btnEls = findByClass(all, "btn");
+    expect(btnEls.length).toBeGreaterThan(0);
+
+    const allText = flattenText(tree);
+    expect(allText).toContain("Next Hand");
+  });
+
+  it("6. Next Hand button is present when tab bar is shown (result tab)", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()], activeTab: "result" }),
+    );
+    const all = flattenElements(tree);
+
+    const btnEls = findByClass(all, "btn");
+    expect(btnEls.length).toBeGreaterThan(0);
+
+    const allText = flattenText(tree);
+    expect(allText).toContain("Next Hand");
+  });
+
+  it("7. Next Hand button is present when history tab is active", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()], activeTab: "history" }),
+    );
+    const all = flattenElements(tree);
+
+    const btnEls = findByClass(all, "btn");
+    expect(btnEls.length).toBeGreaterThan(0);
+
+    const allText = flattenText(tree);
+    expect(allText).toContain("Next Hand");
+  });
+
+  // ── Test 8: History tab renders HandHistoryTable ──────────────────────────
+  it("8. History tab renders HandHistoryTable when activeTab='history'", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()], activeTab: "history" }),
+    );
+    const all = flattenElements(tree);
+
+    // HandHistoryTable component receives a 'rows' prop — find it by prop
+    const historyTableEls = findByProp(all, "rows");
+    expect(historyTableEls).toHaveLength(1);
+
+    // Verify highlightLast=true is passed
+    const tableProps = historyTableEls[0].props as Record<string, unknown>;
+    expect(tableProps.highlightLast).toBe(true);
+  });
+
+  // ── Test 9: History tab hides bidResult, shows table ─────────────────────
+  it("9. Result tab content is hidden when history tab is active", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()], activeTab: "history" }),
+    );
+    const all = flattenElements(tree);
+
+    // bidResult section should NOT be visible on history tab
+    const bidResultEls = findByClass(all, "bidResult");
+    expect(bidResultEls).toHaveLength(0);
+  });
+
+  // ── Test 10: History tab — History button has activeTab class ──────────────
+  it("10. History tab button has activeTab class when activeTab='history'", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ handHistory: [makeHandScore()], activeTab: "history" }),
+    );
+    const all = flattenElements(tree);
+
+    const activeTabEls = findByClass(all, "activeTab");
+    expect(activeTabEls).toHaveLength(1);
+
+    const activeTabText = flattenText(activeTabEls[0]);
+    expect(activeTabText).toContain("History");
+  });
+});

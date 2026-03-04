@@ -50,6 +50,24 @@
   margin-top: 4px;
 }
 
+.tabs { display: flex; gap: 8px; width: 100%; }
+.tab {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.tab.activeTab {
+  background: var(--color-accent);
+  color: #1a1a2e;
+  font-weight: 700;
+  border-color: var(--color-accent);
+}
+
 @media (max-width: 600px) {
   .panel {
     border-radius: 0;
