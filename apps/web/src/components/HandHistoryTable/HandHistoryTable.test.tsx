@@ -9,10 +9,12 @@ vi.mock("./HandHistoryTable.module.css", () => ({
     table: "table",
     pos: "pos",
     neg: "neg",
-    moon: "moon",
     highlighted: "highlighted",
     empty: "empty",
-    resultCell: "resultCell",
+    iconCell: "iconCell",
+    scoreCell: "scoreCell",
+    scoreCumulative: "scoreCumulative",
+    scoreDelta: "scoreDelta",
   },
 }));
 
@@ -125,19 +127,13 @@ describe("HandHistoryTable", () => {
     });
   });
 
-  // 2. Single row — all 8 columns render with correct values
+  // 2. Single row — all 5 columns render with correct values
   describe("single row — all columns", () => {
     it("renders a <table> when rows is non-empty", () => {
       const tree = HandHistoryTable({ rows: [makeRow()] });
       const { elements } = collectTree(tree);
       const tables = findByType(elements, "table");
       expect(tables).toHaveLength(1);
-    });
-
-    it("renders hand number as H1 in the Hand column", () => {
-      const tree = HandHistoryTable({ rows: [makeRow({ handNumber: 1 })] });
-      const { strings } = collectTree(tree);
-      expect(strings).toContain("H1");
     });
 
     it("renders bidderLabel in the Bidder column", () => {
@@ -154,24 +150,6 @@ describe("HandHistoryTable", () => {
       expect(strings).toContain("120");
     });
 
-    it("renders outcomeBadge in the Result column (separate from bid amount)", () => {
-      const tree = HandHistoryTable({
-        rows: [makeRow({ bidAmount: 120, outcomeBadge: "Made it" })],
-      });
-      const { strings } = collectTree(tree);
-      expect(strings.join("")).toContain("Made it");
-    });
-
-    it("does NOT render the combined '120 — Made it' format", () => {
-      const tree = HandHistoryTable({
-        rows: [makeRow({ bidAmount: 120, outcomeBadge: "Made it" })],
-      });
-      const { strings } = collectTree(tree);
-      const joined = strings.join("");
-      // The em-dash separator should not appear between bid and outcome
-      expect(joined).not.toContain("120 — Made it");
-    });
-
     it("renders nsCumulative in the NS column", () => {
       const tree = HandHistoryTable({ rows: [makeRow({ nsCumulative: 120 })] });
       const { strings } = collectTree(tree);
@@ -185,140 +163,293 @@ describe("HandHistoryTable", () => {
       expect(joined).toContain("-120");
     });
 
-    it("renders 8 header columns: Hand, Bidder, Bid, Result, NS Δ, EW Δ, NS, EW", () => {
+    it("renders 5 header columns: empty, Bidder, Bid, NS, EW", () => {
       const tree = HandHistoryTable({ rows: [makeRow()] });
-      const { strings } = collectTree(tree);
-      expect(strings).toContain("Hand");
+      const { elements, strings } = collectTree(tree);
+      // Check presence of expected headers
       expect(strings).toContain("Bidder");
       expect(strings).toContain("Bid");
-      expect(strings).toContain("Result");
-      expect(strings).toContain("NS Δ");
-      expect(strings).toContain("EW Δ");
       expect(strings).toContain("NS");
       expect(strings).toContain("EW");
+      // Check absence of removed headers
+      expect(strings).not.toContain("Hand");
+      expect(strings).not.toContain("Result");
+      expect(strings).not.toContain("NS Δ");
+      expect(strings).not.toContain("EW Δ");
+      // Check there are exactly 5 <th> elements
+      const ths = findByType(elements, "th");
+      expect(ths).toHaveLength(5);
     });
   });
 
-  // 3. nsDelta positive — renders +120 with .pos class
-  describe("nsDelta positive", () => {
-    it("renders +120 for a positive nsDelta", () => {
-      const tree = HandHistoryTable({ rows: [makeRow({ nsDelta: 120 })] });
+  // 3. Icon column — ✓ / ✗ based on bidMade
+  describe("icon column", () => {
+    it("renders ✓ in icon column when bidMade=true", () => {
+      const tree = HandHistoryTable({ rows: [makeRow({ bidMade: true })] });
       const { strings } = collectTree(tree);
-      expect(strings).toContain("+120");
+      expect(strings.join("")).toContain("✓");
     });
 
-    it("applies .pos class to nsDelta cell when nsDelta >= 0", () => {
-      const tree = HandHistoryTable({ rows: [makeRow({ nsDelta: 120 })] });
+    it("renders ✗ in icon column when bidMade=false", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidMade: false, nsDelta: -120, ewDelta: 120 })],
+      });
+      const { strings } = collectTree(tree);
+      expect(strings.join("")).toContain("✗");
+    });
+
+    it("applies .pos class to icon cell when bidMade=true", () => {
+      const tree = HandHistoryTable({ rows: [makeRow({ bidMade: true })] });
       const { elements } = collectTree(tree);
       const posEls = findByClass(elements, "pos");
       expect(posEls.length).toBeGreaterThan(0);
-      // At least one pos element should contain "+120"
-      const hasPosNsDelta = posEls.some((el) =>
+      const hasCheckmark = posEls.some((el) => flattenText(el).includes("✓"));
+      expect(hasCheckmark).toBe(true);
+    });
+
+    it("applies .neg class to icon cell when bidMade=false", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidMade: false, nsDelta: -120, ewDelta: 120 })],
+      });
+      const { elements } = collectTree(tree);
+      const negEls = findByClass(elements, "neg");
+      expect(negEls.length).toBeGreaterThan(0);
+      const hasCross = negEls.some((el) => flattenText(el).includes("✗"));
+      expect(hasCross).toBe(true);
+    });
+
+    it("applies .iconCell class to the icon cell", () => {
+      const tree = HandHistoryTable({ rows: [makeRow({ bidMade: true })] });
+      const { elements } = collectTree(tree);
+      const iconEls = findByClass(elements, "iconCell");
+      expect(iconEls.length).toBeGreaterThan(0);
+    });
+  });
+
+  // 4. Bid column — moon indicator
+  describe("Bid column moon indicator", () => {
+    it("renders bid amount with 🌙 when shotMoon=true", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidAmount: 120, shotMoon: true })],
+      });
+      const { strings } = collectTree(tree);
+      expect(strings.join("")).toContain("120 🌙");
+    });
+
+    it("does NOT render 🌙 in bid column when shotMoon=false", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidAmount: 120, shotMoon: false })],
+      });
+      const { strings } = collectTree(tree);
+      expect(strings.join("")).not.toContain("🌙");
+    });
+
+    it("renders 🌙 in bid column AND ✗ in icon when shotMoon=true and moonShooterWentSet=true", () => {
+      // When the moon-shooter went set, they bid moon (🌙 in bid col) but still lost (✗ in icon col)
+      const tree = HandHistoryTable({
+        rows: [
+          makeRow({
+            bidAmount: 120,
+            shotMoon: true,
+            moonShooterWentSet: true,
+            bidMade: false,
+            nsDelta: -120,
+            ewDelta: 120,
+          }),
+        ],
+      });
+      const { strings } = collectTree(tree);
+      const joined = strings.join("");
+      expect(joined).toContain("120 🌙"); // moon shown in bid col
+      expect(joined).toContain("✗");       // icon shows set
+      expect(joined).not.toContain("✓");   // NOT a checkmark
+    });
+  });
+
+  // 5. NS score cell — stacked cumulative + delta
+  describe("NS score cell (stacked)", () => {
+    it("scoreCell contains a scoreCumulative span with the NS cumulative value", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ nsCumulative: 240, nsDelta: 120 })],
+      });
+      const { elements } = collectTree(tree);
+      const cumulativeSpans = findByClass(elements, "scoreCumulative");
+      expect(cumulativeSpans.length).toBeGreaterThan(0);
+      const hasNsCumulative = cumulativeSpans.some((el) =>
+        flattenText(el).includes("240")
+      );
+      expect(hasNsCumulative).toBe(true);
+    });
+
+    it("scoreCell contains a scoreDelta span with the formatted NS delta", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ nsCumulative: 240, nsDelta: 120 })],
+      });
+      const { elements } = collectTree(tree);
+      const deltaSpans = findByClass(elements, "scoreDelta");
+      expect(deltaSpans.length).toBeGreaterThan(0);
+      const hasNsDelta = deltaSpans.some((el) =>
+        flattenText(el).includes("+120")
+      );
+      expect(hasNsDelta).toBe(true);
+    });
+
+    it("scoreDelta span has .pos class when nsDelta >= 0", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ nsDelta: 120 })],
+      });
+      const { elements } = collectTree(tree);
+      // Find spans that have BOTH scoreDelta and pos classes
+      const posScoreDeltaSpans = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          typeof p.className === "string" &&
+          p.className.includes("scoreDelta") &&
+          p.className.includes("pos")
+        );
+      });
+      expect(posScoreDeltaSpans.length).toBeGreaterThan(0);
+    });
+
+    it("scoreDelta span has .neg class when nsDelta < 0", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ nsDelta: -130, bidMade: false, ewDelta: 130 })],
+      });
+      const { elements } = collectTree(tree);
+      // Find spans that have BOTH scoreDelta and neg classes
+      const negScoreDeltaSpans = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          typeof p.className === "string" &&
+          p.className.includes("scoreDelta") &&
+          p.className.includes("neg")
+        );
+      });
+      expect(negScoreDeltaSpans.length).toBeGreaterThan(0);
+    });
+  });
+
+  // 6. EW score cell — stacked cumulative + delta
+  describe("EW score cell (stacked)", () => {
+    it("EW scoreCell contains ewCumulative and ewDelta", () => {
+      const tree = HandHistoryTable({
+        rows: [
+          makeRow({
+            ewCumulative: -240,
+            ewDelta: -120,
+            nsCumulative: 240,
+            nsDelta: 120,
+          }),
+        ],
+      });
+      const { elements } = collectTree(tree);
+      const cumulativeSpans = findByClass(elements, "scoreCumulative");
+      // Should have at least 2 (one for NS, one for EW)
+      expect(cumulativeSpans.length).toBeGreaterThanOrEqual(2);
+      const hasEwCumulative = cumulativeSpans.some((el) =>
+        flattenText(el).includes("-240")
+      );
+      expect(hasEwCumulative).toBe(true);
+
+      const deltaSpans = findByClass(elements, "scoreDelta");
+      expect(deltaSpans.length).toBeGreaterThanOrEqual(2);
+      const hasEwDelta = deltaSpans.some((el) =>
+        flattenText(el).includes("-120")
+      );
+      expect(hasEwDelta).toBe(true);
+    });
+  });
+
+  // 7. nsDelta positive — +120 in .scoreDelta span with .pos
+  describe("nsDelta positive", () => {
+    it("renders +120 in a scoreDelta span for a positive nsDelta", () => {
+      const tree = HandHistoryTable({ rows: [makeRow({ nsDelta: 120 })] });
+      const { elements } = collectTree(tree);
+      const deltaSpans = findByClass(elements, "scoreDelta");
+      const hasPosNsDelta = deltaSpans.some((el) =>
         flattenText(el).includes("+120")
       );
       expect(hasPosNsDelta).toBe(true);
     });
   });
 
-  // 4. nsDelta negative — renders -130 with .neg class
+  // 8. nsDelta negative — -130 in .scoreDelta span with .neg
   describe("nsDelta negative", () => {
-    it("renders -130 for a negative nsDelta (no + prefix)", () => {
-      const tree = HandHistoryTable({ rows: [makeRow({ nsDelta: -130 })] });
+    it("renders -130 in a scoreDelta span for a negative nsDelta (no + prefix)", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ nsDelta: -130, bidMade: false, ewDelta: 130 })],
+      });
       const { strings } = collectTree(tree);
-      expect(strings).toContain("-130");
-      // should NOT contain "+−130"
+      expect(strings.join("")).toContain("-130");
       expect(strings.join("")).not.toContain("+-130");
-    });
-
-    it("applies .neg class to nsDelta cell when nsDelta < 0", () => {
-      const tree = HandHistoryTable({ rows: [makeRow({ nsDelta: -130 })] });
-      const { elements } = collectTree(tree);
-      const negEls = findByClass(elements, "neg");
-      expect(negEls.length).toBeGreaterThan(0);
-      const hasNegNsDelta = negEls.some((el) =>
-        flattenText(el).includes("-130")
-      );
-      expect(hasNegNsDelta).toBe(true);
     });
   });
 
-  // 5. ewDelta positive — renders +50 with .pos class
+  // 9. ewDelta positive — +50 in .scoreDelta span with .pos
   describe("ewDelta positive", () => {
-    it("renders +50 for a positive ewDelta", () => {
+    it("renders +50 in a scoreDelta span for a positive ewDelta", () => {
       const tree = HandHistoryTable({
-        rows: [makeRow({ ewDelta: 50, nsDelta: -50 })],
-      });
-      const { strings } = collectTree(tree);
-      expect(strings).toContain("+50");
-    });
-
-    it("applies .pos class to ewDelta cell when ewDelta >= 0", () => {
-      const tree = HandHistoryTable({
-        rows: [makeRow({ ewDelta: 50, nsDelta: -50 })],
+        rows: [makeRow({ ewDelta: 50, nsDelta: -50, bidMade: false })],
       });
       const { elements } = collectTree(tree);
-      const posEls = findByClass(elements, "pos");
-      expect(posEls.length).toBeGreaterThan(0);
-      const hasPosEwDelta = posEls.some((el) =>
+      const deltaSpans = findByClass(elements, "scoreDelta");
+      const hasPosEwDelta = deltaSpans.some((el) =>
         flattenText(el).includes("+50")
       );
       expect(hasPosEwDelta).toBe(true);
     });
   });
 
-  // 5b. ewDelta negative — renders -80 with .neg class
+  // 10. ewDelta negative — -80 in .scoreDelta span with .neg
   describe("ewDelta negative", () => {
-    it("renders -80 for a negative ewDelta (no + prefix)", () => {
+    it("renders -80 in a scoreDelta span for a negative ewDelta (no + prefix)", () => {
       const tree = HandHistoryTable({
         rows: [makeRow({ ewDelta: -80, nsDelta: 80 })],
       });
       const { strings } = collectTree(tree);
-      expect(strings).toContain("-80");
+      expect(strings.join("")).toContain("-80");
       expect(strings.join("")).not.toContain("+-80");
-    });
-
-    it("applies .neg class to ewDelta cell when ewDelta < 0", () => {
-      const tree = HandHistoryTable({
-        rows: [makeRow({ ewDelta: -80, nsDelta: 80 })],
-      });
-      const { elements } = collectTree(tree);
-      const negEls = findByClass(elements, "neg");
-      expect(negEls.length).toBeGreaterThan(0);
-      const hasNegEwDelta = negEls.some((el) =>
-        flattenText(el).includes("-80")
-      );
-      expect(hasNegEwDelta).toBe(true);
     });
   });
 
-  // 5c. Zero delta boundary — +0 with .pos class for both NS and EW
+  // 11. Zero delta boundary — +0 with .pos class
   describe("zero delta boundary", () => {
-    it("renders +0 and .pos class for nsDelta === 0", () => {
+    it("renders +0 in scoreDelta span and .pos class for nsDelta === 0", () => {
       const tree = HandHistoryTable({ rows: [makeRow({ nsDelta: 0 })] });
-      const { strings, elements } = collectTree(tree);
-      expect(strings).toContain("+0");
-      const posEls = findByClass(elements, "pos");
-      const hasPosNsDelta = posEls.some((el) =>
+      const { elements } = collectTree(tree);
+      const posScoreDeltaSpans = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          typeof p.className === "string" &&
+          p.className.includes("scoreDelta") &&
+          p.className.includes("pos")
+        );
+      });
+      expect(posScoreDeltaSpans.length).toBeGreaterThan(0);
+      const hasPlusZero = posScoreDeltaSpans.some((el) =>
         flattenText(el).includes("+0")
       );
-      expect(hasPosNsDelta).toBe(true);
+      expect(hasPlusZero).toBe(true);
     });
 
-    it("renders +0 and .pos class for ewDelta === 0", () => {
+    it("renders +0 in scoreDelta span and .pos class for ewDelta === 0", () => {
       const tree = HandHistoryTable({
         rows: [makeRow({ ewDelta: 0, nsDelta: 0 })],
       });
-      const { strings, elements } = collectTree(tree);
-      expect(strings).toContain("+0");
-      const posEls = findByClass(elements, "pos");
-      const hasPosEwDelta = posEls.some((el) =>
-        flattenText(el).includes("+0")
-      );
-      expect(hasPosEwDelta).toBe(true);
+      const { elements } = collectTree(tree);
+      const posScoreDeltaSpans = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          typeof p.className === "string" &&
+          p.className.includes("scoreDelta") &&
+          p.className.includes("pos")
+        );
+      });
+      expect(posScoreDeltaSpans.length).toBeGreaterThan(0);
     });
   });
 
-  // 6. highlightLast=true — last row has the highlighted class
+  // 12. highlightLast=true — last row has the highlighted class
   describe("highlightLast=true", () => {
     it("applies .highlighted to the last <tr> when highlightLast=true", () => {
       const rows = [
@@ -328,7 +459,6 @@ describe("HandHistoryTable", () => {
       ];
       const tree = HandHistoryTable({ rows, highlightLast: true });
       const { elements } = collectTree(tree);
-      // The last data row should have the highlighted class
       const highlightedTrs = findByClass(elements, "highlighted");
       expect(highlightedTrs.length).toBeGreaterThan(0);
     });
@@ -345,24 +475,23 @@ describe("HandHistoryTable", () => {
       expect(highlightedTrs).toHaveLength(1);
     });
 
-    it("highlighted row is the last row (H3), not the first (H1)", () => {
+    it("highlighted row is the last row (nsCumulative=300), not the first (nsCumulative=150)", () => {
       const rows = [
-        makeRow({ handNumber: 1 }),
-        makeRow({ handNumber: 2 }),
-        makeRow({ handNumber: 3 }),
+        makeRow({ handNumber: 1, nsCumulative: 150, nsDelta: 150 }),
+        makeRow({ handNumber: 2, nsCumulative: 225, nsDelta: 75 }),
+        makeRow({ handNumber: 3, nsCumulative: 300, nsDelta: 75 }),
       ];
       const tree = HandHistoryTable({ rows, highlightLast: true });
       const { elements } = collectTree(tree);
       const highlightedTrs = findByClass(elements, "highlighted");
       expect(highlightedTrs).toHaveLength(1);
-      // The highlighted row should contain "H3", not "H1"
       const highlightedText = flattenText(highlightedTrs[0]);
-      expect(highlightedText).toContain("H3");
-      expect(highlightedText).not.toContain("H1");
+      expect(highlightedText).toContain("300");
+      expect(highlightedText).not.toContain("150");
     });
   });
 
-  // 7. highlightLast=false (or omitted) — no row has the highlighted class
+  // 13. highlightLast=false (or omitted) — no row has the highlighted class
   describe("highlightLast=false / omitted", () => {
     it("no row has .highlighted when highlightLast is omitted", () => {
       const rows = [makeRow({ handNumber: 1 }), makeRow({ handNumber: 2 })];
@@ -381,112 +510,8 @@ describe("HandHistoryTable", () => {
     });
   });
 
-  // 8. Moon indicator — shotMoon=true shows moon emoji in outcomeBadge
-  describe("moon indicator", () => {
-    it('shows "🌙 Moon!" in the Result column when outcomeBadge is "🌙 Moon!"', () => {
-      const tree = HandHistoryTable({
-        rows: [
-          makeRow({
-            shotMoon: true,
-            moonShooterWentSet: false,
-            outcomeBadge: "🌙 Moon!",
-          }),
-        ],
-      });
-      const { strings } = collectTree(tree);
-      expect(strings.join("")).toContain("🌙 Moon!");
-    });
-
-    it('shows "🌙 Set!" in the Result column when outcomeBadge is "🌙 Set!"', () => {
-      const tree = HandHistoryTable({
-        rows: [
-          makeRow({
-            shotMoon: true,
-            moonShooterWentSet: true,
-            outcomeBadge: "🌙 Set!",
-          }),
-        ],
-      });
-      const { strings } = collectTree(tree);
-      expect(strings.join("")).toContain("🌙 Set!");
-    });
-
-    it("applies .moon class to result cell when shotMoon=true and moonShooterWentSet=false", () => {
-      const tree = HandHistoryTable({
-        rows: [
-          makeRow({
-            shotMoon: true,
-            moonShooterWentSet: false,
-            outcomeBadge: "🌙 Moon!",
-          }),
-        ],
-      });
-      const { elements } = collectTree(tree);
-      const moonEls = findByClass(elements, "moon");
-      expect(moonEls.length).toBeGreaterThan(0);
-      const hasMoonBadge = moonEls.some((el) =>
-        flattenText(el).includes("🌙 Moon!")
-      );
-      expect(hasMoonBadge).toBe(true);
-    });
-  });
-
-  // 9. Result column coloring — bidMade drives .pos / .neg class on result cell
-  describe("Result column coloring", () => {
-    it("applies .pos class to result cell when bidMade=true", () => {
-      const tree = HandHistoryTable({
-        rows: [makeRow({ bidMade: true, outcomeBadge: "Made it" })],
-      });
-      const { elements } = collectTree(tree);
-      const posEls = findByClass(elements, "pos");
-      // At least one .pos element should contain "Made it"
-      const hasMadeIt = posEls.some((el) => flattenText(el).includes("Made it"));
-      expect(hasMadeIt).toBe(true);
-    });
-
-    it("applies .neg class to result cell when bidMade=false", () => {
-      const tree = HandHistoryTable({
-        rows: [
-          makeRow({
-            bidMade: false,
-            nsDelta: -110,
-            ewDelta: 110,
-            outcomeBadge: "Set!",
-          }),
-        ],
-      });
-      const { elements } = collectTree(tree);
-      const negEls = findByClass(elements, "neg");
-      // At least one .neg element should contain "Set!"
-      const hasSet = negEls.some((el) => flattenText(el).includes("Set!"));
-      expect(hasSet).toBe(true);
-    });
-
-    it("applies .resultCell class to the result cell", () => {
-      const tree = HandHistoryTable({
-        rows: [makeRow({ bidMade: true, outcomeBadge: "Made it" })],
-      });
-      const { elements } = collectTree(tree);
-      const resultEls = findByClass(elements, "resultCell");
-      expect(resultEls.length).toBeGreaterThan(0);
-    });
-  });
-
-  // 10. Multiple rows — handNumber increments correctly
+  // 14. Multiple rows — correct number of <tr> elements
   describe("multiple rows", () => {
-    it("renders H1, H2, H3 for three rows in order", () => {
-      const rows = [
-        makeRow({ handNumber: 1 }),
-        makeRow({ handNumber: 2 }),
-        makeRow({ handNumber: 3 }),
-      ];
-      const tree = HandHistoryTable({ rows });
-      const { strings } = collectTree(tree);
-      expect(strings).toContain("H1");
-      expect(strings).toContain("H2");
-      expect(strings).toContain("H3");
-    });
-
     it("renders the correct number of <tr> rows in the tbody", () => {
       const rows = [
         makeRow({ handNumber: 1 }),

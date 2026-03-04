@@ -10,10 +10,8 @@ function formatDelta(value: number): string {
   return value >= 0 ? `+${value}` : `${value}`;
 }
 
-function resultClass(row: HandHistoryRow): string {
-  if (row.shotMoon && !row.moonShooterWentSet) return styles.moon;
-  if (row.bidMade) return styles.pos;
-  return styles.neg;
+function outcomeClass(row: HandHistoryRow): string {
+  return row.bidMade ? styles.pos : styles.neg;
 }
 
 export default function HandHistoryTable({ rows, highlightLast }: Props) {
@@ -25,12 +23,9 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
     <table className={styles.table} aria-label="Hand history">
       <thead>
         <tr>
-          <th scope="col">Hand</th>
+          <th scope="col" aria-label="Outcome"></th>
           <th scope="col">Bidder</th>
           <th scope="col">Bid</th>
-          <th scope="col">Result</th>
-          <th scope="col">NS Δ</th>
-          <th scope="col">EW Δ</th>
           <th scope="col">NS</th>
           <th scope="col">EW</th>
         </tr>
@@ -42,20 +37,23 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
 
           return (
             <tr key={row.handNumber} className={rowClass}>
-              <td>{`H${row.handNumber}`}</td>
+              <td className={`${outcomeClass(row)} ${styles.iconCell}`}>
+                {row.bidMade ? "✓" : "✗"}
+              </td>
               <td>{row.bidderLabel}</td>
-              <td>{row.bidAmount}</td>
-              <td className={`${resultClass(row)} ${styles.resultCell}`}>
-                {row.outcomeBadge}
+              <td>{row.shotMoon ? `${row.bidAmount} 🌙` : row.bidAmount}</td>
+              <td className={styles.scoreCell}>
+                <span className={styles.scoreCumulative}>{row.nsCumulative}</span>
+                <span className={`${styles.scoreDelta} ${row.nsDelta >= 0 ? styles.pos : styles.neg}`}>
+                  {formatDelta(row.nsDelta)}
+                </span>
               </td>
-              <td className={row.nsDelta >= 0 ? styles.pos : styles.neg}>
-                {formatDelta(row.nsDelta)}
+              <td className={styles.scoreCell}>
+                <span className={styles.scoreCumulative}>{row.ewCumulative}</span>
+                <span className={`${styles.scoreDelta} ${row.ewDelta >= 0 ? styles.pos : styles.neg}`}>
+                  {formatDelta(row.ewDelta)}
+                </span>
               </td>
-              <td className={row.ewDelta >= 0 ? styles.pos : styles.neg}>
-                {formatDelta(row.ewDelta)}
-              </td>
-              <td>{row.nsCumulative}</td>
-              <td>{row.ewCumulative}</td>
             </tr>
           );
         })}

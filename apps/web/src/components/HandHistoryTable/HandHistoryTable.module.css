@@ -20,14 +20,11 @@
   letter-spacing: 0.05em;
 }
 
-.table th:first-child,
-.table td:first-child,
+/* Columns 2 (Bidder) and 3 (Bid) are left-aligned; col 1 (icon) centered via .iconCell */
 .table th:nth-child(2),
 .table td:nth-child(2),
 .table th:nth-child(3),
-.table td:nth-child(3),
-.table th:nth-child(4),
-.table td:nth-child(4) {
+.table td:nth-child(3) {
   text-align: left;
 }
 
@@ -39,13 +36,28 @@
   color: #f44336;
 }
 
-.moon {
-  color: #f1c40f;
+.iconCell {
+  text-align: center;
+  width: 1.5rem;
+  padding: 4px 4px;
 }
 
-.resultCell {
-  font-weight: 600;
-  font-size: 0.8rem;
+.scoreCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.scoreCumulative {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.scoreDelta {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  margin-top: 1px;
 }
 
 .highlighted {
