@@ -8,7 +8,16 @@
 .table td {
   padding: 4px 8px;
   text-align: right;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.table thead th {
+  color: #888;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .table th:first-child,
@@ -16,7 +25,9 @@
 .table th:nth-child(2),
 .table td:nth-child(2),
 .table th:nth-child(3),
-.table td:nth-child(3) {
+.table td:nth-child(3),
+.table th:nth-child(4),
+.table td:nth-child(4) {
   text-align: left;
 }
 
@@ -28,12 +39,21 @@
   color: #f44336;
 }
 
+.moon {
+  color: #f1c40f;
+}
+
+.resultCell {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
 .highlighted {
-  background-color: rgba(255, 255, 100, 0.15);
+  background-color: rgba(243, 156, 18, 0.15);
 }
 
 .empty {
   text-align: center;
-  color: #888;
+  color: #aaa;
   padding: 1rem;
 }

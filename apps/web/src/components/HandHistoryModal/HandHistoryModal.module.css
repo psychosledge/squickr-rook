@@ -11,7 +11,8 @@
 }
 
 .panel {
-  background-color: #ffffff;
+  background: var(--color-surface);
+  color: var(--color-text);
   border-radius: 8px;
   max-width: 720px;
   width: 90%;
@@ -26,13 +27,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .header h2 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
+  color: var(--color-text);
 }
 
 .closeBtn {
@@ -42,14 +44,14 @@
   font-size: 1.25rem;
   line-height: 1;
   padding: 0.25rem 0.5rem;
-  color: #6b7280;
+  color: var(--color-text);
   border-radius: 4px;
   transition: background-color 0.15s ease;
 }
 
 .closeBtn:hover {
-  background-color: #f3f4f6;
-  color: #111827;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 .body {

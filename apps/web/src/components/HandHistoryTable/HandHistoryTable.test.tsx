@@ -9,8 +9,10 @@ vi.mock("./HandHistoryTable.module.css", () => ({
     table: "table",
     pos: "pos",
     neg: "neg",
+    moon: "moon",
     highlighted: "highlighted",
     empty: "empty",
+    resultCell: "resultCell",
   },
 }));
 
@@ -123,7 +125,7 @@ describe("HandHistoryTable", () => {
     });
   });
 
-  // 2. Single row — all 7 columns render with correct values
+  // 2. Single row — all 8 columns render with correct values
   describe("single row — all columns", () => {
     it("renders a <table> when rows is non-empty", () => {
       const tree = HandHistoryTable({ rows: [makeRow()] });
@@ -144,14 +146,30 @@ describe("HandHistoryTable", () => {
       expect(strings).toContain("You");
     });
 
-    it("renders bidAmount and outcomeBadge in the Bid column", () => {
+    it("renders bidAmount in the Bid column (separate from outcome)", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidAmount: 120, outcomeBadge: "Made it" })],
+      });
+      const { strings } = collectTree(tree);
+      expect(strings).toContain("120");
+    });
+
+    it("renders outcomeBadge in the Result column (separate from bid amount)", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidAmount: 120, outcomeBadge: "Made it" })],
+      });
+      const { strings } = collectTree(tree);
+      expect(strings.join("")).toContain("Made it");
+    });
+
+    it("does NOT render the combined '120 — Made it' format", () => {
       const tree = HandHistoryTable({
         rows: [makeRow({ bidAmount: 120, outcomeBadge: "Made it" })],
       });
       const { strings } = collectTree(tree);
       const joined = strings.join("");
-      expect(joined).toContain("120");
-      expect(joined).toContain("Made it");
+      // The em-dash separator should not appear between bid and outcome
+      expect(joined).not.toContain("120 — Made it");
     });
 
     it("renders nsCumulative in the NS column", () => {
@@ -165,6 +183,19 @@ describe("HandHistoryTable", () => {
       const { strings } = collectTree(tree);
       const joined = strings.join("");
       expect(joined).toContain("-120");
+    });
+
+    it("renders 8 header columns: Hand, Bidder, Bid, Result, NS Δ, EW Δ, NS, EW", () => {
+      const tree = HandHistoryTable({ rows: [makeRow()] });
+      const { strings } = collectTree(tree);
+      expect(strings).toContain("Hand");
+      expect(strings).toContain("Bidder");
+      expect(strings).toContain("Bid");
+      expect(strings).toContain("Result");
+      expect(strings).toContain("NS Δ");
+      expect(strings).toContain("EW Δ");
+      expect(strings).toContain("NS");
+      expect(strings).toContain("EW");
     });
   });
 
@@ -352,7 +383,7 @@ describe("HandHistoryTable", () => {
 
   // 8. Moon indicator — shotMoon=true shows moon emoji in outcomeBadge
   describe("moon indicator", () => {
-    it('shows "🌙 Moon!" in the bid column when outcomeBadge is "🌙 Moon!"', () => {
+    it('shows "🌙 Moon!" in the Result column when outcomeBadge is "🌙 Moon!"', () => {
       const tree = HandHistoryTable({
         rows: [
           makeRow({
@@ -366,7 +397,7 @@ describe("HandHistoryTable", () => {
       expect(strings.join("")).toContain("🌙 Moon!");
     });
 
-    it('shows "🌙 Set!" in the bid column when outcomeBadge is "🌙 Set!"', () => {
+    it('shows "🌙 Set!" in the Result column when outcomeBadge is "🌙 Set!"', () => {
       const tree = HandHistoryTable({
         rows: [
           makeRow({
@@ -379,9 +410,69 @@ describe("HandHistoryTable", () => {
       const { strings } = collectTree(tree);
       expect(strings.join("")).toContain("🌙 Set!");
     });
+
+    it("applies .moon class to result cell when shotMoon=true and moonShooterWentSet=false", () => {
+      const tree = HandHistoryTable({
+        rows: [
+          makeRow({
+            shotMoon: true,
+            moonShooterWentSet: false,
+            outcomeBadge: "🌙 Moon!",
+          }),
+        ],
+      });
+      const { elements } = collectTree(tree);
+      const moonEls = findByClass(elements, "moon");
+      expect(moonEls.length).toBeGreaterThan(0);
+      const hasMoonBadge = moonEls.some((el) =>
+        flattenText(el).includes("🌙 Moon!")
+      );
+      expect(hasMoonBadge).toBe(true);
+    });
   });
 
-  // 9. Multiple rows — handNumber increments correctly
+  // 9. Result column coloring — bidMade drives .pos / .neg class on result cell
+  describe("Result column coloring", () => {
+    it("applies .pos class to result cell when bidMade=true", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidMade: true, outcomeBadge: "Made it" })],
+      });
+      const { elements } = collectTree(tree);
+      const posEls = findByClass(elements, "pos");
+      // At least one .pos element should contain "Made it"
+      const hasMadeIt = posEls.some((el) => flattenText(el).includes("Made it"));
+      expect(hasMadeIt).toBe(true);
+    });
+
+    it("applies .neg class to result cell when bidMade=false", () => {
+      const tree = HandHistoryTable({
+        rows: [
+          makeRow({
+            bidMade: false,
+            nsDelta: -110,
+            ewDelta: 110,
+            outcomeBadge: "Set!",
+          }),
+        ],
+      });
+      const { elements } = collectTree(tree);
+      const negEls = findByClass(elements, "neg");
+      // At least one .neg element should contain "Set!"
+      const hasSet = negEls.some((el) => flattenText(el).includes("Set!"));
+      expect(hasSet).toBe(true);
+    });
+
+    it("applies .resultCell class to the result cell", () => {
+      const tree = HandHistoryTable({
+        rows: [makeRow({ bidMade: true, outcomeBadge: "Made it" })],
+      });
+      const { elements } = collectTree(tree);
+      const resultEls = findByClass(elements, "resultCell");
+      expect(resultEls.length).toBeGreaterThan(0);
+    });
+  });
+
+  // 10. Multiple rows — handNumber increments correctly
   describe("multiple rows", () => {
     it("renders H1, H2, H3 for three rows in order", () => {
       const rows = [

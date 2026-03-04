@@ -10,6 +10,12 @@ function formatDelta(value: number): string {
   return value >= 0 ? `+${value}` : `${value}`;
 }
 
+function resultClass(row: HandHistoryRow): string {
+  if (row.shotMoon && !row.moonShooterWentSet) return styles.moon;
+  if (row.bidMade) return styles.pos;
+  return styles.neg;
+}
+
 export default function HandHistoryTable({ rows, highlightLast }: Props) {
   if (rows.length === 0) {
     return <p className={styles.empty}>No hands played yet</p>;
@@ -22,6 +28,7 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
           <th scope="col">Hand</th>
           <th scope="col">Bidder</th>
           <th scope="col">Bid</th>
+          <th scope="col">Result</th>
           <th scope="col">NS Δ</th>
           <th scope="col">EW Δ</th>
           <th scope="col">NS</th>
@@ -37,8 +44,9 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
             <tr key={row.handNumber} className={rowClass}>
               <td>{`H${row.handNumber}`}</td>
               <td>{row.bidderLabel}</td>
-              <td>
-                {row.bidAmount} — {row.outcomeBadge}
+              <td>{row.bidAmount}</td>
+              <td className={`${resultClass(row)} ${styles.resultCell}`}>
+                {row.outcomeBadge}
               </td>
               <td className={row.nsDelta >= 0 ? styles.pos : styles.neg}>
                 {formatDelta(row.nsDelta)}
