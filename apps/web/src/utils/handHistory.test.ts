@@ -51,7 +51,6 @@ describe("buildHandHistoryRows", () => {
     expect(row.bidderSeat).toBe("N");
     expect(row.bidAmount).toBe(120);
     expect(row.bidMade).toBe(true);
-    expect(row.outcomeBadge).toBe("Made it");
     expect(row.nsCumulative).toBe(120);
     expect(row.ewCumulative).toBe(60);
   });
@@ -74,7 +73,6 @@ describe("buildHandHistoryRows", () => {
     expect(rows).toHaveLength(1);
     const row = rows[0];
     expect(row.bidMade).toBe(false);
-    expect(row.outcomeBadge).toBe("Set!");
     expect(row.nsCumulative).toBe(-120);
     expect(row.ewCumulative).toBe(110);
   });
@@ -110,7 +108,7 @@ describe("buildHandHistoryRows", () => {
     expect(rows[1].ewCumulative).toBe(150);   // 60 + 90
   });
 
-  it("moon made — outcomeBadge '🌙 Moon!', bidMade true", () => {
+  it("moon made — shotMoon true, bidMade true", () => {
     const history: HandScore[] = [
       makeHandScore({
         hand: 1,
@@ -131,10 +129,9 @@ describe("buildHandHistoryRows", () => {
     expect(row.shotMoon).toBe(true);
     expect(row.moonShooterWentSet).toBe(false);
     expect(row.bidMade).toBe(true);
-    expect(row.outcomeBadge).toBe("🌙 Moon!");
   });
 
-  it("moon set — outcomeBadge '🌙 Set!', moonShooterWentSet true, bidMade false", () => {
+  it("moon set — shotMoon true, moonShooterWentSet true, bidMade false", () => {
     const history: HandScore[] = [
       makeHandScore({
         hand: 1,
@@ -155,7 +152,6 @@ describe("buildHandHistoryRows", () => {
     expect(row.shotMoon).toBe(true);
     expect(row.moonShooterWentSet).toBe(true);
     expect(row.bidMade).toBe(false);
-    expect(row.outcomeBadge).toBe("🌙 Set!");
   });
 
   it("bidderLabel for seat N is 'You', for seat E is 'P2'", () => {
@@ -193,7 +189,7 @@ describe("buildHandHistoryRows", () => {
     expect(rows[0].ewCumulative).toBe(155); // 75 + 80
   });
 
-  it("exact bid boundary — bidderPoints === bidAmount → bidMade true, outcomeBadge 'Made it'", () => {
+  it("exact bid boundary — bidderPoints === bidAmount → bidMade true", () => {
     const history: HandScore[] = [
       makeHandScore({
         hand: 1,
@@ -210,7 +206,6 @@ describe("buildHandHistoryRows", () => {
 
     const row = rows[0];
     expect(row.bidMade).toBe(true);
-    expect(row.outcomeBadge).toBe("Made it");
   });
 
   it("startScores offset applied once — two hands do not re-add offset each iteration", () => {

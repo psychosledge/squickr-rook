@@ -41,7 +41,7 @@ export default function PlayingCard({
       }}
       onClick={!isDisplay && isPlayable && onClick ? onClick : undefined}
       role={!isDisplay && onClick && isPlayable ? "button" : undefined}
-      aria-label={`${display.label} ${display.colorName}`}
+      aria-label={`${display.label} ${display.colorName}${isFromNest ? " (from nest)" : ""}`}
     >
       <span className={styles.topLeft}>{display.label}</span>
       <span className={styles.center}>{display.colorName[0]}</span>

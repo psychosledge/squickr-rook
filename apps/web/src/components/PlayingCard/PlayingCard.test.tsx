@@ -205,3 +205,24 @@ describe("PlayingCard — isFromNest prop", () => {
     expect(className).toContain("selected");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: aria-label with isFromNest
+// ---------------------------------------------------------------------------
+
+describe("PlayingCard — aria-label (from nest)", () => {
+  it('includes " (from nest)" in aria-label when isFromNest=true', () => {
+    const el = renderCard({ cardId: "R5", isFromNest: true });
+    expect(getProps(el)["aria-label"]).toBe("5 Red (from nest)");
+  });
+
+  it('does NOT include " (from nest)" in aria-label when isFromNest=false', () => {
+    const el = renderCard({ cardId: "R5", isFromNest: false });
+    expect(getProps(el)["aria-label"]).toBe("5 Red");
+  });
+
+  it('does NOT include " (from nest)" in aria-label when isFromNest is omitted', () => {
+    const el = renderCard({ cardId: "R5" });
+    expect(getProps(el)["aria-label"]).toBe("5 Red");
+  });
+});

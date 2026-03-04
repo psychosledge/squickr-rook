@@ -109,7 +109,6 @@ function makeRow(overrides: Partial<HandHistoryRow> = {}): HandHistoryRow {
     ewDelta: -120,
     nsCumulative: 120,
     ewCumulative: -120,
-    outcomeBadge: "Made it",
     ...overrides,
   };
 }

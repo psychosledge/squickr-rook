@@ -2,8 +2,6 @@ import type { HandScore, Seat, Team } from "@rook/engine";
 import { SEAT_TEAM } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 
-export type OutcomeBadge = "🌙 Set!" | "🌙 Moon!" | "Made it" | "Set!";
-
 export type HandHistoryRow = {
   handNumber: number;
   bidderTeam: Team;
@@ -17,7 +15,6 @@ export type HandHistoryRow = {
   ewDelta: number;
   nsCumulative: number;
   ewCumulative: number;
-  outcomeBadge: OutcomeBadge;
 };
 
 export function buildHandHistoryRows(
@@ -40,15 +37,6 @@ export function buildHandHistoryRows(
 
     const bidMade = (shotMoon && !moonShooterWentSet) || bidderPoints >= bidAmount;
 
-    const outcomeBadge: OutcomeBadge =
-      shotMoon && moonShooterWentSet
-        ? "🌙 Set!"
-        : shotMoon && !moonShooterWentSet
-          ? "🌙 Moon!"
-          : bidMade
-            ? "Made it"
-            : "Set!";
-
     nsCumulative += nsDelta;
     ewCumulative += ewDelta;
 
@@ -65,7 +53,6 @@ export function buildHandHistoryRows(
       ewDelta,
       nsCumulative,
       ewCumulative,
-      outcomeBadge,
     };
   });
 }

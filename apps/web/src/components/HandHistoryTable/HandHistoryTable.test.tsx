@@ -101,7 +101,6 @@ function makeRow(overrides: Partial<HandHistoryRow> = {}): HandHistoryRow {
     ewDelta: -120,
     nsCumulative: 120,
     ewCumulative: -120,
-    outcomeBadge: "Made it",
     ...overrides,
   };
 }
@@ -144,7 +143,7 @@ describe("HandHistoryTable", () => {
 
     it("renders bidAmount in the Bid column (separate from outcome)", () => {
       const tree = HandHistoryTable({
-        rows: [makeRow({ bidAmount: 120, outcomeBadge: "Made it" })],
+        rows: [makeRow({ bidAmount: 120 })],
       });
       const { strings } = collectTree(tree);
       expect(strings).toContain("120");
