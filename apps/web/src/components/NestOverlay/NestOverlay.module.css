@@ -21,6 +21,7 @@
 }
 
 .title { font-size: 1.2rem; font-weight: 700; }
+.infoRow { font-size: 0.85rem; color: var(--color-accent); opacity: 0.9; margin-top: -8px; }
 .subtitle { color: #888; font-size: 0.9rem; margin-top: -8px; }
 
 .hand {
