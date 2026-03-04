@@ -19,7 +19,6 @@ vi.mock("./BiddingOverlay.module.css", () => ({
     passed: "passed",
     activeRow: "activeRow",
     quickBidBtn: "quickBidBtn",
-    bidMoreLink: "bidMoreLink",
     picker: "picker",
     stepBtn: "stepBtn",
     pickerAmount: "pickerAmount",
@@ -82,14 +81,16 @@ function findButtons(
   });
 }
 
-/** Find elements by className match (any tag) */
+/** Find elements by className match (any tag) — exact match by default */
 function findByClass(
   elements: React.ReactElement[],
-  classMatch: string
+  classMatch: string,
+  exact = false
 ): React.ReactElement[] {
   return elements.filter((el) => {
     const p = el.props as Record<string, unknown>;
-    return typeof p.className === "string" && p.className.includes(classMatch);
+    if (typeof p.className !== "string") return false;
+    return exact ? p.className === classMatch : p.className.includes(classMatch);
   });
 }
 
@@ -137,7 +138,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
   };
 }
 
-/** Build default view props (picker closed, amount=minNextBid) */
+/** Build default view props (amount=minNextBid) */
 function makeViewProps(
   gsOverrides: Partial<GameState> = {},
   viewOverrides: Partial<BiddingOverlayViewProps> = {}
@@ -149,10 +150,7 @@ function makeViewProps(
     onPlaceBid: vi.fn(),
     onPass: vi.fn(),
     onShootMoon: vi.fn(),
-    pickerOpen: false,
     pickerAmount: minNextBid,
-    onOpenPicker: vi.fn(),
-    onClosePicker: vi.fn(),
     onIncrement: vi.fn(),
     onDecrement: vi.fn(),
     ...viewOverrides,
@@ -178,28 +176,30 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────
-  it("2. 'Bid more…' toggle is visible; picker is hidden initially (picker div absent)", () => {
-    const props = makeViewProps(); // pickerOpen=false
+  it("2. stepper (+/− and confirm button) is always visible when it's the human's turn", () => {
+    const props = makeViewProps(); // human's turn, minNextBid=100
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
 
-    // "Bid more…" link should be present
-    const bidMoreLinks = findButtons(all, "bidMoreLink");
-    expect(bidMoreLinks).toHaveLength(1);
-    const linkText = flattenStrings(bidMoreLinks[0]).join("");
-    expect(linkText).toContain("Bid more");
+    // Picker (stepper row) should always be visible — exact class match avoids "pickerAmount" false positive
+    const pickerDivs = findByClass(all, "picker", true);
+    expect(pickerDivs).toHaveLength(1);
 
-    // Picker div should be absent when closed
-    const pickerDivs = findByClass(all, "picker");
-    expect(pickerDivs).toHaveLength(0);
+    // Confirm bid button should always be visible
+    const confirmBtns = findButtons(all, "confirmBidBtn");
+    expect(confirmBtns).toHaveLength(1);
 
-    // Quick-bid button is visible when closed
+    // Quick-bid button should also be visible
     expect(findButtons(all, "quickBidBtn")).toHaveLength(1);
+
+    // No "Bid more…" toggle button
+    const bidMoreLinks = findButtons(all, "bidMoreLink");
+    expect(bidMoreLinks).toHaveLength(0);
   });
 
   // ── Test 3 ──────────────────────────────────────────────────────────────
-  it("3. stepper shows the correct initial amount (minNextBid) when picker is open", () => {
-    const props = makeViewProps({}, { pickerOpen: true, pickerAmount: 100 });
+  it("3. stepper shows the correct initial amount (minNextBid)", () => {
+    const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
 
@@ -211,7 +211,7 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
 
   // ── Test 4 ──────────────────────────────────────────────────────────────
   it("4. '+' stepBtn is enabled when pickerAmount < maximumBid", () => {
-    const props = makeViewProps({}, { pickerOpen: true, pickerAmount: 100 });
+    const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
     const stepBtns = findButtons(all, "stepBtn");
@@ -226,7 +226,7 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
 
   // ── Test 5 ──────────────────────────────────────────────────────────────
   it("5. '−' stepBtn is disabled when pickerAmount === minNextBid (100)", () => {
-    const props = makeViewProps({}, { pickerOpen: true, pickerAmount: 100 });
+    const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
     const stepBtns = findButtons(all, "stepBtn");
@@ -239,7 +239,7 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
 
   // ── Test 6 ──────────────────────────────────────────────────────────────
   it("6. '+' stepBtn is disabled when pickerAmount === maximumBid (200)", () => {
-    const props = makeViewProps({}, { pickerOpen: true, pickerAmount: 200 });
+    const props = makeViewProps({}, { pickerAmount: 200 });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
     const stepBtns = findButtons(all, "stepBtn");
@@ -250,25 +250,32 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
   });
 
   // ── Test 7 ──────────────────────────────────────────────────────────────
-  it("7. '← Back' text is shown and quickBidBtn is hidden when picker is open", () => {
-    const props = makeViewProps({}, { pickerOpen: true, pickerAmount: 100 });
+  it("7. stepper and confirm button are visible alongside quick-bid button", () => {
+    const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
 
+    // No "Bid more…" / "← Back" toggle at all
     const bidMoreLinks = findButtons(all, "bidMoreLink");
-    expect(bidMoreLinks).toHaveLength(1);
-    const linkText = flattenStrings(bidMoreLinks[0]).join("");
-    expect(linkText).toContain("Back");
+    expect(bidMoreLinks).toHaveLength(0);
 
-    // Quick-bid button should be hidden when picker is open
+    // Quick-bid always visible
     const quickBidBtns = findButtons(all, "quickBidBtn");
-    expect(quickBidBtns).toHaveLength(0);
+    expect(quickBidBtns).toHaveLength(1);
+
+    // Stepper always visible — exact class match avoids "pickerAmount" false positive
+    const pickerDivs = findByClass(all, "picker", true);
+    expect(pickerDivs).toHaveLength(1);
+
+    // Confirm bid always visible
+    const confirmBtns = findButtons(all, "confirmBidBtn");
+    expect(confirmBtns).toHaveLength(1);
   });
 
   // ── Test 8 ──────────────────────────────────────────────────────────────
   it("8. 'Confirm bid: X' shows pickerAmount and calls onPlaceBid with that amount", () => {
     const onPlaceBid = vi.fn();
-    const props = makeViewProps({}, { pickerOpen: true, pickerAmount: 115, onPlaceBid });
+    const props = makeViewProps({}, { pickerAmount: 115, onPlaceBid });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
 

@@ -15,10 +15,7 @@ const HUMAN = "N" as const;
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
 // This is exported so tests can call it directly without hitting React hooks.
 export type BiddingOverlayViewProps = Props & {
-  pickerOpen: boolean;
   pickerAmount: number;
-  onOpenPicker: () => void;
-  onClosePicker: () => void;
   onIncrement: () => void;
   onDecrement: () => void;
 };
@@ -28,10 +25,7 @@ export function BiddingOverlayView({
   onPlaceBid,
   onPass,
   onShootMoon,
-  pickerOpen,
   pickerAmount,
-  onOpenPicker,
-  onClosePicker,
   onIncrement,
   onDecrement,
 }: BiddingOverlayViewProps) {
@@ -84,55 +78,44 @@ export function BiddingOverlayView({
 
         {isMyTurn && (
           <>
-            {/* Quick-bid button — shown when picker is closed */}
-            {!pickerOpen && (
-              <button
-                className={styles.quickBidBtn}
-                aria-label={`Bid ${minNextBid}`}
-                onClick={() => onPlaceBid(minNextBid)}
-              >
-                Bid {minNextBid}
-              </button>
-            )}
-
-            {/* "Bid more…" / "← Back" toggle */}
+            {/* Quick-bid button — one-tap confirm at minimum */}
             <button
-              className={styles.bidMoreLink}
-              onClick={pickerOpen ? onClosePicker : onOpenPicker}
+              className={styles.quickBidBtn}
+              aria-label={`Bid ${minNextBid}`}
+              onClick={() => onPlaceBid(minNextBid)}
             >
-              {pickerOpen ? "← Back" : "Bid more…"}
+              Bid {minNextBid}
             </button>
 
-            {/* Expandable stepper — shown when picker is open */}
-            {pickerOpen && (
-              <>
-                <div className={styles.picker}>
-                  <button
-                    className={styles.stepBtn}
-                    aria-label="Decrease bid"
-                    onClick={onDecrement}
-                    disabled={pickerAmount <= minNextBid}
-                  >
-                    −
-                  </button>
-                  <span className={styles.pickerAmount}>{pickerAmount}</span>
-                  <button
-                    className={styles.stepBtn}
-                    aria-label="Increase bid"
-                    onClick={onIncrement}
-                    disabled={pickerAmount >= maximumBid}
-                  >
-                    +
-                  </button>
-                </div>
-                <button
-                  className={styles.confirmBidBtn}
-                  onClick={() => onPlaceBid(pickerAmount)}
-                >
-                  Confirm bid: {pickerAmount}
-                </button>
-              </>
-            )}
+            {/* Stepper row — always visible */}
+            <div className={styles.picker}>
+              <button
+                className={styles.stepBtn}
+                aria-label="Decrease bid"
+                onClick={onDecrement}
+                disabled={pickerAmount <= minNextBid}
+              >
+                −
+              </button>
+              <span className={styles.pickerAmount}>{pickerAmount}</span>
+              <button
+                className={styles.stepBtn}
+                aria-label="Increase bid"
+                onClick={onIncrement}
+                disabled={pickerAmount >= maximumBid}
+              >
+                +
+              </button>
+            </div>
+
+            {/* Confirm bid button — always visible */}
+            <button
+              className={styles.confirmBidBtn}
+              aria-label={`Confirm bid of ${pickerAmount}`}
+              onClick={() => onPlaceBid(pickerAmount)}
+            >
+              Confirm bid: {pickerAmount}
+            </button>
 
             {/* Pass button — always visible */}
             <button className={styles.passBtn} onClick={onPass}>PASS</button>
@@ -161,22 +144,14 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
   const { currentBid, rules } = gameState;
   const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
 
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerAmount, setPickerAmount] = useState(minNextBid);
 
-  // When minNextBid changes (another player bid while picker is open), reset pickerAmount
+  // Reset pickerAmount when the legal minimum advances (another player outbid us).
+  // We only react to the derived minNextBid value, not its constituent rule inputs,
+  // to avoid spurious resets when rules object identity changes.
   useEffect(() => {
     setPickerAmount(minNextBid);
   }, [minNextBid]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function openPicker() {
-    setPickerAmount(minNextBid);
-    setPickerOpen(true);
-  }
-
-  function closePicker() {
-    setPickerOpen(false);
-  }
 
   function increment() {
     setPickerAmount((a) => Math.min(a + rules.bidIncrement, rules.maximumBid));
@@ -192,10 +167,7 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
       onPlaceBid={onPlaceBid}
       onPass={onPass}
       onShootMoon={onShootMoon}
-      pickerOpen={pickerOpen}
       pickerAmount={pickerAmount}
-      onOpenPicker={openPicker}
-      onClosePicker={closePicker}
       onIncrement={increment}
       onDecrement={decrement}
     />
