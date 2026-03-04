@@ -41,6 +41,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   announcement: null,
   gameOverReason: null,
   historyModalOpen: false,
+  biddingThinkingSeat: null,
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       announcement: null,
       gameOverReason: null,
       historyModalOpen: false,
+      biddingThinkingSeat: null,
     });
 
     get()._scheduleNextTurn();
@@ -96,6 +98,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       announcement: null,
       gameOverReason: null,
       historyModalOpen: false,
+      biddingThinkingSeat: null,
     });
   },
 
@@ -137,7 +140,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
     // Human's turn
     if (activePlayer === HUMAN_SEAT) {
       if (phase === "bidding") {
-        set({ overlay: "bidding" });
+        set({ overlay: "bidding", biddingThinkingSeat: null });
       } else if (phase === "nest") {
         // Issue TakeNest immediately so the hand has all 15 cards before overlay opens
         const gs = get().gameState;
@@ -158,8 +161,13 @@ export const useGameStore = create<AppStore>((set, get) => ({
       return;
     }
 
-    // Bot's turn — schedule with delay only for playing phase
-    const delay = phase === "playing" ? (gameState.rules.botDelayMs ?? 1000) : 0;
+    // Bot's turn — keep overlay open during bidding, set thinking seat
+    if (phase === "bidding") {
+      set({ overlay: "bidding", biddingThinkingSeat: activePlayer });
+    }
+    const delay = (phase === "playing" || phase === "bidding")
+      ? (gameState.rules.botDelayMs ?? 1000)
+      : 0;
     const id = setTimeout(() => get()._dispatchBotTurn(), delay);
     set({ botTimeoutId: id });
   },
@@ -196,13 +204,13 @@ export const useGameStore = create<AppStore>((set, get) => ({
       const delay = get().gameState?.rules.botDelayMs ?? 1000;
       const id = setTimeout(() => {
         get()._applyEvents(postEvents);
-        set({ botTimeoutId: null });
+        set({ botTimeoutId: null, biddingThinkingSeat: null });
         get()._scheduleNextTurn();
       }, delay);
       set({ botTimeoutId: id });
     } else {
       get()._applyEvents(result.events);
-      set({ botTimeoutId: null });
+      set({ botTimeoutId: null, biddingThinkingSeat: null });
       get()._scheduleNextTurn();
     }
   },
@@ -263,7 +271,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       return;
     }
     get()._applyEvents(result.events);
-    set({ overlay: "none" });
+    set({ biddingThinkingSeat: null });
     get()._scheduleNextTurn();
   },
 
@@ -280,7 +288,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       return;
     }
     get()._applyEvents(result.events);
-    set({ overlay: "none" });
+    set({ biddingThinkingSeat: null });
     get()._scheduleNextTurn();
   },
 
@@ -297,7 +305,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       return;
     }
     get()._applyEvents(result.events);
-    set({ overlay: "none" });
+    set({ biddingThinkingSeat: null });
     get()._scheduleNextTurn();
   },
 

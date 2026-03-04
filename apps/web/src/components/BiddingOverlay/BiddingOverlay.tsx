@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { GameState } from "@rook/engine";
+import type { GameState, Seat } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./BiddingOverlay.module.css";
 
@@ -8,6 +8,7 @@ type Props = {
   onPlaceBid: (amount: number) => void;
   onPass: () => void;
   onShootMoon: () => void;
+  biddingThinkingSeat?: Seat | null;
 };
 
 const HUMAN = "N" as const;
@@ -28,6 +29,7 @@ export function BiddingOverlayView({
   pickerAmount,
   onIncrement,
   onDecrement,
+  biddingThinkingSeat,
 }: BiddingOverlayViewProps) {
   const { bids, currentBid, activePlayer, rules, moonShooters } = gameState;
   const isMyTurn = activePlayer === HUMAN;
@@ -122,7 +124,13 @@ export function BiddingOverlayView({
 
         {!isMyTurn && (
           <div className={styles.waiting}>
-            {activePlayer ? `${getSeatLabel(activePlayer)} is bidding…` : ""}
+            <span className={biddingThinkingSeat ? styles.thinking : undefined}>
+              {biddingThinkingSeat
+                ? `${getSeatLabel(biddingThinkingSeat)} is thinking…`
+                : activePlayer
+                ? `${getSeatLabel(activePlayer)} is bidding…`
+                : ""}
+            </span>
           </div>
         )}
       </div>
@@ -131,7 +139,7 @@ export function BiddingOverlayView({
 }
 
 // ── Stateful wrapper (the actual exported default) ────────────────────────────
-export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon }: Props) {
+export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, biddingThinkingSeat }: Props) {
   const { currentBid, rules } = gameState;
   const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
 
@@ -161,6 +169,7 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
       pickerAmount={pickerAmount}
       onIncrement={increment}
       onDecrement={decrement}
+      biddingThinkingSeat={biddingThinkingSeat}
     />
   );
 }

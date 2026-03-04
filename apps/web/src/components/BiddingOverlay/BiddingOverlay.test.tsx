@@ -25,6 +25,7 @@ vi.mock("./BiddingOverlay.module.css", () => ({
     passBtn: "passBtn",
     moonBtn: "moonBtn",
     waiting: "waiting",
+    thinking: "thinking",
   },
 }));
 
@@ -365,5 +366,81 @@ describe("BiddingOverlay — Stepper UX", () => {
 
     const moonBtns = findButtons(all, "moonBtn");
     expect(moonBtns).toHaveLength(0);
+  });
+});
+
+describe("BiddingOverlay — thinking / waiting messages", () => {
+  // ── Test 14 ──────────────────────────────────────────────────────────────
+  it("14. When biddingThinkingSeat is null and !isMyTurn, shows '<Label> is bidding…'", () => {
+    const props = makeViewProps(
+      { activePlayer: "E" as const },
+      { biddingThinkingSeat: null },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const waitingEls = findByClass(all, "waiting");
+    expect(waitingEls).toHaveLength(1);
+
+    const text = flattenStrings(waitingEls[0]).join("");
+    expect(text).toBe("Label-E is bidding…");
+  });
+
+  // ── Test 15 ──────────────────────────────────────────────────────────────
+  it("15. When biddingThinkingSeat='E' and !isMyTurn, shows 'Label-E is thinking…' with .thinking class", () => {
+    const props = makeViewProps(
+      { activePlayer: "E" as const },
+      { biddingThinkingSeat: "E" as const },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const waitingEls = findByClass(all, "waiting");
+    expect(waitingEls).toHaveLength(1);
+
+    // Find the span with .thinking class inside the waiting div
+    const thinkingSpans = flattenElements(waitingEls[0]).filter((el) => {
+      const p = el.props as Record<string, unknown>;
+      return typeof p.className === "string" && p.className.includes("thinking");
+    });
+    expect(thinkingSpans).toHaveLength(1);
+
+    const text = flattenStrings(waitingEls[0]).join("");
+    expect(text).toContain("Label-E is thinking…");
+  });
+
+  // ── Test 16 ──────────────────────────────────────────────────────────────
+  it("16. When biddingThinkingSeat='E' and isMyTurn, human controls are still shown", () => {
+    // Edge case: biddingThinkingSeat set but it's actually human's turn
+    const props = makeViewProps(
+      { activePlayer: "N" as const },
+      { biddingThinkingSeat: "E" as const },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    // Human controls should be visible
+    const confirmBtns = findButtons(all, "confirmBidBtn");
+    expect(confirmBtns).toHaveLength(1);
+
+    const passBtns = findButtons(all, "passBtn");
+    expect(passBtns).toHaveLength(1);
+
+    // Waiting div should NOT be shown when isMyTurn
+    const waitingEls = findByClass(all, "waiting");
+    expect(waitingEls).toHaveLength(0);
+  });
+
+  // ── Test 17 ──────────────────────────────────────────────────────────────
+  it("17. When biddingThinkingSeat is null and isMyTurn, the .waiting div is NOT rendered", () => {
+    const props = makeViewProps(
+      { activePlayer: "N" as const },
+      { biddingThinkingSeat: null },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const waitingEls = findByClass(all, "waiting");
+    expect(waitingEls).toHaveLength(0);
   });
 });

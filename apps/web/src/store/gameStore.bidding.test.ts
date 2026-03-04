@@ -14,6 +14,7 @@ function resetStore() {
     botDifficulty: "normal",
     announcement: null,
     gameOverReason: null,
+    biddingThinkingSeat: null,
   });
 }
 
@@ -45,6 +46,22 @@ describe("gameStore bidding", () => {
     vi.useRealTimers();
   });
 
+  describe("initial state", () => {
+    it("biddingThinkingSeat is null in initial state", () => {
+      expect(useGameStore.getState().biddingThinkingSeat).toBeNull();
+    });
+  });
+
+  describe("resetGame", () => {
+    it("biddingThinkingSeat is null after resetGame", () => {
+      // Set a non-null value first
+      useGameStore.setState({ biddingThinkingSeat: "E" });
+      expect(useGameStore.getState().biddingThinkingSeat).toBe("E");
+      useGameStore.getState().resetGame();
+      expect(useGameStore.getState().biddingThinkingSeat).toBeNull();
+    });
+  });
+
   describe("_scheduleNextTurn — bidding phase", () => {
     it("sets overlay to 'bidding' when it is the human's turn to bid (dealer=W → activePlayer=N)", () => {
       const gs = makeBiddingState("W"); // dealer=W → leftOf(W)=N → human bids first
@@ -55,15 +72,34 @@ describe("gameStore bidding", () => {
       expect(useGameStore.getState().overlay).toBe("bidding");
     });
 
-    it("schedules bot turn with delay=0 when it is a bot's turn during bidding (dealer=N → activePlayer=E)", () => {
+    it("sets biddingThinkingSeat to null when it is the human's turn to bid", () => {
+      const gs = makeBiddingState("W"); // N bids first
+      useGameStore.setState({ gameState: gs, biddingThinkingSeat: "E" });
+      useGameStore.getState()._scheduleNextTurn();
+      expect(useGameStore.getState().biddingThinkingSeat).toBeNull();
+    });
+
+    it("sets overlay to 'bidding' and biddingThinkingSeat to bot seat when it is a bot's turn during bidding", () => {
       const gs = makeBiddingState("N"); // dealer=N → leftOf(N)=E → bot bids first
       expect(gs.phase).toBe("bidding");
       expect(gs.activePlayer).toBe("E");
       useGameStore.setState({ gameState: gs });
       useGameStore.getState()._scheduleNextTurn();
-      // Overlay should NOT be 'bidding'
-      expect(useGameStore.getState().overlay).not.toBe("bidding");
+      // Overlay SHOULD be 'bidding' (overlay stays open during entire bidding phase)
+      expect(useGameStore.getState().overlay).toBe("bidding");
+      // biddingThinkingSeat should be the active bot seat
+      expect(useGameStore.getState().biddingThinkingSeat).toBe("E");
       // A timeout should be scheduled (botTimeoutId set)
+      expect(useGameStore.getState().botTimeoutId).not.toBeNull();
+    });
+
+    it("schedules bot turn WITH delay (botDelayMs) during bidding phase", () => {
+      const gs = makeBiddingState("N"); // E bids first
+      const rulesWithDelay = { ...DEFAULT_RULES, botDelayMs: 500 };
+      const gsWithDelay = { ...gs, rules: rulesWithDelay };
+      useGameStore.setState({ gameState: gsWithDelay });
+      useGameStore.getState()._scheduleNextTurn();
+      // botTimeoutId should be set — bot scheduled with a delay
       expect(useGameStore.getState().botTimeoutId).not.toBeNull();
     });
   });
@@ -82,6 +118,18 @@ describe("gameStore bidding", () => {
       // No game state set
       useGameStore.getState().humanPlaceBid(100);
       expect(useGameStore.getState().gameState).toBeNull();
+    });
+
+    it("does NOT force overlay to 'none' after human bids (overlay stays 'bidding' while bidding continues)", () => {
+      const gs = makeBiddingState("W"); // N bids first, next will be E (bot)
+      useGameStore.setState({ gameState: gs, overlay: "bidding", biddingThinkingSeat: null });
+      useGameStore.getState().humanPlaceBid(100);
+      const state = useGameStore.getState();
+      // overlay should NOT be forced to "none" by humanPlaceBid
+      // (it should remain "bidding" while bidding continues with bots)
+      expect(state.overlay).not.toBe("none");
+      // After the bot's turn is scheduled, biddingThinkingSeat should be set to the next bot
+      expect(state.biddingThinkingSeat).toBe("E");
     });
 
     it("closes overlay and sets announcement when BiddingComplete fires (3 bots pass)", () => {
@@ -117,6 +165,17 @@ describe("gameStore bidding", () => {
       useGameStore.getState().humanPassBid();
       expect(useGameStore.getState().gameState).toBeNull();
     });
+
+    it("clears biddingThinkingSeat (does NOT keep the old seat) and overlay stays 'bidding' after human passes while bidding continues", () => {
+      const gs = makeBiddingState("W"); // N is active, next will be E (bot)
+      useGameStore.setState({ gameState: gs, overlay: "bidding", biddingThinkingSeat: "S" });
+      useGameStore.getState().humanPassBid();
+      const state = useGameStore.getState();
+      // overlay should remain "bidding" — not forced to "none"
+      expect(state.overlay).toBe("bidding");
+      // biddingThinkingSeat should NOT be the stale "S" value — it's been updated to the next bot
+      expect(state.biddingThinkingSeat).not.toBe("S");
+    });
   });
 
   describe("humanShootMoon", () => {
@@ -131,6 +190,17 @@ describe("gameStore bidding", () => {
     it("does nothing if not in bidding phase", () => {
       useGameStore.getState().humanShootMoon();
       expect(useGameStore.getState().gameState).toBeNull();
+    });
+
+    it("clears biddingThinkingSeat (does NOT keep the old seat) and overlay stays 'bidding' after human shoots moon while bidding continues", () => {
+      const gs = makeBiddingState("W"); // N is active, next will be E (bot)
+      useGameStore.setState({ gameState: gs, overlay: "bidding", biddingThinkingSeat: "W" });
+      useGameStore.getState().humanShootMoon();
+      const state = useGameStore.getState();
+      // overlay should remain "bidding" — not forced to "none"
+      expect(state.overlay).toBe("bidding");
+      // biddingThinkingSeat should NOT be the stale "W" value
+      expect(state.biddingThinkingSeat).not.toBe("W");
     });
   });
 });

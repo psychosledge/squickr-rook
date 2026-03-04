@@ -1,4 +1,4 @@
-import type { GameState, GameEvent, CardId, Color, BotDifficulty, HandScore } from "@rook/engine";
+import type { GameState, GameEvent, CardId, Color, BotDifficulty, HandScore, Seat } from "@rook/engine";
 
 export type OverlayKind = "none" | "bidding" | "nest" | "trump" | "hand-result" | "game-over";
 
@@ -13,6 +13,7 @@ export type AppState = {
   announcement: string | null;
   gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
   historyModalOpen: boolean;
+  biddingThinkingSeat: Seat | null;
 };
 
 export type AppActions = {

@@ -33,6 +33,7 @@ export default function GamePage() {
   const historyModalOpen = useGameStore((s) => s.historyModalOpen);
   const openHistoryModal = useGameStore((s) => s.openHistoryModal);
   const closeHistoryModal = useGameStore((s) => s.closeHistoryModal);
+  const biddingThinkingSeat = useGameStore((s) => s.biddingThinkingSeat);
 
   // Redirect to lobby if no game active
   useEffect(() => {
@@ -65,6 +66,7 @@ export default function GamePage() {
           onPlaceBid={humanPlaceBid}
           onPass={humanPassBid}
           onShootMoon={humanShootMoon}
+          biddingThinkingSeat={biddingThinkingSeat}
         />
       )}
 
