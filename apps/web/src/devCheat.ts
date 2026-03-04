@@ -22,6 +22,8 @@ function dealMoonHand(): void {
 
   // 2. Build the rigged GameState.
   //    N holds all Black trumps + the Rook — leading trump every trick wins all 10.
+  //    Preserve current scores so in-the-hole scenarios can be tested accurately.
+  const currentScores = useGameStore.getState().gameState?.scores ?? { NS: 0, EW: 0 };
   const riggedState: GameState = {
     version: 1,
     phase: "playing",
@@ -50,7 +52,7 @@ function dealMoonHand(): void {
     tricksPlayed: 0,
     completedTricks: [],
     capturedCards: { NS: [], EW: [] },
-    scores: { NS: 0, EW: 0 },
+    scores: currentScores,
     handHistory: [],
     winner: null,
     playedCards: [],
