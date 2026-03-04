@@ -18,7 +18,6 @@ vi.mock("./BiddingOverlay.module.css", () => ({
     bidVal: "bidVal",
     passed: "passed",
     activeRow: "activeRow",
-    quickBidBtn: "quickBidBtn",
     picker: "picker",
     stepBtn: "stepBtn",
     pickerAmount: "pickerAmount",
@@ -161,18 +160,22 @@ function makeViewProps(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
+describe("BiddingOverlay — Stepper UX", () => {
 
   // ── Test 1 ──────────────────────────────────────────────────────────────
-  it("1. renders 'Bid 100' quick-bid button when no bids have been placed yet (minNextBid = 100)", () => {
-    const props = makeViewProps(); // currentBid=0 → minNextBid=100
+  it("1. stepper shows the correct initial amount (minNextBid = 100) when no bids have been placed", () => {
+    const props = makeViewProps(); // currentBid=0 → minNextBid=100, pickerAmount=100
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
-    const quickBidBtns = findButtons(all, "quickBidBtn");
 
-    expect(quickBidBtns).toHaveLength(1);
-    const text = flattenStrings(quickBidBtns[0]).join("");
-    expect(text).toContain("100");
+    // No quick-bid button
+    expect(findButtons(all, "quickBidBtn")).toHaveLength(0);
+
+    // Stepper amount should reflect minNextBid=100
+    const amountEls = findByClass(all, "pickerAmount");
+    expect(amountEls).toHaveLength(1);
+    const text = flattenStrings(amountEls[0]).join("");
+    expect(text).toBe("100");
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────
@@ -189,8 +192,8 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
     const confirmBtns = findButtons(all, "confirmBidBtn");
     expect(confirmBtns).toHaveLength(1);
 
-    // Quick-bid button should also be visible
-    expect(findButtons(all, "quickBidBtn")).toHaveLength(1);
+    // No quick-bid button
+    expect(findButtons(all, "quickBidBtn")).toHaveLength(0);
 
     // No "Bid more…" toggle button
     const bidMoreLinks = findButtons(all, "bidMoreLink");
@@ -250,7 +253,7 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
   });
 
   // ── Test 7 ──────────────────────────────────────────────────────────────
-  it("7. stepper and confirm button are visible alongside quick-bid button", () => {
+  it("7. stepper and confirm button are visible; no quick-bid button", () => {
     const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
@@ -259,9 +262,9 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
     const bidMoreLinks = findButtons(all, "bidMoreLink");
     expect(bidMoreLinks).toHaveLength(0);
 
-    // Quick-bid always visible
+    // No quick-bid button
     const quickBidBtns = findButtons(all, "quickBidBtn");
-    expect(quickBidBtns).toHaveLength(1);
+    expect(quickBidBtns).toHaveLength(0);
 
     // Stepper always visible — exact class match avoids "pickerAmount" false positive
     const pickerDivs = findByClass(all, "picker", true);
@@ -291,16 +294,20 @@ describe("BiddingOverlay — Quick-Bid + Stepper UX", () => {
   });
 
   // ── Test 9 ──────────────────────────────────────────────────────────────
-  it("9. quick-bid button calls onPlaceBid(minNextBid=100)", () => {
+  it("9. confirm button at minNextBid calls onPlaceBid(100) when pickerAmount starts at 100", () => {
     const onPlaceBid = vi.fn();
-    const props = makeViewProps({}, { onPlaceBid });
+    const props = makeViewProps({}, { onPlaceBid }); // pickerAmount defaults to minNextBid=100
     const element = BiddingOverlayView(props);
     const all = flattenElements(element);
 
-    const quickBidBtns = findButtons(all, "quickBidBtn");
-    expect(quickBidBtns).toHaveLength(1);
+    // No quick-bid button present
+    expect(findButtons(all, "quickBidBtn")).toHaveLength(0);
 
-    const onClick = (quickBidBtns[0].props as Record<string, unknown>).onClick as () => void;
+    // Confirm button present and fires with 100
+    const confirmBtns = findButtons(all, "confirmBidBtn");
+    expect(confirmBtns).toHaveLength(1);
+
+    const onClick = (confirmBtns[0].props as Record<string, unknown>).onClick as () => void;
     onClick();
     expect(onPlaceBid).toHaveBeenCalledWith(100);
   });

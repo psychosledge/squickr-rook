@@ -78,15 +78,6 @@ export function BiddingOverlayView({
 
         {isMyTurn && (
           <>
-            {/* Quick-bid button — one-tap confirm at minimum */}
-            <button
-              className={styles.quickBidBtn}
-              aria-label={`Bid ${minNextBid}`}
-              onClick={() => onPlaceBid(minNextBid)}
-            >
-              Bid {minNextBid}
-            </button>
-
             {/* Stepper row — always visible */}
             <div className={styles.picker}>
               <button
