@@ -4,6 +4,16 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v0.4.3] — 2026-03-04
+
+### Improvements
+- **A11y: nest card screen reader label** — cards dealt from the nest now announce `" (from nest)"` in their `aria-label`, giving screen readers parity with the visual amber pip indicator added in v0.4.1
+
+### Internal
+- Removed dead `outcomeBadge` field and `OutcomeBadge` type from `HandHistoryRow` — was computed but never rendered; outcome display is derived from `bidMade`/`shotMoon`/`moonShooterWentSet` at the render layer
+
+---
+
 ## [v0.4.2] — 2026-03-04
 
 ### New Features
