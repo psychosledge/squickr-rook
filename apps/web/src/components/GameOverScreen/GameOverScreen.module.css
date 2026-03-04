@@ -64,6 +64,19 @@
   margin-top: 4px;
 }
 
+.handLogBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  width: 100%;
+}
+.handLogBtn:hover { opacity: 0.7; }
+.handLogSection { width: 100%; overflow-y: auto; max-height: 40vh; }
+
 @media (max-width: 600px) {
   .panel {
     border-radius: 0;

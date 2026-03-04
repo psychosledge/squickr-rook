@@ -86,6 +86,7 @@ export default function GamePage() {
           finalScores={gameState.scores}
           reason={gameOverReason ?? "threshold-reached"}
           onPlayAgain={handlePlayAgain}
+          handHistory={gameState.handHistory}
         />
       )}
     </div>
