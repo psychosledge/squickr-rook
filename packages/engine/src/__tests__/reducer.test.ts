@@ -4,7 +4,7 @@ import { validateCommand, legalCommands } from "../validator.js";
 import type { GameEvent } from "../events.js";
 import type { GameState, Seat } from "../types.js";
 import { DEFAULT_RULES, leftOf } from "../types.js";
-import { deriveDeal } from "../deal.js";
+
 
 // Helper to create a GameStarted event
 function makeGameStarted(seed = 42, dealer: Seat = "N"): GameEvent {
@@ -363,6 +363,7 @@ describe("applyEvent - HandScored", () => {
       nsDelta: 80,
       ewDelta: 120,
       shotMoon: false,
+      moonShooterWentSet: false,
     };
 
     state = applyEvent(state, {
@@ -1129,6 +1130,7 @@ describe("applyEvent - HandScored", () => {
       nsDelta: 80,
       ewDelta: 120,
       shotMoon: false,
+      moonShooterWentSet: false,
     };
 
     state = applyEvent(state, {

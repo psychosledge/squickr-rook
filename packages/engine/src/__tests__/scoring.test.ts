@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { pointValue, scoreHand, checkWinCondition } from "../scoring.js";
-import { CARD_POINTS, buildDeck } from "../deck.js";
-import type { CompletedTrick, GameRules, Seat } from "../types.js";
+import { buildDeck } from "../deck.js";
+import type { CompletedTrick, Seat } from "../types.js";
 import { DEFAULT_RULES } from "../types.js";
 
 describe("pointValue", () => {

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { validateCommand, legalCommands } from "../validator.js";
-import { applyEvent, reduceEvents, INITIAL_STATE } from "../reducer.js";
+import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import type { GameEvent } from "../events.js";
 import type { GameState, Seat } from "../types.js";
 import { DEFAULT_RULES, leftOf, SEAT_TEAM } from "../types.js";
-import type { PlaceBid, PassBid, ShootMoon } from "../commands.js";
+import type { PlaceBid } from "../commands.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

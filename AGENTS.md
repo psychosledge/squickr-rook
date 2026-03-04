@@ -165,9 +165,10 @@ User performs manual testing (all items from session)
 1. Bump version in **root `package.json`** and any relevant workspace `package.json` files (e.g. `apps/web/package.json`)
 2. Update `CHANGELOG.md` — add release entry
 3. Update any roadmap or session docs — mark items complete
-4. Commit: `chore: bump version to vX.Y.Z and update docs`
-5. Push commits: `git push`
-6. Create and push tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+4. **Run full build locally: `pnpm --filter @rook/engine build && pnpm --filter @rook/web build`** — must succeed before tagging
+5. Commit: `chore: bump version to vX.Y.Z and update docs`
+6. Push commits: `git push`
+7. Create and push tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
 
 > The tag triggers deployment. Pushing commits alone does NOT deploy.
 
@@ -175,6 +176,7 @@ User performs manual testing (all items from session)
 - The git tag name **must exactly match** the version in root `package.json` (e.g. tag `v0.3.0` requires `"version": "0.3.0"`).
 - Always bump `package.json` **in the same commit that will be tagged** — never tag an existing fix commit.
 - The deploy CI enforces this: it will fail if the tag and `package.json` disagree.
+- **The tag must point to HEAD** — if any fix commits land after the version bump, re-tag at HEAD before pushing.
 
 ---
 

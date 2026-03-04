@@ -3,7 +3,7 @@ import { botChooseCommand } from "../bot.js";
 import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import { legalCommands } from "../validator.js";
 import type { GameEvent } from "../events.js";
-import type { BotProfile, GameState, Seat } from "../types.js";
+import type { GameState, Seat } from "../types.js";
 import { BOT_PRESETS, DEFAULT_RULES, leftOf } from "../types.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
