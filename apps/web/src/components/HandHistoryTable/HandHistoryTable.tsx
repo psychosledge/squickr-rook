@@ -42,17 +42,21 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
               </td>
               <td>{row.bidderLabel}</td>
               <td>{row.shotMoon ? `${row.bidAmount} 🌙` : row.bidAmount}</td>
-              <td className={styles.scoreCell}>
-                <span className={styles.scoreCumulative}>{row.nsCumulative}</span>
-                <span className={`${styles.scoreDelta} ${row.nsDelta >= 0 ? styles.pos : styles.neg}`}>
-                  {formatDelta(row.nsDelta)}
-                </span>
+              <td>
+                <div className={styles.scoreCell}>
+                  <span className={styles.scoreCumulative}>{row.nsCumulative}</span>
+                  <span className={`${styles.scoreDelta} ${row.nsDelta >= 0 ? styles.pos : styles.neg}`}>
+                    {formatDelta(row.nsDelta)}
+                  </span>
+                </div>
               </td>
-              <td className={styles.scoreCell}>
-                <span className={styles.scoreCumulative}>{row.ewCumulative}</span>
-                <span className={`${styles.scoreDelta} ${row.ewDelta >= 0 ? styles.pos : styles.neg}`}>
-                  {formatDelta(row.ewDelta)}
-                </span>
+              <td>
+                <div className={styles.scoreCell}>
+                  <span className={styles.scoreCumulative}>{row.ewCumulative}</span>
+                  <span className={`${styles.scoreDelta} ${row.ewDelta >= 0 ? styles.pos : styles.neg}`}>
+                    {formatDelta(row.ewDelta)}
+                  </span>
+                </div>
               </td>
             </tr>
           );
