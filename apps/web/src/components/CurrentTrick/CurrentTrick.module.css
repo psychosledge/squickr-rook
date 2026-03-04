@@ -8,8 +8,9 @@
     ". top ."
     "left . right"
     ". bottom .";
-  grid-template-columns: var(--trick-card-w) auto var(--trick-card-w);
-  grid-template-rows:    var(--trick-card-h) auto var(--trick-card-h);
+  /* All 3 tracks are card-sized — prevents the centre cell expanding with auto and shifting the layout */
+  grid-template-columns: var(--trick-card-w) var(--trick-card-w) var(--trick-card-w);
+  grid-template-rows:    var(--trick-card-h) var(--trick-card-h) var(--trick-card-h);
   align-items: center;
   justify-items: center;
   padding: 6px;
