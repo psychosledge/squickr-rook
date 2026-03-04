@@ -83,18 +83,8 @@
   transform: rotate(180deg);
 }
 
-.nestBadge {
-  position: absolute;
-  bottom: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.5rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  background: rgba(255, 255, 255, 0.25);
-  color: #fff;
-  padding: 1px 3px;
-  border-radius: 2px;
-  pointer-events: none;
-  white-space: nowrap;
+.fromNest {
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 0 8px 2px rgba(243, 156, 18, 0.4); /* fallback for older browsers */
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-accent) 40%, transparent);
 }

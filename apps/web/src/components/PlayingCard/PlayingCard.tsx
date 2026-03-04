@@ -32,7 +32,7 @@ export default function PlayingCard({
 
   return (
     <div
-      className={`${styles.card} ${!isPlayable && !isDisplay ? styles.unplayable : ""} ${isDisplay ? styles.displayOnly : ""} ${isSelected ? styles.selected : ""}`}
+      className={`${styles.card} ${!isPlayable && !isDisplay ? styles.unplayable : ""} ${isDisplay ? styles.displayOnly : ""} ${isSelected ? styles.selected : ""} ${isFromNest ? styles.fromNest : ""}`}
       style={{
         backgroundColor: display.bgColor,
         borderColor: isSelected ? "#ffffff" : display.borderColor,
@@ -46,7 +46,6 @@ export default function PlayingCard({
       <span className={styles.topLeft}>{display.label}</span>
       <span className={styles.center}>{display.colorName[0]}</span>
       <span className={styles.bottomRight}>{display.label}</span>
-      {isFromNest && <span className={styles.nestBadge}>NEST</span>}
     </div>
   );
 }

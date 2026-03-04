@@ -13,7 +13,7 @@ vi.mock("./PlayingCard.module.css", () => ({
     center: "center",
     bottomRight: "bottomRight",
     displayOnly: "displayOnly",
-    nestBadge: "nestBadge",
+    fromNest: "fromNest",
   },
 }));
 
@@ -159,43 +159,49 @@ describe("PlayingCard — isSelected prop", () => {
 // Tests: isFromNest prop
 // ---------------------------------------------------------------------------
 
-function collectStrings(node: React.ReactNode): string[] {
-  const strings: string[] = [];
-  function visit(n: React.ReactNode) {
-    if (n == null || typeof n === "boolean") return;
-    if (typeof n === "string") { strings.push(n); return; }
-    if (typeof n === "number") { strings.push(String(n)); return; }
-    if (Array.isArray(n)) { n.forEach(visit); return; }
-    if (!React.isValidElement(n)) return;
-    const p = (n as React.ReactElement).props as Record<string, unknown>;
-    visit(p.children as React.ReactNode);
-  }
-  visit(node);
-  return strings;
-}
-
 describe("PlayingCard — isFromNest prop", () => {
-  it('renders "NEST" text when isFromNest=true and faceDown is not set', () => {
+  it("applies fromNest class to wrapper div when isFromNest=true", () => {
     const el = renderCard({ cardId: "R5", isFromNest: true });
-    const strings = collectStrings(el);
-    expect(strings).toContain("NEST");
+    const className = getProps(el).className as string;
+    expect(className).toContain("fromNest");
   });
 
-  it('does NOT render "NEST" text when isFromNest=false', () => {
+  it("does NOT apply fromNest class when isFromNest=false", () => {
     const el = renderCard({ cardId: "R5", isFromNest: false });
-    const strings = collectStrings(el);
-    expect(strings).not.toContain("NEST");
+    const className = getProps(el).className as string;
+    expect(className).not.toContain("fromNest");
   });
 
-  it('does NOT render "NEST" text when isFromNest is omitted', () => {
+  it("does NOT apply fromNest class when isFromNest is omitted", () => {
     const el = renderCard({ cardId: "R5" });
-    const strings = collectStrings(el);
-    expect(strings).not.toContain("NEST");
+    const className = getProps(el).className as string;
+    expect(className).not.toContain("fromNest");
   });
 
-  it('does NOT render "NEST" text when isFromNest=true but faceDown=true', () => {
-    const el = renderCard({ cardId: "R5", isFromNest: true, faceDown: true });
-    const strings = collectStrings(el);
-    expect(strings).not.toContain("NEST");
+  it("does NOT render any 'NEST' text in the DOM", () => {
+    const el = renderCard({ cardId: "R5", isFromNest: true });
+    // Recursively collect all string children — none should be "NEST"
+    function collectStrings(node: React.ReactNode): string[] {
+      const strings: string[] = [];
+      function visit(n: React.ReactNode) {
+        if (n == null || typeof n === "boolean") return;
+        if (typeof n === "string") { strings.push(n); return; }
+        if (typeof n === "number") { strings.push(String(n)); return; }
+        if (Array.isArray(n)) { n.forEach(visit); return; }
+        if (!React.isValidElement(n)) return;
+        const p = (n as React.ReactElement).props as Record<string, unknown>;
+        visit(p.children as React.ReactNode);
+      }
+      visit(node);
+      return strings;
+    }
+    expect(collectStrings(el)).not.toContain("NEST");
+  });
+
+  it("applies both fromNest and selected classes when isFromNest=true and isSelected=true", () => {
+    const el = renderCard({ cardId: "R5", isFromNest: true, isSelected: true });
+    const className = getProps(el).className as string;
+    expect(className).toContain("fromNest");
+    expect(className).toContain("selected");
   });
 });
