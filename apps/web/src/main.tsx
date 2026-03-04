@@ -13,3 +13,7 @@ createRoot(root).render(
     </BrowserRouter>
   </StrictMode>
 );
+
+if (import.meta.env.DEV) {
+  void import("./devCheat").then((m) => m.registerCheat());
+}
