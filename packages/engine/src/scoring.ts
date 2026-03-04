@@ -20,8 +20,9 @@ export function scoreHand(params: {
   bidAmount: number;
   hand: number;
   rules: GameRules;
+  shotMoon?: boolean;
 }): HandScore {
-  const { completedTricks, discarded, nestCards, bidder, bidAmount, hand } = params;
+  const { completedTricks, discarded, nestCards, bidder, bidAmount, hand, shotMoon = false } = params;
 
   // 1. Count point cards captured by each team from completed tricks
   let nsPointCards = 0;
@@ -125,6 +126,7 @@ export function scoreHand(params: {
     ewTotal,
     nsDelta,
     ewDelta,
+    shotMoon,
   };
 }
 

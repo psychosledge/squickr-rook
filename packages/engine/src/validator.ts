@@ -1,12 +1,66 @@
+import { getNextBidder } from "./bidding.js";
 import type { GameCommand } from "./commands.js";
 import { compareTrickCards, cardFromId } from "./deck.js";
 import type { GameEvent, TrickCompleted, HandScored, GameFinished, HandStarted } from "./events.js";
 import { applyEvent } from "./reducer.js";
 import { scoreHand, checkWinCondition } from "./scoring.js";
 import type { CardId, Color, GameRules, GameState, Seat, Team } from "./types.js";
-import { SEAT_TEAM, leftOf, nextSeat } from "./types.js";
+import { DEFAULT_RULES, SEAT_TEAM, leftOf, nextSeat } from "./types.js";
 
 const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
+
+/**
+ * Check if bidding is complete.
+ * Complete when:
+ *   - passedCount === 3 → the one non-passed seat wins
+ *   - passedCount === 4 → forced bid on dealer (minimumBid)
+ * Returns the BiddingComplete event payload or null if still ongoing.
+ */
+function checkBiddingComplete(
+  bids: Record<Seat, number | "pass" | null>,
+  dealer: Seat,
+  rules: GameRules,
+  moonShooters: Seat[],
+  now: number,
+  handNumber: number,
+): Extract<GameEvent, { type: "BiddingComplete" }> | null {
+  const seats: Seat[] = ["N", "E", "S", "W"];
+  const passedSeats = seats.filter((s) => bids[s] === "pass");
+  const passedCount = passedSeats.length;
+
+  if (passedCount === 4) {
+    // All passed — forced bid on dealer
+    return {
+      type: "BiddingComplete",
+      winner: dealer,
+      amount: rules.minimumBid,
+      forced: true,
+      shotMoon: false,
+      handNumber,
+      timestamp: now,
+    };
+  }
+
+  if (passedCount === 3) {
+    // Exactly one player remaining — they win
+    const winner = seats.find((s) => bids[s] !== "pass")!;
+    const bidValue = bids[winner];
+    const amount =
+      typeof bidValue === "number" ? bidValue : rules.minimumBid;
+    const forced = bidValue === null; // never had a chance to bid
+    return {
+      type: "BiddingComplete",
+      winner,
+      amount: forced ? rules.minimumBid : amount,
+      forced,
+      shotMoon: moonShooters.includes(winner),
+      handNumber,
+      timestamp: now,
+    };
+  }
+
+  return null;
+}
 
 /**
  * Validate a command against the current game state.
@@ -15,16 +69,159 @@ const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
 export function validateCommand(
   state: GameState,
   command: GameCommand,
-  rules: GameRules,
+  rules: GameRules = DEFAULT_RULES,
 ): { ok: true; events: GameEvent[] } | { ok: false; error: string } {
   const now = Date.now();
 
   switch (command.type) {
+    case "PlaceBid": {
+      if (state.phase !== "bidding") {
+        return { ok: false, error: `Cannot PlaceBid in phase: ${state.phase}` };
+      }
+      if (state.activePlayer !== command.seat) {
+        return {
+          ok: false,
+          error: `PlaceBid: not your turn (active: ${state.activePlayer}, you: ${command.seat})`,
+        };
+      }
+      if (state.bids[command.seat] === "pass") {
+        return { ok: false, error: `PlaceBid: ${command.seat} already passed` };
+      }
+      if (command.amount < rules.minimumBid) {
+        return {
+          ok: false,
+          error: `PlaceBid: amount ${command.amount} below minimum ${rules.minimumBid}`,
+        };
+      }
+      if (command.amount > rules.maximumBid) {
+        return {
+          ok: false,
+          error: `PlaceBid: amount ${command.amount} above maximum ${rules.maximumBid}`,
+        };
+      }
+      if (command.amount <= state.currentBid) {
+        return {
+          ok: false,
+          error: `PlaceBid: amount ${command.amount} must be > currentBid ${state.currentBid}`,
+        };
+      }
+      // Validate increment: amount must be minimumBid + N * bidIncrement
+      const offset = command.amount - rules.minimumBid;
+      if (offset % rules.bidIncrement !== 0) {
+        return {
+          ok: false,
+          error: `PlaceBid: amount ${command.amount} is not a valid increment (minimumBid=${rules.minimumBid}, increment=${rules.bidIncrement})`,
+        };
+      }
+
+      const events: GameEvent[] = [];
+      const bidPlaced: GameEvent = {
+        type: "BidPlaced",
+        seat: command.seat,
+        amount: command.amount,
+        handNumber: state.handNumber,
+        timestamp: now,
+      };
+      events.push(bidPlaced);
+
+      // Apply the bid to check for completion
+      const newBids = { ...state.bids, [command.seat]: command.amount };
+      const complete = checkBiddingComplete(
+        newBids,
+        state.dealer,
+        rules,
+        state.moonShooters,
+        now,
+        state.handNumber,
+      );
+      if (complete) events.push(complete);
+
+      return { ok: true, events };
+    }
+
+    case "PassBid": {
+      if (state.phase !== "bidding") {
+        return { ok: false, error: `Cannot PassBid in phase: ${state.phase}` };
+      }
+      if (state.activePlayer !== command.seat) {
+        return {
+          ok: false,
+          error: `PassBid: not your turn (active: ${state.activePlayer}, you: ${command.seat})`,
+        };
+      }
+      if (state.bids[command.seat] === "pass") {
+        return { ok: false, error: `PassBid: ${command.seat} already passed` };
+      }
+
+      const events: GameEvent[] = [];
+      const bidPassed: GameEvent = {
+        type: "BidPassed",
+        seat: command.seat,
+        handNumber: state.handNumber,
+        timestamp: now,
+      };
+      events.push(bidPassed);
+
+      const newBids = { ...state.bids, [command.seat]: "pass" as const };
+      const complete = checkBiddingComplete(
+        newBids,
+        state.dealer,
+        rules,
+        state.moonShooters,
+        now,
+        state.handNumber,
+      );
+      if (complete) events.push(complete);
+
+      return { ok: true, events };
+    }
+
+    case "ShootMoon": {
+      if (state.phase !== "bidding") {
+        return { ok: false, error: `Cannot ShootMoon in phase: ${state.phase}` };
+      }
+      if (state.activePlayer !== command.seat) {
+        return {
+          ok: false,
+          error: `ShootMoon: not your turn (active: ${state.activePlayer}, you: ${command.seat})`,
+        };
+      }
+      if (state.bids[command.seat] === "pass") {
+        return { ok: false, error: `ShootMoon: ${command.seat} already passed` };
+      }
+      if (state.moonShooters.includes(command.seat)) {
+        return { ok: false, error: `ShootMoon: ${command.seat} already declared moon` };
+      }
+
+      const events: GameEvent[] = [];
+      const moonDeclared: GameEvent = {
+        type: "MoonDeclared",
+        seat: command.seat,
+        amount: rules.maximumBid,
+        handNumber: state.handNumber,
+        timestamp: now,
+      };
+      events.push(moonDeclared);
+
+      const newBids = { ...state.bids, [command.seat]: rules.maximumBid };
+      const complete = checkBiddingComplete(
+        newBids,
+        state.dealer,
+        rules,
+        [...state.moonShooters, command.seat],
+        now,
+        state.handNumber,
+      );
+      if (complete) events.push(complete);
+
+      return { ok: true, events };
+    }
+
     case "TakeNest": {
       if (state.phase !== "nest") {
         return { ok: false, error: `Cannot TakeNest in phase: ${state.phase}` };
       }
-      const expectedSeat = leftOf(state.dealer);
+      const expectedSeat = state.bidder!;
       if (command.seat !== expectedSeat) {
         return { ok: false, error: `TakeNest: wrong seat ${command.seat}, expected ${expectedSeat}` };
       }
@@ -45,7 +242,7 @@ export function validateCommand(
       if (state.phase !== "nest") {
         return { ok: false, error: `Cannot DiscardCard in phase: ${state.phase}` };
       }
-      const expectedSeat = leftOf(state.dealer);
+      const expectedSeat = state.bidder!;
       if (command.seat !== expectedSeat) {
         return { ok: false, error: `DiscardCard: wrong seat ${command.seat}` };
       }
@@ -76,7 +273,7 @@ export function validateCommand(
       if (state.phase !== "trump") {
         return { ok: false, error: `Cannot SelectTrump in phase: ${state.phase}` };
       }
-      const expectedSeat = leftOf(state.dealer);
+      const expectedSeat = state.bidder!;
       if (command.seat !== expectedSeat) {
         return { ok: false, error: `SelectTrump: wrong seat ${command.seat}` };
       }
@@ -194,9 +391,9 @@ export function validateCommand(
             timestamp: now,
           });
 
-          // Score the hand
-          const bidder = leftOf(stateAfterTrick.dealer);
-          const bidAmount = rules.autoBidAmount;
+          // Score the hand using bidder and bidAmount from state
+          const bidder = state.bidder ?? leftOf(state.dealer);
+          const bidAmount = state.bidAmount > 0 ? state.bidAmount : rules.autoBidAmount;
 
           const handScore = scoreHand({
             completedTricks: stateAfterTrick.completedTricks,
@@ -206,6 +403,7 @@ export function validateCommand(
             bidAmount,
             hand: state.handNumber,
             rules,
+            shotMoon: state.shotMoon,
           });
 
           const handScoredEvent: HandScored = {
@@ -261,12 +459,41 @@ export function validateCommand(
 /**
  * Return all legal commands for a given seat in the current state.
  */
-export function legalCommands(state: GameState, seat: Seat): GameCommand[] {
+export function legalCommands(
+  state: GameState,
+  seat: Seat,
+  _rules?: GameRules,
+): GameCommand[] {
+  const rules = _rules ?? state.rules ?? DEFAULT_RULES;
   const commands: GameCommand[] = [];
 
   switch (state.phase) {
+    case "bidding": {
+      if (state.activePlayer !== seat) return [];
+      if (state.bids[seat] === "pass") return [];
+
+      // PassBid is always available
+      commands.push({ type: "PassBid", seat });
+
+      // PlaceBid: from max(minimumBid, currentBid + increment) to maximumBid
+      const startBid =
+        state.currentBid === 0
+          ? rules.minimumBid
+          : state.currentBid + rules.bidIncrement;
+      for (let amount = startBid; amount <= rules.maximumBid; amount += rules.bidIncrement) {
+        commands.push({ type: "PlaceBid", seat, amount });
+      }
+
+      // ShootMoon if not already in moonShooters
+      if (!state.moonShooters.includes(seat)) {
+        commands.push({ type: "ShootMoon", seat });
+      }
+
+      break;
+    }
+
     case "nest": {
-      const expectedSeat = leftOf(state.dealer);
+      const expectedSeat = state.bidder!;
       if (seat !== expectedSeat) return [];
 
       if (state.nest.length > 0) {
@@ -285,7 +512,7 @@ export function legalCommands(state: GameState, seat: Seat): GameCommand[] {
     }
 
     case "trump": {
-      const expectedSeat = leftOf(state.dealer);
+      const expectedSeat = state.bidder!;
       if (seat !== expectedSeat) return [];
       for (const color of COLORS) {
         commands.push({ type: "SelectTrump", seat, color });

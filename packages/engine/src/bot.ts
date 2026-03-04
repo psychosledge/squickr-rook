@@ -3,7 +3,7 @@ import { compareTrickCards, cardFromId, offSuitRank, trumpRank } from "./deck.js
 import { pointValue } from "./scoring.js";
 import { legalCommands } from "./validator.js";
 import type { BotProfile, CardId, Color, GameState, Seat } from "./types.js";
-import { SEAT_TEAM } from "./types.js";
+import { DEFAULT_RULES, SEAT_TEAM } from "./types.js";
 
 const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
 
@@ -23,6 +23,45 @@ export function botChooseCommand(
 
   // Handle by phase
   switch (state.phase) {
+    case "bidding": {
+      const hand = state.hands[seat] ?? [];
+      const strength = estimateBidStrength(hand);
+      const rules = state.rules ?? DEFAULT_RULES;
+      const minNextBid = state.currentBid === 0
+        ? rules.minimumBid
+        : state.currentBid + rules.bidIncrement;
+
+      if (profile.difficulty === "easy") {
+        // Easy always passes
+        return { type: "PassBid", seat };
+      }
+
+      if (profile.difficulty === "normal") {
+        // Shoot moon if very strong and not already declared
+        if (strength >= 120 && !state.moonShooters.includes(seat)) {
+          const shootCmd = legal.find(c => c.type === "ShootMoon");
+          if (shootCmd) return shootCmd;
+        }
+        // Bid if reasonably strong
+        if (strength >= 80 && minNextBid <= rules.maximumBid) {
+          const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
+          if (bidCmd) return bidCmd;
+        }
+        return { type: "PassBid", seat };
+      }
+
+      // Hard
+      if (strength >= 150 && !state.moonShooters.includes(seat)) {
+        const shootCmd = legal.find(c => c.type === "ShootMoon");
+        if (shootCmd) return shootCmd;
+      }
+      if (strength >= 100 && minNextBid <= rules.maximumBid) {
+        const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
+        if (bidCmd) return bidCmd;
+      }
+      return { type: "PassBid", seat };
+    }
+
     case "nest": {
       // Check if we need to take nest or discard
       if (state.nest.length > 0) {
@@ -72,6 +111,22 @@ export function botChooseCommand(
     default:
       return legal[0]!;
   }
+}
+
+// ── Bid strength estimation ───────────────────────────────────────────────────
+
+function estimateBidStrength(hand: CardId[]): number {
+  let strength = 0;
+  for (const cardId of hand) {
+    if (cardId === "ROOK") { strength += 15; continue; }
+    const card = cardFromId(cardId);
+    if (card.kind !== "regular") continue;
+    if (card.value === 1) strength += 15;   // Ace (highest)
+    if (card.value === 14) strength += 10;  // 14-point card
+    if (card.value === 10) strength += 8;   // 10-point card
+    if (card.value === 5) strength += 5;    // 5-point card
+  }
+  return strength;
 }
 
 // ── Discard strategy ──────────────────────────────────────────────────────────

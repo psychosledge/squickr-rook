@@ -190,6 +190,101 @@ describe("scoreHand", () => {
   });
 });
 
+describe("scoreHand - shotMoon field", () => {
+  const rules = DEFAULT_RULES;
+
+  it("scoreHand with shotMoon: true → HandScore.shotMoon = true", () => {
+    const tricks: CompletedTrick[] = [
+      makeTrick("N", [["N", "B1"], ["E", "B6"], ["S", "B7"], ["W", "B8"]]),
+      makeTrick("N", [["N", "R1"], ["E", "R6"], ["S", "R7"], ["W", "R8"]]),
+      makeTrick("N", [["N", "G1"], ["E", "G6"], ["S", "G7"], ["W", "G8"]]),
+      makeTrick("N", [["N", "Y1"], ["E", "Y6"], ["S", "Y7"], ["W", "Y8"]]),
+      makeTrick("N", [["N", "B10"], ["E", "B9"], ["S", "B11"], ["W", "B12"]]),
+      makeTrick("N", [["N", "R10"], ["E", "R9"], ["S", "R11"], ["W", "R12"]]),
+      makeTrick("N", [["N", "G10"], ["E", "G9"], ["S", "G11"], ["W", "G12"]]),
+      makeTrick("N", [["N", "Y10"], ["E", "Y9"], ["S", "Y11"], ["W", "Y12"]]),
+      makeTrick("E", [["E", "B5"], ["N", "B13"], ["S", "R13"], ["W", "G13"]]),
+      makeTrick("E", [["E", "R5"], ["N", "B14"], ["S", "R14"], ["W", "G5"]]),
+    ];
+    const score = scoreHand({
+      completedTricks: tricks,
+      discarded: [],
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 100,
+      hand: 0,
+      rules,
+      shotMoon: true,
+    });
+    expect(score.shotMoon).toBe(true);
+  });
+
+  it("scoreHand with shotMoon: false → HandScore.shotMoon = false", () => {
+    const tricks: CompletedTrick[] = [
+      makeTrick("N", [["N", "B1"], ["E", "B6"], ["S", "B7"], ["W", "B8"]]),
+      makeTrick("N", [["N", "R1"], ["E", "R6"], ["S", "R7"], ["W", "R8"]]),
+      makeTrick("N", [["N", "G1"], ["E", "G6"], ["S", "G7"], ["W", "G8"]]),
+      makeTrick("N", [["N", "Y1"], ["E", "Y6"], ["S", "Y7"], ["W", "Y8"]]),
+      makeTrick("N", [["N", "B10"], ["E", "B9"], ["S", "B11"], ["W", "B12"]]),
+      makeTrick("N", [["N", "R10"], ["E", "R9"], ["S", "R11"], ["W", "R12"]]),
+      makeTrick("N", [["N", "G10"], ["E", "G9"], ["S", "G11"], ["W", "G12"]]),
+      makeTrick("N", [["N", "Y10"], ["E", "Y9"], ["S", "Y11"], ["W", "Y12"]]),
+      makeTrick("E", [["E", "B5"], ["N", "B13"], ["S", "R13"], ["W", "G13"]]),
+      makeTrick("E", [["E", "R5"], ["N", "B14"], ["S", "R14"], ["W", "G5"]]),
+    ];
+    const score = scoreHand({
+      completedTricks: tricks,
+      discarded: [],
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 100,
+      hand: 0,
+      rules,
+      shotMoon: false,
+    });
+    expect(score.shotMoon).toBe(false);
+  });
+
+  it("scoreHand still computes correct deltas regardless of shotMoon value", () => {
+    // NS wins everything, bid=100, shotMoon=true → nsDelta should still equal nsTotal
+    const tricks: CompletedTrick[] = [
+      makeTrick("N", [["N", "B1"], ["E", "B6"], ["S", "B7"], ["W", "B8"]]),
+      makeTrick("N", [["N", "R1"], ["E", "R6"], ["S", "R7"], ["W", "R8"]]),
+      makeTrick("N", [["N", "G1"], ["E", "G6"], ["S", "G7"], ["W", "G8"]]),
+      makeTrick("N", [["N", "Y1"], ["E", "Y6"], ["S", "Y7"], ["W", "Y8"]]),
+      makeTrick("N", [["N", "B10"], ["E", "B9"], ["S", "B11"], ["W", "B12"]]),
+      makeTrick("N", [["N", "R10"], ["E", "R9"], ["S", "R11"], ["W", "R12"]]),
+      makeTrick("N", [["N", "G10"], ["E", "G9"], ["S", "G11"], ["W", "G12"]]),
+      makeTrick("N", [["N", "Y10"], ["E", "Y9"], ["S", "Y11"], ["W", "Y12"]]),
+      makeTrick("E", [["E", "B5"], ["N", "B13"], ["S", "R13"], ["W", "G13"]]),
+      makeTrick("E", [["E", "R5"], ["N", "B14"], ["S", "R14"], ["W", "G5"]]),
+    ];
+    const scoreWithMoon = scoreHand({
+      completedTricks: tricks,
+      discarded: [],
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 100,
+      hand: 0,
+      rules,
+      shotMoon: true,
+    });
+    const scoreWithoutMoon = scoreHand({
+      completedTricks: tricks,
+      discarded: [],
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 100,
+      hand: 0,
+      rules,
+      shotMoon: false,
+    });
+    // deltas should be the same regardless of shotMoon (it's just stored, no logic change)
+    expect(scoreWithMoon.nsDelta).toBe(scoreWithoutMoon.nsDelta);
+    expect(scoreWithMoon.ewDelta).toBe(scoreWithoutMoon.ewDelta);
+  });
+});
+
 describe("checkWinCondition", () => {
   const rules = DEFAULT_RULES;
 

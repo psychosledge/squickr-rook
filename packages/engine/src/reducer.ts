@@ -1,12 +1,13 @@
 import { deriveDeal } from "./deal.js";
 import type { GameEvent } from "./events.js";
-import type { GameState, Team } from "./types.js";
+import type { GameState, Seat, Team } from "./types.js";
 import {
   DEFAULT_RULES,
   SEAT_TEAM,
   leftOf,
   nextSeat,
 } from "./types.js";
+import { getNextBidder } from "./bidding.js";
 
 export const INITIAL_STATE: GameState = {
   version: 0,
@@ -30,23 +31,30 @@ export const INITIAL_STATE: GameState = {
   handHistory: [],
   winner: null,
   playedCards: [],
+  // Bidding phase fields
+  bids: { N: null, E: null, S: null, W: null },
+  moonShooters: [],
+  currentBid: 0,
+  bidder: null,
+  bidAmount: 0,
+  shotMoon: false,
 };
 
 export function applyEvent(state: GameState, event: GameEvent): GameState {
   switch (event.type) {
     case "GameStarted": {
       const deal = deriveDeal(event.seed, 0);
-      const nestPlayer = leftOf(event.dealer);
+      const firstBidder = leftOf(event.dealer);
       return {
         ...state,
         version: state.version + 1,
-        phase: "nest",
+        phase: "bidding",
         rules: event.rules,
         players: event.players,
         dealer: event.dealer,
         seed: event.seed,
         handNumber: 0,
-        activePlayer: nestPlayer,
+        activePlayer: firstBidder,
         hands: deal.hands,
         nest: deal.nest,
         originalNest: [],
@@ -60,19 +68,26 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         handHistory: [],
         winner: null,
         playedCards: [],
+        // Reset bidding state
+        bids: { N: null, E: null, S: null, W: null },
+        moonShooters: [],
+        currentBid: 0,
+        bidder: null,
+        bidAmount: 0,
+        shotMoon: false,
       };
     }
 
     case "HandStarted": {
       const deal = deriveDeal(state.seed, event.handNumber);
-      const nestPlayer = leftOf(event.dealer);
+      const firstBidder = leftOf(event.dealer);
       return {
         ...state,
         version: state.version + 1,
-        phase: "nest",
+        phase: "bidding",
         dealer: event.dealer,
         handNumber: event.handNumber,
-        activePlayer: nestPlayer,
+        activePlayer: firstBidder,
         hands: deal.hands,
         nest: deal.nest,
         originalNest: [],
@@ -83,6 +98,68 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         completedTricks: [],
         capturedCards: { NS: [], EW: [] },
         playedCards: [],
+        // Reset bidding state
+        bids: { N: null, E: null, S: null, W: null },
+        moonShooters: [],
+        currentBid: 0,
+        bidder: null,
+        bidAmount: 0,
+        shotMoon: false,
+      };
+    }
+
+    case "BidPlaced": {
+      const { seat, amount } = event;
+      const newBids = { ...state.bids, [seat]: amount };
+      const newCurrentBid = Math.max(state.currentBid, amount);
+      const nextBidder = getNextBidder(newBids, seat);
+      return {
+        ...state,
+        version: state.version + 1,
+        bids: newBids,
+        currentBid: newCurrentBid,
+        activePlayer: nextBidder,
+      };
+    }
+
+    case "BidPassed": {
+      const { seat } = event;
+      const newBids = { ...state.bids, [seat]: "pass" as const };
+      const nextBidder = getNextBidder(newBids, seat);
+      return {
+        ...state,
+        version: state.version + 1,
+        bids: newBids,
+        activePlayer: nextBidder,
+      };
+    }
+
+    case "MoonDeclared": {
+      const { seat, amount } = event;
+      const newBids = { ...state.bids, [seat]: amount };
+      const newCurrentBid = Math.max(state.currentBid, amount);
+      const newMoonShooters = [...state.moonShooters, seat];
+      const nextBidder = getNextBidder(newBids, seat);
+      return {
+        ...state,
+        version: state.version + 1,
+        bids: newBids,
+        currentBid: newCurrentBid,
+        moonShooters: newMoonShooters,
+        activePlayer: nextBidder,
+      };
+    }
+
+    case "BiddingComplete": {
+      const { winner, amount, shotMoon } = event;
+      return {
+        ...state,
+        version: state.version + 1,
+        phase: "nest",
+        bidder: winner,
+        bidAmount: amount,
+        shotMoon,
+        activePlayer: winner,
       };
     }
 
@@ -120,7 +197,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         version: state.version + 1,
         trump: event.color,
         phase: "playing",
-        activePlayer: leftOf(leftOf(state.dealer)),
+        activePlayer: leftOf(state.bidder!),
       };
     }
 

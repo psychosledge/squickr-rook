@@ -16,6 +16,39 @@ export type HandStarted = {
   timestamp: number;
 };
 
+export type BidPlaced = {
+  type: "BidPlaced";
+  seat: Seat;
+  amount: number;
+  handNumber: number;
+  timestamp: number;
+};
+
+export type BidPassed = {
+  type: "BidPassed";
+  seat: Seat;
+  handNumber: number;
+  timestamp: number;
+};
+
+export type MoonDeclared = {
+  type: "MoonDeclared";
+  seat: Seat;
+  amount: number;
+  handNumber: number;
+  timestamp: number;
+};
+
+export type BiddingComplete = {
+  type: "BiddingComplete";
+  winner: Seat;
+  amount: number;
+  forced: boolean;
+  shotMoon: boolean;
+  handNumber: number;
+  timestamp: number;
+};
+
 export type NestTaken = {
   type: "NestTaken";
   seat: Seat;
@@ -77,6 +110,10 @@ export type GameFinished = {
 export type GameEvent =
   | GameStarted
   | HandStarted
+  | BidPlaced
+  | BidPassed
+  | MoonDeclared
+  | BiddingComplete
   | NestTaken
   | CardDiscarded
   | TrumpSelected

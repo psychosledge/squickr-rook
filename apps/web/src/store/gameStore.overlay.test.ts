@@ -36,6 +36,7 @@ const MOCK_HAND_SCORE: HandScore = {
   ewTotal: 60,
   nsDelta: 0,
   ewDelta: 0,
+  shotMoon: false,
 };
 
 const HAND_SCORED_EVENT: GameEvent = {

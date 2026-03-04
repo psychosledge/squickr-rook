@@ -1,5 +1,21 @@
 import type { CardId, Color, Seat } from "./types.js";
 
+export type PlaceBid = {
+  type: "PlaceBid";
+  seat: Seat;
+  amount: number;
+};
+
+export type PassBid = {
+  type: "PassBid";
+  seat: Seat;
+};
+
+export type ShootMoon = {
+  type: "ShootMoon";
+  seat: Seat;
+};
+
 export type TakeNest = {
   type: "TakeNest";
   seat: Seat;
@@ -24,6 +40,9 @@ export type PlayCard = {
 };
 
 export type GameCommand =
+  | PlaceBid
+  | PassBid
+  | ShootMoon
   | TakeNest
   | DiscardCard
   | SelectTrump

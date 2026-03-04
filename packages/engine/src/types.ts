@@ -23,7 +23,7 @@ export function leftOf(seat: Seat): Seat {
   return nextSeat(seat);
 }
 
-export type GamePhase = "dealing" | "nest" | "trump" | "playing" | "scoring" | "finished";
+export type GamePhase = "dealing" | "bidding" | "nest" | "trump" | "playing" | "scoring" | "finished";
 
 export type GameRules = {
   version: 1;
@@ -32,6 +32,9 @@ export type GameRules = {
   autoBidAmount: number;
   botDelayMs: number;
   nestAssignment: "left-of-dealer";
+  minimumBid: number;
+  bidIncrement: number;
+  maximumBid: number;
 };
 
 export const DEFAULT_RULES: GameRules = {
@@ -41,6 +44,9 @@ export const DEFAULT_RULES: GameRules = {
   autoBidAmount: 100,
   botDelayMs: 1000,
   nestAssignment: "left-of-dealer",
+  minimumBid: 100,
+  bidIncrement: 5,
+  maximumBid: 200,
 };
 
 export type PlayedCard = { seat: Seat; cardId: CardId };
@@ -69,6 +75,7 @@ export type HandScore = {
   ewTotal: number;
   nsDelta: number;
   ewDelta: number;
+  shotMoon: boolean;
 };
 
 export type PlayerKind = "human" | "bot";
@@ -117,4 +124,11 @@ export type GameState = {
   handHistory: HandScore[];
   winner: Team | null;
   playedCards: CardId[];
+  // Bidding phase fields
+  bids: Record<Seat, number | "pass" | null>;
+  moonShooters: Seat[];
+  currentBid: number;
+  bidder: Seat | null;
+  bidAmount: number;
+  shotMoon: boolean;
 };
