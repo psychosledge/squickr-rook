@@ -17,6 +17,7 @@ vi.mock("./ScoreBar.module.css", () => ({
     status: "status",
     active: "active",
     bidBadge: "bidBadge",
+    historyBtn: "historyBtn",
   },
 }));
 
@@ -234,5 +235,75 @@ describe("ScoreBar — bid badge", () => {
 
     expect(badges).toHaveLength(1);
     expect(flattenText(badges[0])).toBe("Label-S bid 150");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// History button tests
+// ---------------------------------------------------------------------------
+
+const minimalHandScore = {
+  hand: 1,
+  bidder: "N" as const,
+  bidAmount: 120,
+  nestCards: [],
+  discarded: [],
+  nsPointCards: 140,
+  ewPointCards: 60,
+  nsMostCardsBonus: 0,
+  ewMostCardsBonus: 0,
+  nsNestBonus: 0,
+  ewNestBonus: 0,
+  nsWonLastTrick: false,
+  ewWonLastTrick: false,
+  nsTotal: 140,
+  ewTotal: 60,
+  nsDelta: 120,
+  ewDelta: -60,
+  shotMoon: false,
+  moonShooterWentSet: false,
+};
+
+describe("ScoreBar — history button", () => {
+  it("is not rendered when handHistory is empty, even if onOpenHistory is provided", () => {
+    const gs = makeGameState({ handHistory: [] });
+    const tree = ScoreBar({ gameState: gs, onOpenHistory: vi.fn() });
+    const elements = flattenElements(tree);
+    const btns = findByClass(elements, "historyBtn");
+    expect(btns).toHaveLength(0);
+  });
+
+  it("is not rendered when onOpenHistory is not provided, even if handHistory has entries", () => {
+    const gs = makeGameState({ handHistory: [minimalHandScore] });
+    const tree = ScoreBar({ gameState: gs });
+    const elements = flattenElements(tree);
+    const btns = findByClass(elements, "historyBtn");
+    expect(btns).toHaveLength(0);
+  });
+
+  it("is rendered when handHistory has entries AND onOpenHistory is provided", () => {
+    const gs = makeGameState({ handHistory: [minimalHandScore] });
+    const tree = ScoreBar({ gameState: gs, onOpenHistory: vi.fn() });
+    const elements = flattenElements(tree);
+    const btns = findByClass(elements, "historyBtn");
+    expect(btns).toHaveLength(1);
+    const btn = btns[0];
+    const p = btn.props as Record<string, unknown>;
+    expect(p["aria-label"]).toBe("View hand history");
+    expect(p["type"]).toBe("button");
+    expect(flattenText(btn)).toBe("📋");
+  });
+
+  it("calls onOpenHistory when the history button is clicked", () => {
+    const onOpenHistory = vi.fn();
+    const gs = makeGameState({ handHistory: [minimalHandScore] });
+    const tree = ScoreBar({ gameState: gs, onOpenHistory });
+    const elements = flattenElements(tree);
+    const btns = findByClass(elements, "historyBtn");
+    expect(btns).toHaveLength(1);
+    const btn = btns[0];
+    const p = btn.props as Record<string, unknown>;
+    (p.onClick as () => void)();
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,7 +2,7 @@ import type { GameState } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./ScoreBar.module.css";
 
-type Props = { gameState: GameState };
+type Props = { gameState: GameState; onOpenHistory?: () => void };
 
 const TRUMP_COLORS: Record<string, string> = {
   Black:  "#aaaaaa",
@@ -11,8 +11,8 @@ const TRUMP_COLORS: Record<string, string> = {
   Yellow: "#f1c40f",
 };
 
-export default function ScoreBar({ gameState }: Props) {
-  const { scores, handNumber, trump, phase, activePlayer, bidder, bidAmount, shotMoon } = gameState;
+export default function ScoreBar({ gameState, onOpenHistory }: Props) {
+  const { scores, handNumber, trump, phase, activePlayer, bidder, bidAmount, shotMoon, handHistory } = gameState;
   const activeName = activePlayer ? getSeatLabel(activePlayer) : "";
 
   const showBidBadge =
@@ -30,6 +30,16 @@ export default function ScoreBar({ gameState }: Props) {
         <span className={styles.team}>NS <strong>{scores.NS}</strong></span>
         <span className={styles.divider}>|</span>
         <span className={styles.team}>EW <strong>{scores.EW}</strong></span>
+        {onOpenHistory && handHistory.length > 0 && (
+          <button
+            type="button"
+            className={styles.historyBtn}
+            aria-label="View hand history"
+            onClick={onOpenHistory}
+          >
+            📋
+          </button>
+        )}
       </div>
 
       <div className={styles.center}>
