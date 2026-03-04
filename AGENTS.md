@@ -162,7 +162,7 @@ User performs manual testing (all items from session)
 
 ### Phase 4: Release (when user says "ship it")
 
-1. Bump version in relevant `package.json` files
+1. Bump version in **root `package.json`** and any relevant workspace `package.json` files (e.g. `apps/web/package.json`)
 2. Update `CHANGELOG.md` — add release entry
 3. Update any roadmap or session docs — mark items complete
 4. Commit: `chore: bump version to vX.Y.Z and update docs`
@@ -170,6 +170,11 @@ User performs manual testing (all items from session)
 6. Create and push tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
 
 > The tag triggers deployment. Pushing commits alone does NOT deploy.
+
+**Version sync rule — never break this:**
+- The git tag name **must exactly match** the version in root `package.json` (e.g. tag `v0.3.0` requires `"version": "0.3.0"`).
+- Always bump `package.json` **in the same commit that will be tagged** — never tag an existing fix commit.
+- The deploy CI enforces this: it will fail if the tag and `package.json` disagree.
 
 ---
 
