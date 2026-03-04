@@ -102,7 +102,7 @@ export type HandScored = {
 export type GameFinished = {
   type: "GameFinished";
   winner: Team;
-  reason: "threshold-reached" | "bust";
+  reason: "threshold-reached" | "bust" | "moon-set" | "moon-made";
   finalScores: Record<Team, number>;
   timestamp: number;
 };

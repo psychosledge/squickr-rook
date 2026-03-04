@@ -76,6 +76,7 @@ export type HandScore = {
   nsDelta: number;
   ewDelta: number;
   shotMoon: boolean;
+  moonShooterWentSet: boolean;
 };
 
 export type PlayerKind = "human" | "bot";

@@ -407,6 +407,9 @@ export function validateCommand(
           const bidder = state.bidder ?? leftOf(state.dealer);
           const bidAmount = state.bidAmount > 0 ? state.bidAmount : rules.autoBidAmount;
 
+          // Snapshot pre-hand scores BEFORE applying deltas
+          const preHandScores = { ...stateAfterTrick.scores };
+
           const handScore = scoreHand({
             completedTricks: stateAfterTrick.completedTricks,
             discarded: stateAfterTrick.discarded,
@@ -416,6 +419,7 @@ export function validateCommand(
             hand: state.handNumber,
             rules,
             shotMoon: state.shotMoon,
+            preHandScores,
           });
 
           const handScoredEvent: HandScored = {
@@ -433,7 +437,21 @@ export function validateCommand(
           };
 
           const bidderTeam: Team = SEAT_TEAM[bidder];
-          const winCondition = checkWinCondition(newScores, bidderTeam, rules);
+
+          // Determine moon-made flag: only true if pre-hand score was >= 0
+          const bidderTotal = bidderTeam === "NS" ? handScore.nsTotal : handScore.ewTotal;
+          const moonShooterMade =
+            state.shotMoon &&
+            bidderTotal >= bidAmount &&
+            preHandScores[bidderTeam] >= 0;
+
+          const winCondition = checkWinCondition(
+            newScores,
+            bidderTeam,
+            rules,
+            handScore.moonShooterWentSet,
+            moonShooterMade,
+          );
 
           if (winCondition !== null) {
             const gameFinishedEvent: GameFinished = {

@@ -13,6 +13,7 @@ function resetStore() {
     botTimeoutId: null,
     botDifficulty: "normal",
     announcement: null,
+    gameOverReason: null,
   });
 }
 

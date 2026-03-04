@@ -21,8 +21,18 @@ export function scoreHand(params: {
   hand: number;
   rules: GameRules;
   shotMoon?: boolean;
+  preHandScores?: Record<Team, number>;
 }): HandScore {
-  const { completedTricks, discarded, nestCards, bidder, bidAmount, hand, shotMoon = false } = params;
+  const {
+    completedTricks,
+    discarded,
+    nestCards,
+    bidder,
+    bidAmount,
+    hand,
+    shotMoon = false,
+    preHandScores,
+  } = params;
 
   // 1. Count point cards captured by each team from completed tricks
   let nsPointCards = 0;
@@ -90,15 +100,52 @@ export function scoreHand(params: {
   const bidderTeam: Team = SEAT_TEAM[bidder];
   const bidderTotal = bidderTeam === "NS" ? nsTotal : ewTotal;
 
+  // Detect moon shooter going set: shotMoon=true AND bidder didn't capture all tricks
+  const moonShooterWentSet = shotMoon && bidderTotal < bidAmount;
+
+  // Detect moon shooter making it: shotMoon=true AND bidder made the bid
+  const bidderMadeIt = bidderTotal >= bidAmount;
+
+  // Pre-hand score for the bidder team (0 if not provided)
+  const preHandScore = preHandScores ? preHandScores[bidderTeam] : 0;
+
+  // Moon made: shotMoon=true, bidder made bid, AND pre-hand score >= 0
+  const moonShooterMadePositive = shotMoon && bidderMadeIt && preHandScore >= 0;
+  // Moon made but in the hole: shotMoon=true, bidder made bid, pre-hand score < 0
+  const moonShooterMadeInHole = shotMoon && bidderMadeIt && preHandScore < 0;
+
   let nsDelta: number;
   let ewDelta: number;
 
-  if (bidderTotal >= bidAmount) {
-    // Bidder wins — both teams score their points
+  if (moonShooterWentSet) {
+    // Moon shooter went set: bidder team scores 0, opponent gets the full point pool
+    if (bidderTeam === "NS") {
+      nsDelta = 0;
+      ewDelta = nsTotal + ewTotal;
+    } else {
+      nsDelta = nsTotal + ewTotal;
+      ewDelta = 0;
+    }
+  } else if (moonShooterMadeInHole) {
+    // Moon made but bidder team is in the hole: reset their score to 0
+    // Opponent scores their normal points
+    if (bidderTeam === "NS") {
+      nsDelta = Math.abs(preHandScore); // brings NS from negative to 0
+      ewDelta = ewTotal;
+    } else {
+      nsDelta = nsTotal;
+      ewDelta = Math.abs(preHandScore); // brings EW from negative to 0
+    }
+  } else if (moonShooterMadePositive) {
+    // Moon made with positive pre-hand score: instant win (score normally, win condition handled in checkWinCondition)
+    nsDelta = nsTotal;
+    ewDelta = ewTotal;
+  } else if (bidderMadeIt) {
+    // Normal win — both teams score their points
     nsDelta = nsTotal;
     ewDelta = ewTotal;
   } else {
-    // Bidder loses — bidder team loses bidAmount, opponent scores normally
+    // Normal set
     if (bidderTeam === "NS") {
       nsDelta = -bidAmount;
       ewDelta = ewTotal;
@@ -127,6 +174,7 @@ export function scoreHand(params: {
     nsDelta,
     ewDelta,
     shotMoon,
+    moonShooterWentSet,
   };
 }
 
@@ -138,8 +186,21 @@ export function checkWinCondition(
   scores: Record<Team, number>,
   bidderTeam: Team,
   rules: GameRules,
-): { winner: Team; reason: "threshold-reached" | "bust" } | null {
+  moonShooterWentSet = false,
+  moonShooterMade = false,
+): { winner: Team; reason: "threshold-reached" | "bust" | "moon-set" | "moon-made" } | null {
   const { winThreshold, bustThreshold } = rules;
+
+  // Instant loss: moon shooter went set
+  if (moonShooterWentSet) {
+    const winner: Team = bidderTeam === "NS" ? "EW" : "NS";
+    return { winner, reason: "moon-set" };
+  }
+
+  // Instant win: moon shooter made it (only if score was >= 0 before hand)
+  if (moonShooterMade) {
+    return { winner: bidderTeam, reason: "moon-made" };
+  }
 
   // Check bust condition first
   const nsBusted = scores.NS < bustThreshold;

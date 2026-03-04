@@ -3,7 +3,7 @@ import { validateCommand, legalCommands } from "../validator.js";
 import { applyEvent, reduceEvents, INITIAL_STATE } from "../reducer.js";
 import type { GameEvent } from "../events.js";
 import type { GameState, Seat } from "../types.js";
-import { DEFAULT_RULES, leftOf } from "../types.js";
+import { DEFAULT_RULES, leftOf, SEAT_TEAM } from "../types.js";
 import type { PlaceBid, PassBid, ShootMoon } from "../commands.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1120,5 +1120,399 @@ describe("bidding - ShootMoon after numeric bid: legalCommands", () => {
     const state = biddingState(); // E is active, no bids yet
     const cmds = legalCommands(state, "E", DEFAULT_RULES);
     expect(cmds.some(c => c.type === "ShootMoon")).toBe(true);
+  });
+});
+
+// ── Helpers for Shoot the Moon outcome tests ──────────────────────────────────
+
+/**
+ * Build a game state where W is about to play the 4th (final) card of trick 10.
+ * tricksPlayed=9, currentTrick already has 3 plays (N, E, S).
+ * W is activePlayer with exactly 1 card left.
+ * shotMoon=true, bidder=N (NS team), bidAmount=200, trump=Black.
+ * scores = caller-supplied pre-hand scores.
+ */
+function lastCardState(
+  first9Tricks: import("../types.js").CompletedTrick[],
+  currentTrick3: [
+    { seat: "N"; cardId: string },
+    { seat: "E"; cardId: string },
+    { seat: "S"; cardId: string },
+  ],
+  wCard: string,
+  preHandScores: { NS: number; EW: number },
+): GameState {
+  // Build capturedCards from the first 9 tricks
+  const capturedCards: Record<import("../types.js").Team, string[]> = { NS: [], EW: [] };
+  for (const t of first9Tricks) {
+    const team = SEAT_TEAM[t.winner];
+    for (const p of t.plays) capturedCards[team].push(p.cardId);
+  }
+  // discarded: Y5 — goes to last-trick winner as nest bonus
+  const discarded = ["Y5"];
+
+  return {
+    version: 1,
+    phase: "playing",
+    rules: DEFAULT_RULES,
+    players: [
+      { seat: "N", name: "Alice", kind: "human" },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+    ],
+    handNumber: 0,
+    dealer: "N",
+    seed: 42,
+    activePlayer: "W",
+    hands: {
+      N: [],
+      E: [],
+      S: [],
+      W: [wCard],
+    },
+    nest: [],
+    originalNest: ["Y5"],
+    discarded,
+    trump: "Black",
+    currentTrick: currentTrick3,
+    tricksPlayed: 9,
+    completedTricks: first9Tricks,
+    capturedCards,
+    scores: preHandScores,
+    handHistory: [],
+    winner: null,
+    playedCards: [],
+    bids: { N: 200, E: "pass", S: "pass", W: "pass" },
+    moonShooters: ["N"],
+    currentBid: 200,
+    bidder: "N",
+    bidAmount: 200,
+    shotMoon: true,
+  };
+}
+
+/**
+ * Build a game state where N is about to play the 4th (final) card of trick 10.
+ * tricksPlayed=9, currentTrick already has 3 plays (E, S, W).
+ * N is activePlayer with exactly 1 card left.
+ * shotMoon=true, bidder=E (EW team), bidAmount=200, trump=Black.
+ * scores = caller-supplied pre-hand scores.
+ */
+function lastCardStateEW(
+  first9Tricks: import("../types.js").CompletedTrick[],
+  currentTrick3: [
+    { seat: "E"; cardId: string },
+    { seat: "S"; cardId: string },
+    { seat: "W"; cardId: string },
+  ],
+  nCard: string,
+  preHandScores: { NS: number; EW: number },
+): GameState {
+  // Build capturedCards from the first 9 tricks
+  const capturedCards: Record<import("../types.js").Team, string[]> = { NS: [], EW: [] };
+  for (const t of first9Tricks) {
+    const team = SEAT_TEAM[t.winner];
+    for (const p of t.plays) capturedCards[team].push(p.cardId);
+  }
+  // discarded: Y5 — goes to last-trick winner as nest bonus
+  const discarded = ["Y5"];
+
+  return {
+    version: 1,
+    phase: "playing",
+    rules: DEFAULT_RULES,
+    players: [
+      { seat: "N", name: "Alice", kind: "human" },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+    ],
+    handNumber: 0,
+    dealer: "N",
+    seed: 42,
+    activePlayer: "N",
+    hands: {
+      N: [nCard],
+      E: [],
+      S: [],
+      W: [],
+    },
+    nest: [],
+    originalNest: ["Y5"],
+    discarded,
+    trump: "Black",
+    currentTrick: currentTrick3,
+    tricksPlayed: 9,
+    completedTricks: first9Tricks,
+    capturedCards,
+    scores: preHandScores,
+    handHistory: [],
+    winner: null,
+    playedCards: [],
+    bids: { N: "pass", E: 200, S: "pass", W: "pass" },
+    moonShooters: ["E"],
+    currentBid: 200,
+    bidder: "E",
+    bidAmount: 200,
+    shotMoon: true,
+  };
+}
+
+/**
+ * Shared first 9 tricks: NS wins all 9.
+ * Remaining cards: B13, B14, R13, R14, G13, G14, Y13, Y14.
+ * Plus Y5 in discarded.
+ */
+const sharedFirst9Tricks: import("../types.js").CompletedTrick[] = [
+  { winner: "N", plays: [{ seat: "N", cardId: "B1" },   { seat: "E", cardId: "B6" },  { seat: "S", cardId: "B7" },  { seat: "W", cardId: "B8" }],  leadColor: "Black" },
+  { winner: "N", plays: [{ seat: "N", cardId: "R1" },   { seat: "E", cardId: "R6" },  { seat: "S", cardId: "R7" },  { seat: "W", cardId: "R8" }],  leadColor: "Red" },
+  { winner: "N", plays: [{ seat: "N", cardId: "G1" },   { seat: "E", cardId: "G6" },  { seat: "S", cardId: "G7" },  { seat: "W", cardId: "G8" }],  leadColor: "Green" },
+  { winner: "N", plays: [{ seat: "N", cardId: "Y1" },   { seat: "E", cardId: "Y6" },  { seat: "S", cardId: "Y7" },  { seat: "W", cardId: "Y8" }],  leadColor: "Yellow" },
+  { winner: "N", plays: [{ seat: "N", cardId: "B10" },  { seat: "E", cardId: "B9" },  { seat: "S", cardId: "B11" }, { seat: "W", cardId: "B12" }], leadColor: "Black" },
+  { winner: "N", plays: [{ seat: "N", cardId: "R10" },  { seat: "E", cardId: "R9" },  { seat: "S", cardId: "R11" }, { seat: "W", cardId: "R12" }], leadColor: "Red" },
+  { winner: "N", plays: [{ seat: "N", cardId: "G10" },  { seat: "E", cardId: "G9" },  { seat: "S", cardId: "G11" }, { seat: "W", cardId: "G12" }], leadColor: "Green" },
+  { winner: "N", plays: [{ seat: "N", cardId: "Y10" },  { seat: "E", cardId: "Y9" },  { seat: "S", cardId: "Y11" }, { seat: "W", cardId: "Y12" }], leadColor: "Yellow" },
+  { winner: "N", plays: [{ seat: "N", cardId: "ROOK" }, { seat: "E", cardId: "B5" },  { seat: "S", cardId: "R5" },  { seat: "W", cardId: "G5" }],  leadColor: null },
+];
+
+/**
+ * Trick 10 (moon goes set — EW wins):
+ *   N leads R13 (Red, not trump), E plays B14 (Black=trump, wins), S plays G13, W plays Y13.
+ *   trump=Black → E wins with B14 (highest trump beats non-trump lead).
+ */
+const moonSetTrick10_3cards: [
+  { seat: "N"; cardId: string },
+  { seat: "E"; cardId: string },
+  { seat: "S"; cardId: string },
+] = [
+  { seat: "N", cardId: "R13" },
+  { seat: "E", cardId: "B14" },
+  { seat: "S", cardId: "G13" },
+];
+const moonSetTrick10_wCard = "Y13"; // W plays last; E wins with B14
+
+/**
+ * Trick 10 (moon made — NS wins):
+ *   N leads B14 (Black=trump, highest trump), E plays R14, S plays G14, W plays Y14.
+ *   trump=Black → N wins with B14 (only Black card in the trick, highest trump).
+ *   NS total: first 9 (135) + trick10 B14(10)+R14(10)+G14(10)+Y14(10) = 175
+ *           + Y5 nest bonus (NS wins last trick) = 180
+ *           + most-cards bonus (+20) = 200 ✓
+ *   Note: B14 also appears in moonSetTrick10 but that's a different test scenario.
+ */
+const moonMadeTrick10_3cards: [
+  { seat: "N"; cardId: string },
+  { seat: "E"; cardId: string },
+  { seat: "S"; cardId: string },
+] = [
+  { seat: "N", cardId: "B14" },
+  { seat: "E", cardId: "R14" },
+  { seat: "S", cardId: "G14" },
+];
+const moonMadeTrick10_wCard = "Y14"; // W plays last; N wins with B14 (only trump in trick)
+
+/**
+ * Shared first 9 tricks for EW-bidder tests: EW wins all 9.
+ * Remaining cards for trick 10: B13, B14, R13, R14, G13, G14, Y13, Y14.
+ * Plus Y5 in discarded.
+ */
+const sharedFirst9TricksEW: import("../types.js").CompletedTrick[] = [
+  { winner: "E", plays: [{ seat: "E", cardId: "B1" },   { seat: "S", cardId: "B6" },  { seat: "W", cardId: "B7" },  { seat: "N", cardId: "B8" }],  leadColor: "Black" },
+  { winner: "E", plays: [{ seat: "E", cardId: "R1" },   { seat: "S", cardId: "R6" },  { seat: "W", cardId: "R7" },  { seat: "N", cardId: "R8" }],  leadColor: "Red" },
+  { winner: "E", plays: [{ seat: "E", cardId: "G1" },   { seat: "S", cardId: "G6" },  { seat: "W", cardId: "G7" },  { seat: "N", cardId: "G8" }],  leadColor: "Green" },
+  { winner: "E", plays: [{ seat: "E", cardId: "Y1" },   { seat: "S", cardId: "Y6" },  { seat: "W", cardId: "Y7" },  { seat: "N", cardId: "Y8" }],  leadColor: "Yellow" },
+  { winner: "E", plays: [{ seat: "E", cardId: "B10" },  { seat: "S", cardId: "B9" },  { seat: "W", cardId: "B11" }, { seat: "N", cardId: "B12" }], leadColor: "Black" },
+  { winner: "E", plays: [{ seat: "E", cardId: "R10" },  { seat: "S", cardId: "R9" },  { seat: "W", cardId: "R11" }, { seat: "N", cardId: "R12" }], leadColor: "Red" },
+  { winner: "E", plays: [{ seat: "E", cardId: "G10" },  { seat: "S", cardId: "G9" },  { seat: "W", cardId: "G11" }, { seat: "N", cardId: "G12" }], leadColor: "Green" },
+  { winner: "E", plays: [{ seat: "E", cardId: "Y10" },  { seat: "S", cardId: "Y9" },  { seat: "W", cardId: "Y11" }, { seat: "N", cardId: "Y12" }], leadColor: "Yellow" },
+  { winner: "E", plays: [{ seat: "E", cardId: "ROOK" }, { seat: "S", cardId: "B5" },  { seat: "W", cardId: "R5" },  { seat: "N", cardId: "G5" }],  leadColor: null },
+];
+
+/**
+ * Trick 10 for EW-bidder "moon goes set" (NS wins):
+ *   E leads R13 (Red, not trump), S plays G13, W plays Y13, N plays B14 (Black=trump → N wins).
+ *   trump=Black → N wins with B14 (only trump in the trick).
+ */
+const ewMoonSetTrick10_3cards: [
+  { seat: "E"; cardId: string },
+  { seat: "S"; cardId: string },
+  { seat: "W"; cardId: string },
+] = [
+  { seat: "E", cardId: "R13" },
+  { seat: "S", cardId: "G13" },
+  { seat: "W", cardId: "Y13" },
+];
+const ewMoonSetTrick10_nCard = "B14"; // N plays last and wins with B14 (only trump)
+
+/**
+ * Trick 10 for EW-bidder "moon made" (EW wins):
+ *   E leads B14 (Black=trump, highest trump), S plays R14, W plays G14, N plays Y14.
+ *   trump=Black → E wins with B14 (only Black card in the trick).
+ */
+const ewMoonMadeTrick10_3cards: [
+  { seat: "E"; cardId: string },
+  { seat: "S"; cardId: string },
+  { seat: "W"; cardId: string },
+] = [
+  { seat: "E", cardId: "B14" },
+  { seat: "S", cardId: "R14" },
+  { seat: "W", cardId: "G14" },
+];
+const ewMoonMadeTrick10_nCard = "Y14"; // N plays last; E wins with B14 (only trump)
+
+describe("PlayCard - Shoot the Moon outcomes (EW bidder)", () => {
+  it("EW bidder moon goes set: last card played emits GameFinished with reason='moon-set' and winner=NS", () => {
+    // Arrange: EW shot moon but NS wins the last trick (EW failed to take all 10 tricks).
+    // N plays the 4th card; currentTrick has E:R13, S:G13, W:Y13 → N wins (trump B14).
+    const state = lastCardStateEW(
+      sharedFirst9TricksEW,
+      ewMoonSetTrick10_3cards,
+      ewMoonSetTrick10_nCard,
+      { NS: 0, EW: 0 },
+    );
+
+    // Act: N plays B14 (trump — N wins trick, EW failed to take all tricks)
+    const result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "N", cardId: "B14" },
+      DEFAULT_RULES,
+    );
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const gameFinished = result.events.find(e => e.type === "GameFinished");
+    expect(gameFinished).toBeDefined();
+    if (gameFinished?.type !== "GameFinished") return;
+
+    expect(gameFinished.reason).toBe("moon-set");
+    expect(gameFinished.winner).toBe("NS"); // opponent of EW bidder wins
+  });
+
+  it("EW bidder moon made, pre-hand score >= 0: last card played emits GameFinished with reason='moon-made' and winner=EW", () => {
+    // Arrange: EW shot moon and wins ALL 10 tricks. Pre-hand score = 0 (not in the hole).
+    // N plays the 4th card; currentTrick has E:B14, S:R14, W:G14 → E wins (B14 is only trump).
+    const state = lastCardStateEW(
+      sharedFirst9TricksEW,
+      ewMoonMadeTrick10_3cards,
+      ewMoonMadeTrick10_nCard,
+      { NS: 0, EW: 0 },
+    );
+
+    // Act: N plays Y14 (4th card, non-trump — E wins trick with B14)
+    const result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "N", cardId: "Y14" },
+      DEFAULT_RULES,
+    );
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const gameFinished = result.events.find(e => e.type === "GameFinished");
+    expect(gameFinished).toBeDefined();
+    if (gameFinished?.type !== "GameFinished") return;
+
+    expect(gameFinished.reason).toBe("moon-made");
+    expect(gameFinished.winner).toBe("EW"); // bidder's team wins instantly
+  });
+});
+
+describe("PlayCard - Shoot the Moon outcomes", () => {
+  it("moon goes set: last card played emits GameFinished with reason='moon-set' and winner=EW", () => {
+    // Arrange: NS shot moon but EW wins the last trick (NS failed to take all 10 tricks).
+    // W plays the 4th card; currentTrick has N:R13, E:B14, S:G13 → E wins (trump B14).
+    const state = lastCardState(
+      sharedFirst9Tricks,
+      moonSetTrick10_3cards,
+      moonSetTrick10_wCard,
+      { NS: 0, EW: 0 },
+    );
+
+    // Act: W plays Y13 (4th card, non-trump — E still wins with B14)
+    const result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "W", cardId: "Y13" },
+      DEFAULT_RULES,
+    );
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const gameFinished = result.events.find(e => e.type === "GameFinished");
+    expect(gameFinished).toBeDefined();
+    if (gameFinished?.type !== "GameFinished") return;
+
+    expect(gameFinished.reason).toBe("moon-set");
+    expect(gameFinished.winner).toBe("EW"); // opponent of NS bidder wins
+  });
+
+  it("moon made, pre-hand score >= 0: last card played emits GameFinished with reason='moon-made' and winner=NS", () => {
+    // Arrange: NS shot moon and wins ALL 10 tricks. Pre-hand score = 0 (not in the hole).
+    // W plays the 4th card; currentTrick has N:B14, E:R14, S:G14 → N wins (B14 is only trump).
+    const state = lastCardState(
+      sharedFirst9Tricks,
+      moonMadeTrick10_3cards,
+      moonMadeTrick10_wCard,
+      { NS: 0, EW: 0 },
+    );
+
+    // Act: W plays Y14 (4th card, non-trump — N wins trick with B14)
+    const result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "W", cardId: "Y14" },
+      DEFAULT_RULES,
+    );
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const gameFinished = result.events.find(e => e.type === "GameFinished");
+    expect(gameFinished).toBeDefined();
+    if (gameFinished?.type !== "GameFinished") return;
+
+    expect(gameFinished.reason).toBe("moon-made");
+    expect(gameFinished.winner).toBe("NS"); // bidder's team wins instantly
+  });
+
+  it("moon made, pre-hand score < 0 (in the hole): no GameFinished emitted, HandStarted emitted, NS score resets to 0", () => {
+    // Arrange: NS shot moon and wins ALL 10 tricks. Pre-hand score = -150 (in the hole).
+    const state = lastCardState(
+      sharedFirst9Tricks,
+      moonMadeTrick10_3cards,
+      moonMadeTrick10_wCard,
+      { NS: -150, EW: 100 },
+    );
+
+    // Act: W plays Y14 (4th card — N wins trick, NS wins all 10 tricks)
+    const result = validateCommand(
+      state,
+      { type: "PlayCard", seat: "W", cardId: "Y14" },
+      DEFAULT_RULES,
+    );
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // No GameFinished — game continues because pre-hand score was negative
+    const gameFinished = result.events.find(e => e.type === "GameFinished");
+    expect(gameFinished).toBeUndefined();
+
+    // HandStarted should be emitted (next hand begins)
+    const handStarted = result.events.find(e => e.type === "HandStarted");
+    expect(handStarted).toBeDefined();
+
+    // NS score after this hand should be exactly 0 (reset from -150)
+    const handScored = result.events.find(e => e.type === "HandScored");
+    expect(handScored).toBeDefined();
+    if (handScored?.type !== "HandScored") return;
+    const newNSScore = state.scores.NS + handScored.score.nsDelta;
+    expect(newNSScore).toBe(0);
   });
 });

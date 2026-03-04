@@ -14,6 +14,7 @@ function resetStore() {
     botTimeoutId: null,
     botDifficulty: "normal",
     announcement: null,
+    gameOverReason: null,
   });
 }
 
@@ -37,6 +38,7 @@ const MOCK_HAND_SCORE: HandScore = {
   nsDelta: 0,
   ewDelta: 0,
   shotMoon: false,
+  moonShooterWentSet: false,
 };
 
 const HAND_SCORED_EVENT: GameEvent = {

@@ -215,6 +215,7 @@ describe("scoreHand - shotMoon field", () => {
       hand: 0,
       rules,
       shotMoon: true,
+      preHandScores: { NS: 0, EW: 0 },
     });
     expect(score.shotMoon).toBe(true);
   });
@@ -244,44 +245,222 @@ describe("scoreHand - shotMoon field", () => {
     });
     expect(score.shotMoon).toBe(false);
   });
+});
 
-  it("scoreHand still computes correct deltas regardless of shotMoon value", () => {
-    // NS wins everything, bid=100, shotMoon=true → nsDelta should still equal nsTotal
-    const tricks: CompletedTrick[] = [
-      makeTrick("N", [["N", "B1"], ["E", "B6"], ["S", "B7"], ["W", "B8"]]),
-      makeTrick("N", [["N", "R1"], ["E", "R6"], ["S", "R7"], ["W", "R8"]]),
-      makeTrick("N", [["N", "G1"], ["E", "G6"], ["S", "G7"], ["W", "G8"]]),
-      makeTrick("N", [["N", "Y1"], ["E", "Y6"], ["S", "Y7"], ["W", "Y8"]]),
-      makeTrick("N", [["N", "B10"], ["E", "B9"], ["S", "B11"], ["W", "B12"]]),
-      makeTrick("N", [["N", "R10"], ["E", "R9"], ["S", "R11"], ["W", "R12"]]),
-      makeTrick("N", [["N", "G10"], ["E", "G9"], ["S", "G11"], ["W", "G12"]]),
-      makeTrick("N", [["N", "Y10"], ["E", "Y9"], ["S", "Y11"], ["W", "Y12"]]),
-      makeTrick("E", [["E", "B5"], ["N", "B13"], ["S", "R13"], ["W", "G13"]]),
-      makeTrick("E", [["E", "R5"], ["N", "B14"], ["S", "R14"], ["W", "G5"]]),
-    ];
-    const scoreWithMoon = scoreHand({
-      completedTricks: tricks,
+// ── Moon shot scoring tests ───────────────────────────────────────────────────
+
+/**
+ * All 10 tricks won by NS team.
+ * NS captures: 4 aces(60) + 4 tens(40) + ROOK(20) + 4 fives(20) + 4 fourteens(40) = 180 pts
+ * NS most-cards bonus: 40 trick-cards > 22 → +20
+ * nsTotal = 200; bidAmount=200 → NS exactly makes the moon bid.
+ *
+ * Card layout (45 cards = 40 in 10 tricks + 5 in discard):
+ *  tricks 1-4: 4 aces + 12 zero-value (B6-Y8)
+ *  tricks 5-8: 4 tens + 12 zero-value (B9-Y12)
+ *  trick  9:   ROOK + B5 + R5 + G5
+ *  trick  10:  B14 + R14 + G14 + Y14
+ *  (Y5 is in discarded=[\"Y5\"] so the last-trick winner NS gets it)
+ */
+const allNSTricks: CompletedTrick[] = [
+  makeTrick("N", [["N", "B1"],   ["E", "B6"],  ["S", "B7"],  ["W", "B8"]]),
+  makeTrick("N", [["N", "R1"],   ["E", "R6"],  ["S", "R7"],  ["W", "R8"]]),
+  makeTrick("N", [["N", "G1"],   ["E", "G6"],  ["S", "G7"],  ["W", "G8"]]),
+  makeTrick("N", [["N", "Y1"],   ["E", "Y6"],  ["S", "Y7"],  ["W", "Y8"]]),
+  makeTrick("N", [["N", "B10"],  ["E", "B9"],  ["S", "B11"], ["W", "B12"]]),
+  makeTrick("N", [["N", "R10"],  ["E", "R9"],  ["S", "R11"], ["W", "R12"]]),
+  makeTrick("N", [["N", "G10"],  ["E", "G9"],  ["S", "G11"], ["W", "G12"]]),
+  makeTrick("N", [["N", "Y10"],  ["E", "Y9"],  ["S", "Y11"], ["W", "Y12"]]),
+  makeTrick("N", [["N", "ROOK"], ["E", "B5"],  ["S", "R5"],  ["W", "G5"]]),
+  makeTrick("N", [["N", "B14"],  ["E", "R14"], ["S", "G14"], ["W", "Y14"]]),
+];
+// Y5 is discarded — NS won the last trick so gets the nest bonus
+const allNSTricksDiscarded = ["Y5"];
+
+/**
+ * 9 tricks to NS, last trick to EW — moon shooter went set.
+ * NS never captured all 10 tricks so moonShooterWentSet = true.
+ */
+const ewWinsLastTrick: CompletedTrick[] = [
+  makeTrick("N", [["N", "B1"],   ["E", "B6"],  ["S", "B7"],  ["W", "B8"]]),
+  makeTrick("N", [["N", "R1"],   ["E", "R6"],  ["S", "R7"],  ["W", "R8"]]),
+  makeTrick("N", [["N", "G1"],   ["E", "G6"],  ["S", "G7"],  ["W", "G8"]]),
+  makeTrick("N", [["N", "Y1"],   ["E", "Y6"],  ["S", "Y7"],  ["W", "Y8"]]),
+  makeTrick("N", [["N", "B10"],  ["E", "B9"],  ["S", "B11"], ["W", "B12"]]),
+  makeTrick("N", [["N", "R10"],  ["E", "R9"],  ["S", "R11"], ["W", "R12"]]),
+  makeTrick("N", [["N", "G10"],  ["E", "G9"],  ["S", "G11"], ["W", "G12"]]),
+  makeTrick("N", [["N", "Y10"],  ["E", "Y9"],  ["S", "Y11"], ["W", "Y12"]]),
+  makeTrick("N", [["N", "ROOK"], ["E", "B5"],  ["S", "R5"],  ["W", "G5"]]),
+  makeTrick("E", [["E", "B14"],  ["N", "R14"], ["S", "G14"], ["W", "Y14"]]), // EW wins last
+];
+
+describe("scoreHand - moon goes set", () => {
+  const rules = DEFAULT_RULES;
+
+  it("moonShooterWentSet = true when shotMoon=true and bidder did NOT take all tricks", () => {
+    const score = scoreHand({
+      completedTricks: ewWinsLastTrick,
       discarded: [],
       nestCards: [],
-      bidder: "N",
-      bidAmount: 100,
+      bidder: "N",  // NS team bid moon
+      bidAmount: 200,
       hand: 0,
       rules,
       shotMoon: true,
+      preHandScores: { NS: 0, EW: 0 },
     });
-    const scoreWithoutMoon = scoreHand({
-      completedTricks: tricks,
+    expect(score.moonShooterWentSet).toBe(true);
+  });
+
+  it("nsDelta = 0, ewDelta = nsTotal + ewTotal when NS bidder shot moon and went set", () => {
+    const score = scoreHand({
+      completedTricks: ewWinsLastTrick,
+      discarded: [],
+      nestCards: [],
+      bidder: "N",  // NS team bid moon
+      bidAmount: 200,
+      hand: 0,
+      rules,
+      shotMoon: true,
+      preHandScores: { NS: 0, EW: 0 },
+    });
+    expect(score.nsDelta).toBe(0);
+    expect(score.ewDelta).toBe(score.nsTotal + score.ewTotal);
+  });
+
+  it("moonShooterWentSet = false when shotMoon=false (normal set, unaffected)", () => {
+    const score = scoreHand({
+      completedTricks: ewWinsLastTrick,
       discarded: [],
       nestCards: [],
       bidder: "N",
-      bidAmount: 100,
+      bidAmount: 200,
       hand: 0,
       rules,
       shotMoon: false,
     });
-    // deltas should be the same regardless of shotMoon (it's just stored, no logic change)
-    expect(scoreWithMoon.nsDelta).toBe(scoreWithoutMoon.nsDelta);
-    expect(scoreWithMoon.ewDelta).toBe(scoreWithoutMoon.ewDelta);
+    expect(score.moonShooterWentSet).toBe(false);
+  });
+});
+
+describe("scoreHand - moon makes it (positive pre-hand score)", () => {
+  const rules = DEFAULT_RULES;
+
+  it("checkWinCondition returns { winner: bidderTeam, reason: 'moon-made' } when pre-hand score >= 0 and bidder wins all tricks", () => {
+    const score = scoreHand({
+      completedTricks: allNSTricks,
+      discarded: allNSTricksDiscarded, // Y5 → nest bonus to NS (last trick winner)
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 200,
+      hand: 0,
+      rules,
+      shotMoon: true,
+      preHandScores: { NS: 0, EW: 0 },
+    });
+
+    // Bidder NS scored >= 200 (they took all tricks + nest), moon made
+    expect(score.moonShooterWentSet).toBe(false);
+
+    const newScores = { NS: 0 + score.nsDelta, EW: 0 + score.ewDelta };
+    const result = checkWinCondition(newScores, "NS", rules, false, true);
+    expect(result).not.toBeNull();
+    expect(result!.winner).toBe("NS");
+    expect(result!.reason).toBe("moon-made");
+  });
+});
+
+describe("scoreHand - moon makes it (negative pre-hand score / in the hole)", () => {
+  const rules = DEFAULT_RULES;
+
+  it("bidder team score resets to 0 (not a win) when pre-hand score < 0 and bidder wins all tricks", () => {
+    const preHandScores = { NS: -150, EW: 100 };
+    const score = scoreHand({
+      completedTricks: allNSTricks,
+      discarded: allNSTricksDiscarded,
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 200,
+      hand: 0,
+      rules,
+      shotMoon: true,
+      preHandScores,
+    });
+
+    // nsDelta should be exactly 150 (enough to bring NS from -150 to 0)
+    expect(score.nsDelta).toBe(Math.abs(preHandScores.NS));
+    // Final NS score = -150 + 150 = 0
+    const newNSScore = preHandScores.NS + score.nsDelta;
+    expect(newNSScore).toBe(0);
+    // moonShooterWentSet should be false (they made it, just in the hole)
+    expect(score.moonShooterWentSet).toBe(false);
+  });
+
+  it("checkWinCondition returns null (game continues) when pre-hand score was negative", () => {
+    const preHandScores = { NS: -150, EW: 100 };
+    const score = scoreHand({
+      completedTricks: allNSTricks,
+      discarded: allNSTricksDiscarded,
+      nestCards: [],
+      bidder: "N",
+      bidAmount: 200,
+      hand: 0,
+      rules,
+      shotMoon: true,
+      preHandScores,
+    });
+
+    const newScores = {
+      NS: preHandScores.NS + score.nsDelta,
+      EW: preHandScores.EW + score.ewDelta,
+    };
+    // moonShooterMade = false because pre-hand score was negative
+    const result = checkWinCondition(newScores, "NS", rules, false, false);
+    expect(result).toBeNull();
+  });
+});
+
+describe("checkWinCondition - moon-set and moon-made", () => {
+  const rules = DEFAULT_RULES;
+
+  it("returns { winner: EW, reason: 'moon-set' } when NS bidder moonShooterWentSet=true", () => {
+    const result = checkWinCondition({ NS: 100, EW: 200 }, "NS", rules, true, false);
+    expect(result).not.toBeNull();
+    expect(result!.winner).toBe("EW");
+    expect(result!.reason).toBe("moon-set");
+  });
+
+  it("returns { winner: NS, reason: 'moon-set' } when EW bidder moonShooterWentSet=true", () => {
+    const result = checkWinCondition({ NS: 100, EW: 200 }, "EW", rules, true, false);
+    expect(result).not.toBeNull();
+    expect(result!.winner).toBe("NS");
+    expect(result!.reason).toBe("moon-set");
+  });
+
+  it("returns { winner: NS, reason: 'moon-made' } when NS bidder moonShooterMade=true", () => {
+    const result = checkWinCondition({ NS: 200, EW: 100 }, "NS", rules, false, true);
+    expect(result).not.toBeNull();
+    expect(result!.winner).toBe("NS");
+    expect(result!.reason).toBe("moon-made");
+  });
+
+  it("moon-set takes priority over normal threshold checks", () => {
+    // Even if NS score would be above threshold, moon-set causes instant loss
+    const result = checkWinCondition({ NS: 600, EW: 600 }, "NS", rules, true, false);
+    expect(result!.reason).toBe("moon-set");
+    expect(result!.winner).toBe("EW");
+  });
+
+  it("moon-made takes priority over normal threshold checks", () => {
+    const result = checkWinCondition({ NS: 100, EW: 100 }, "NS", rules, false, true);
+    expect(result!.reason).toBe("moon-made");
+    expect(result!.winner).toBe("NS");
+  });
+
+  it("normal threshold-reached still works when no moon flags set", () => {
+    const result = checkWinCondition({ NS: 500, EW: 200 }, "NS", rules);
+    expect(result!.winner).toBe("NS");
+    expect(result!.reason).toBe("threshold-reached");
   });
 });
 

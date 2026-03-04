@@ -12,7 +12,7 @@ export default function HandResultOverlay({ score, runningScores, onContinue }: 
   const { bidder, bidAmount, nsDelta, ewDelta, nsTotal, ewTotal } = score;
   const bidderTeam: Team = ["N", "S"].includes(bidder) ? "NS" : "EW";
   const bidderPoints = bidderTeam === "NS" ? nsTotal : ewTotal;
-  const bidWon = bidderPoints >= bidAmount;
+  const bidWon = bidderPoints >= bidAmount || (score.shotMoon && !score.moonShooterWentSet);
 
   return (
     <div className={styles.overlay}>

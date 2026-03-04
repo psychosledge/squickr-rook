@@ -39,6 +39,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   botTimeoutId: null,
   botDifficulty: "normal",
   announcement: null,
+  gameOverReason: null,
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       botTimeoutId: null,
       botDifficulty: difficulty,
       announcement: null,
+      gameOverReason: null,
     });
 
     get()._scheduleNextTurn();
@@ -90,6 +92,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       pendingHandScore: null,
       botTimeoutId: null,
       announcement: null,
+      gameOverReason: null,
     });
   },
 
@@ -98,13 +101,15 @@ export const useGameStore = create<AppStore>((set, get) => ({
       let gs: GameState = s.gameState ?? INITIAL_STATE;
       let pendingHandScore = s.pendingHandScore;
       let announcement = s.announcement;
+      let gameOverReason = s.gameOverReason;
       for (const ev of events) {
         gs = applyEvent(gs, ev);
         if (ev.type === "HandScored") pendingHandScore = ev.score;
+        if (ev.type === "GameFinished") gameOverReason = ev.reason;
         const next = buildAnnouncementFromEvent(ev, gs.rules);
         if (next !== null) announcement = next;
       }
-      return { gameState: gs, eventLog: [...s.eventLog, ...events], pendingHandScore, announcement };
+      return { gameState: gs, eventLog: [...s.eventLog, ...events], pendingHandScore, announcement, gameOverReason };
     });
   },
 

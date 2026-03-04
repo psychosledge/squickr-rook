@@ -27,6 +27,7 @@ export default function GamePage() {
   const humanPlaceBid = useGameStore((s) => s.humanPlaceBid);
   const humanPassBid = useGameStore((s) => s.humanPassBid);
   const humanShootMoon = useGameStore((s) => s.humanShootMoon);
+  const gameOverReason = useGameStore((s) => s.gameOverReason);
 
   // Redirect to lobby if no game active
   useEffect(() => {
@@ -82,16 +83,7 @@ export default function GamePage() {
         <GameOverScreen
           winner={gameState.winner}
           finalScores={gameState.scores}
-          reason={
-            gameState.shotMoon
-              ? gameState.winner === "NS"
-                ? "moon-made"
-                : "moon-set"
-              : gameState.scores.NS <= gameState.rules.bustThreshold ||
-                gameState.scores.EW <= gameState.rules.bustThreshold
-              ? "bust"
-              : "threshold-reached"
-          }
+          reason={gameOverReason ?? "threshold-reached"}
           onPlayAgain={handlePlayAgain}
         />
       )}

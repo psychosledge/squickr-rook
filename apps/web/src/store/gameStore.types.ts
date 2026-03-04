@@ -11,6 +11,7 @@ export type AppState = {
   botTimeoutId: ReturnType<typeof setTimeout> | null;
   botDifficulty: BotDifficulty;
   announcement: string | null;
+  gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
 };
 
 export type AppActions = {
