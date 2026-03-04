@@ -38,12 +38,12 @@ export function botChooseCommand(
 
       if (profile.difficulty === "normal") {
         // Shoot moon if very strong and not already declared
-        if (strength >= 120 && !state.moonShooters.includes(seat)) {
+        if (strength >= 90 && !state.moonShooters.includes(seat)) {
           const shootCmd = legal.find(c => c.type === "ShootMoon");
           if (shootCmd) return shootCmd;
         }
-        // Bid if reasonably strong
-        if (strength >= 80 && minNextBid <= rules.maximumBid) {
+        // Bid if hand is average or better
+        if (strength >= 40 && minNextBid <= rules.maximumBid) {
           const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
           if (bidCmd) return bidCmd;
         }
@@ -51,11 +51,11 @@ export function botChooseCommand(
       }
 
       // Hard
-      if (strength >= 150 && !state.moonShooters.includes(seat)) {
+      if (strength >= 110 && !state.moonShooters.includes(seat)) {
         const shootCmd = legal.find(c => c.type === "ShootMoon");
         if (shootCmd) return shootCmd;
       }
-      if (strength >= 100 && minNextBid <= rules.maximumBid) {
+      if (strength >= 55 && minNextBid <= rules.maximumBid) {
         const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
         if (bidCmd) return bidCmd;
       }
