@@ -13,6 +13,7 @@ vi.mock("./PlayingCard.module.css", () => ({
     center: "center",
     bottomRight: "bottomRight",
     displayOnly: "displayOnly",
+    nestBadge: "nestBadge",
   },
 }));
 
@@ -151,5 +152,50 @@ describe("PlayingCard — isSelected prop", () => {
     const el = renderCard({ cardId: "R5" });
     const className = getProps(el).className as string;
     expect(className).not.toContain("selected");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: isFromNest prop
+// ---------------------------------------------------------------------------
+
+function collectStrings(node: React.ReactNode): string[] {
+  const strings: string[] = [];
+  function visit(n: React.ReactNode) {
+    if (n == null || typeof n === "boolean") return;
+    if (typeof n === "string") { strings.push(n); return; }
+    if (typeof n === "number") { strings.push(String(n)); return; }
+    if (Array.isArray(n)) { n.forEach(visit); return; }
+    if (!React.isValidElement(n)) return;
+    const p = (n as React.ReactElement).props as Record<string, unknown>;
+    visit(p.children as React.ReactNode);
+  }
+  visit(node);
+  return strings;
+}
+
+describe("PlayingCard — isFromNest prop", () => {
+  it('renders "NEST" text when isFromNest=true and faceDown is not set', () => {
+    const el = renderCard({ cardId: "R5", isFromNest: true });
+    const strings = collectStrings(el);
+    expect(strings).toContain("NEST");
+  });
+
+  it('does NOT render "NEST" text when isFromNest=false', () => {
+    const el = renderCard({ cardId: "R5", isFromNest: false });
+    const strings = collectStrings(el);
+    expect(strings).not.toContain("NEST");
+  });
+
+  it('does NOT render "NEST" text when isFromNest is omitted', () => {
+    const el = renderCard({ cardId: "R5" });
+    const strings = collectStrings(el);
+    expect(strings).not.toContain("NEST");
+  });
+
+  it('does NOT render "NEST" text when isFromNest=true but faceDown=true', () => {
+    const el = renderCard({ cardId: "R5", isFromNest: true, faceDown: true });
+    const strings = collectStrings(el);
+    expect(strings).not.toContain("NEST");
   });
 });

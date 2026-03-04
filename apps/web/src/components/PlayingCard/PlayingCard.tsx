@@ -9,6 +9,7 @@ type Props = {
   isPlayable?: boolean;
   isDisplay?: boolean;
   isSelected?: boolean;
+  isFromNest?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
 };
@@ -19,6 +20,7 @@ export default function PlayingCard({
   isPlayable = true,
   isDisplay = false,
   isSelected = false,
+  isFromNest = false,
   onClick,
   style,
 }: Props) {
@@ -44,6 +46,7 @@ export default function PlayingCard({
       <span className={styles.topLeft}>{display.label}</span>
       <span className={styles.center}>{display.colorName[0]}</span>
       <span className={styles.bottomRight}>{display.label}</span>
+      {isFromNest && <span className={styles.nestBadge}>NEST</span>}
     </div>
   );
 }

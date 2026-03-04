@@ -77,9 +77,12 @@ export default function GamePage() {
       {overlay === "nest" && (
         <NestOverlay
           hand={sortHand(gameState.hands["N"] ?? [], gameState.trump).filter((c) => c !== "ROOK")}
+          nestCardIds={gameState.originalNest}
           pendingDiscards={pendingDiscards}
           onToggleDiscard={toggleDiscard}
           onConfirm={confirmDiscards}
+          bidAmount={gameState.bidAmount}
+          shotMoon={gameState.shotMoon}
         />
       )}
 
