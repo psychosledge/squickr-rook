@@ -12,8 +12,17 @@ const TRUMP_COLORS: Record<string, string> = {
 };
 
 export default function ScoreBar({ gameState }: Props) {
-  const { scores, handNumber, trump, phase, activePlayer } = gameState;
+  const { scores, handNumber, trump, phase, activePlayer, bidder, bidAmount, shotMoon } = gameState;
   const activeName = activePlayer ? getSeatLabel(activePlayer) : "";
+
+  const showBidBadge =
+    bidder !== null &&
+    bidAmount > 0 &&
+    (phase === "playing" || phase === "nest" || phase === "trump" || phase === "scoring");
+
+  const bidBadgeText = showBidBadge
+    ? `${getSeatLabel(bidder!)} bid ${bidAmount}${shotMoon ? " 🌙" : ""}`
+    : null;
 
   return (
     <div className={styles.bar}>
@@ -28,6 +37,9 @@ export default function ScoreBar({ gameState }: Props) {
           <span className={styles.trump} style={{ color: TRUMP_COLORS[trump] }}>
             ■ {trump}
           </span>
+        )}
+        {showBidBadge && (
+          <span className={styles.bidBadge}>{bidBadgeText}</span>
         )}
         <span className={styles.hand}>H{handNumber + 1}</span>
       </div>

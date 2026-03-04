@@ -8,6 +8,20 @@ import { DEFAULT_RULES, SEAT_TEAM } from "./types.js";
 const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
 
 /**
+ * Returns the maximum bid amount this bot is willing to reach.
+ * Returns 0 if the bot won't bid at all.
+ */
+function bidWillingness(strength: number): number {
+  if (strength < 40) return 0;
+  if (strength < 55) return 110;
+  if (strength < 65) return 120;
+  if (strength < 75) return 135;
+  if (strength < 85) return 150;
+  if (strength < 95) return 165;
+  return 180;
+}
+
+/**
  * Choose the best command for a bot player.
  */
 export function botChooseCommand(
@@ -38,12 +52,13 @@ export function botChooseCommand(
 
       if (profile.difficulty === "normal") {
         // Shoot moon if very strong and not already declared
-        if (strength >= 90 && !state.moonShooters.includes(seat)) {
+        if (strength >= 85 && !state.moonShooters.includes(seat)) {
           const shootCmd = legal.find(c => c.type === "ShootMoon");
           if (shootCmd) return shootCmd;
         }
-        // Bid if hand is average or better
-        if (strength >= 40 && minNextBid <= rules.maximumBid) {
+        // Bid only up to bidWillingness ceiling
+        const ceiling = bidWillingness(strength);
+        if (minNextBid <= ceiling) {
           const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
           if (bidCmd) return bidCmd;
         }
@@ -51,11 +66,12 @@ export function botChooseCommand(
       }
 
       // Hard
-      if (strength >= 110 && !state.moonShooters.includes(seat)) {
+      if (strength >= 95 && !state.moonShooters.includes(seat)) {
         const shootCmd = legal.find(c => c.type === "ShootMoon");
         if (shootCmd) return shootCmd;
       }
-      if (strength >= 55 && minNextBid <= rules.maximumBid) {
+      // Hard bots bid 10 higher than normal bots
+      if (minNextBid <= bidWillingness(strength) + 10) {
         const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
         if (bidCmd) return bidCmd;
       }

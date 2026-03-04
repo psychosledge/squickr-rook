@@ -934,23 +934,20 @@ describe("bidding - ShootMoon validation", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("valid: after already having bid this hand", () => {
-    let state = biddingState();
-    // E bids 100, round goes around, back to E
-    state = applyEvent(state, { type: "BidPlaced", seat: "E", amount: 100, handNumber: 0, timestamp: 2000 });
-    state = applyEvent(state, { type: "BidPassed", seat: "S", handNumber: 0, timestamp: 2001 });
-    state = applyEvent(state, { type: "BidPassed", seat: "W", handNumber: 0, timestamp: 2002 });
-    state = applyEvent(state, { type: "BidPassed", seat: "N", handNumber: 0, timestamp: 2003 });
-    // Wait — 3 passes → BiddingComplete. Need to avoid that.
-    // E bids, then S bids higher to avoid completion
+  it("invalid: ShootMoon blocked when seat has already placed a numeric bid (round-trip)", () => {
+    // E bids, then S bids higher to avoid completion, round comes back to E
     let s2 = biddingState();
     s2 = applyEvent(s2, { type: "BidPlaced", seat: "E", amount: 100, handNumber: 0, timestamp: 2000 });
     s2 = applyEvent(s2, { type: "BidPlaced", seat: "S", amount: 105, handNumber: 0, timestamp: 2001 });
     s2 = applyEvent(s2, { type: "BidPlaced", seat: "W", amount: 110, handNumber: 0, timestamp: 2002 });
     s2 = applyEvent(s2, { type: "BidPlaced", seat: "N", amount: 115, handNumber: 0, timestamp: 2003 });
-    // E is active again with bids[E]=100, currentBid=115
+    // E is active again with bids[E]=100 (numeric), currentBid=115
+    // ShootMoon must be blocked: E already placed a numeric bid
     const result = validateCommand(s2, { type: "ShootMoon", seat: "E" }, DEFAULT_RULES);
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("numeric bid");
+    }
   });
 
   it("valid: when currentBid is already 200 (double shoot)", () => {
@@ -1014,5 +1011,114 @@ describe("bidding - ShootMoon validation", () => {
     const complete = result.events.find(e => e.type === "BiddingComplete") as import("../events.js").BiddingComplete;
     expect(complete.shotMoon).toBe(true);
     expect(complete.winner).toBe("N");
+  });
+
+  it("invalid: ShootMoon after seat has already placed a numeric bid", () => {
+    // E bids 100, W bids 105, N bids 110, E comes back — E already placed a numeric bid
+    let state = biddingState(); // E active
+    state = applyEvent(state, { type: "BidPlaced", seat: "E", amount: 100, handNumber: 0, timestamp: 2000 });
+    state = applyEvent(state, { type: "BidPlaced", seat: "S", amount: 105, handNumber: 0, timestamp: 2001 });
+    state = applyEvent(state, { type: "BidPlaced", seat: "W", amount: 110, handNumber: 0, timestamp: 2002 });
+    state = applyEvent(state, { type: "BidPlaced", seat: "N", amount: 115, handNumber: 0, timestamp: 2003 });
+    // E is active again — bids["E"] = 100 (numeric), currentBid = 115
+    const result = validateCommand(state, { type: "ShootMoon", seat: "E" }, DEFAULT_RULES);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("numeric bid");
+    }
+  });
+});
+
+describe("PlayCard — full trick guard", () => {
+  it("rejects PlayCard when currentTrick already has 4 cards", () => {
+    // Arrange: playing phase, currentTrick already has 4 entries, activePlayer = N
+    const base = stateAfterTrumpSelected(42, "N");
+    const hand = base.hands["N"]!;
+    const stateWith4Cards: GameState = {
+      ...base,
+      activePlayer: "N",
+      currentTrick: [
+        { seat: "E", cardId: "B6" },
+        { seat: "S", cardId: "B7" },
+        { seat: "W", cardId: "B8" },
+        { seat: "N", cardId: "B9" },
+      ],
+    };
+
+    const result = validateCommand(
+      stateWith4Cards,
+      { type: "PlayCard", seat: "N", cardId: hand[0]! },
+      DEFAULT_RULES,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("trick already has");
+    }
+  });
+
+  it("accepts PlayCard when currentTrick has 3 cards (trick not yet full)", () => {
+    // Arrange: playing phase, currentTrick has 3 entries, activePlayer = N
+    const base = stateAfterTrumpSelected(42, "N");
+    // N has only Yellow cards (none matching the Red lead), so any card is legal (void in suit)
+    const stateWith3Cards: GameState = {
+      ...base,
+      activePlayer: "N",
+      trump: "Black",
+      hands: {
+        ...base.hands,
+        N: ["Y5", "Y7", "Y9"],  // void in Red (the led suit)
+      },
+      currentTrick: [
+        { seat: "E", cardId: "R6" },
+        { seat: "S", cardId: "R7" },
+        { seat: "W", cardId: "R8" },
+      ],
+    };
+
+    // N is void in Red (the led suit), so any card is legal
+    const result = validateCommand(
+      stateWith3Cards,
+      { type: "PlayCard", seat: "N", cardId: "Y5" },
+      DEFAULT_RULES,
+    );
+
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("bidding - ShootMoon after numeric bid: legalCommands", () => {
+  function biddingState(): GameState {
+    return applyEvent(INITIAL_STATE, {
+      type: "GameStarted",
+      seed: 42,
+      dealer: "N",
+      players: [
+        { seat: "N", name: "Alice", kind: "human" },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      ],
+      rules: DEFAULT_RULES,
+      timestamp: 1000,
+    });
+  }
+
+  it("legalCommands does NOT include ShootMoon after seat placed a numeric bid", () => {
+    // E bids 100, S bids 105, W bids 110, N bids 115 — back to E (who bid 100 earlier)
+    let state = biddingState(); // E active
+    state = applyEvent(state, { type: "BidPlaced", seat: "E", amount: 100, handNumber: 0, timestamp: 2000 });
+    state = applyEvent(state, { type: "BidPlaced", seat: "S", amount: 105, handNumber: 0, timestamp: 2001 });
+    state = applyEvent(state, { type: "BidPlaced", seat: "W", amount: 110, handNumber: 0, timestamp: 2002 });
+    state = applyEvent(state, { type: "BidPlaced", seat: "N", amount: 115, handNumber: 0, timestamp: 2003 });
+    // E is active again with a numeric bid already placed
+    const cmds = legalCommands(state, "E", DEFAULT_RULES);
+    expect(cmds.some(c => c.type === "ShootMoon")).toBe(false);
+  });
+
+  it("legalCommands INCLUDES ShootMoon before any numeric bid is placed (regression)", () => {
+    const state = biddingState(); // E is active, no bids yet
+    const cmds = legalCommands(state, "E", DEFAULT_RULES);
+    expect(cmds.some(c => c.type === "ShootMoon")).toBe(true);
   });
 });

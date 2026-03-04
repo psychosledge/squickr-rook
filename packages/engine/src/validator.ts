@@ -192,6 +192,12 @@ export function validateCommand(
       if (state.moonShooters.includes(command.seat)) {
         return { ok: false, error: `ShootMoon: ${command.seat} already declared moon` };
       }
+      if (typeof state.bids[command.seat] === "number") {
+        return {
+          ok: false,
+          error: `ShootMoon: ${command.seat} has already placed a numeric bid`,
+        };
+      }
 
       const events: GameEvent[] = [];
       const moonDeclared: GameEvent = {
@@ -298,6 +304,12 @@ export function validateCommand(
         return {
           ok: false,
           error: `PlayCard: not your turn (active: ${state.activePlayer}, you: ${command.seat})`,
+        };
+      }
+      if (state.currentTrick.length >= 4) {
+        return {
+          ok: false,
+          error: `PlayCard: trick already has ${state.currentTrick.length} cards — must wait for TrickCompleted`,
         };
       }
       const hand = state.hands[command.seat] ?? [];
@@ -484,8 +496,9 @@ export function legalCommands(
         commands.push({ type: "PlaceBid", seat, amount });
       }
 
-      // ShootMoon if not already in moonShooters
-      if (!state.moonShooters.includes(seat)) {
+      // ShootMoon if not already in moonShooters and no prior numeric bid
+      const hasPlacedNumericBid = typeof state.bids[seat] === "number";
+      if (!state.moonShooters.includes(seat) && !hasPlacedNumericBid) {
         commands.push({ type: "ShootMoon", seat });
       }
 

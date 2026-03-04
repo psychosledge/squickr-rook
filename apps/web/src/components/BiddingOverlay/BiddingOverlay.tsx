@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import type { GameState } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./BiddingOverlay.module.css";
@@ -11,16 +12,39 @@ type Props = {
 
 const HUMAN = "N" as const;
 
-export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon }: Props) {
+// ── Pure render helper (state is passed in explicitly) ────────────────────────
+// This is exported so tests can call it directly without hitting React hooks.
+export type BiddingOverlayViewProps = Props & {
+  pickerOpen: boolean;
+  pickerAmount: number;
+  onOpenPicker: () => void;
+  onClosePicker: () => void;
+  onIncrement: () => void;
+  onDecrement: () => void;
+};
+
+export function BiddingOverlayView({
+  gameState,
+  onPlaceBid,
+  onPass,
+  onShootMoon,
+  pickerOpen,
+  pickerAmount,
+  onOpenPicker,
+  onClosePicker,
+  onIncrement,
+  onDecrement,
+}: BiddingOverlayViewProps) {
   const { bids, currentBid, activePlayer, rules, moonShooters } = gameState;
   const isMyTurn = activePlayer === HUMAN;
-  const iAlreadyMoon = moonShooters.includes(HUMAN);
+  const { minimumBid, bidIncrement, maximumBid } = rules;
 
-  const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
-  const bidOptions: number[] = [];
-  for (let b = minNextBid; b <= rules.maximumBid; b += rules.bidIncrement) {
-    bidOptions.push(b);
-  }
+  const minNextBid = currentBid === 0 ? minimumBid : currentBid + bidIncrement;
+
+  // moonEligible: human has not placed a numeric bid and is not already a moon shooter
+  const iAlreadyMoon = moonShooters.includes(HUMAN);
+  const humanBid = bids[HUMAN];
+  const moonEligible = !iAlreadyMoon && typeof humanBid !== "number";
 
   const seats = ["N", "E", "S", "W"] as const;
 
@@ -60,26 +84,65 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
 
         {isMyTurn && (
           <>
-            <div className={styles.bidButtons}>
-              {bidOptions.map((amount) => (
+            {/* Quick-bid button — shown when picker is closed */}
+            {!pickerOpen && (
+              <button
+                className={styles.quickBidBtn}
+                aria-label={`Bid ${minNextBid}`}
+                onClick={() => onPlaceBid(minNextBid)}
+              >
+                Bid {minNextBid}
+              </button>
+            )}
+
+            {/* "Bid more…" / "← Back" toggle */}
+            <button
+              className={styles.bidMoreLink}
+              onClick={pickerOpen ? onClosePicker : onOpenPicker}
+            >
+              {pickerOpen ? "← Back" : "Bid more…"}
+            </button>
+
+            {/* Expandable stepper — shown when picker is open */}
+            {pickerOpen && (
+              <>
+                <div className={styles.picker}>
+                  <button
+                    className={styles.stepBtn}
+                    aria-label="Decrease bid"
+                    onClick={onDecrement}
+                    disabled={pickerAmount <= minNextBid}
+                  >
+                    −
+                  </button>
+                  <span className={styles.pickerAmount}>{pickerAmount}</span>
+                  <button
+                    className={styles.stepBtn}
+                    aria-label="Increase bid"
+                    onClick={onIncrement}
+                    disabled={pickerAmount >= maximumBid}
+                  >
+                    +
+                  </button>
+                </div>
                 <button
-                  key={amount}
-                  className={styles.bidBtn}
-                  aria-label={`Bid ${amount}`}
-                  onClick={() => onPlaceBid(amount)}
+                  className={styles.confirmBidBtn}
+                  onClick={() => onPlaceBid(pickerAmount)}
                 >
-                  {amount}
+                  Confirm bid: {pickerAmount}
                 </button>
-              ))}
-            </div>
-            <div className={styles.actions}>
-              <button className={styles.passBtn} onClick={onPass}>PASS</button>
-              {!iAlreadyMoon && (
-                <button className={styles.moonBtn} onClick={handleShootMoon}>
-                  🌙 Shoot the Moon
-                </button>
-              )}
-            </div>
+              </>
+            )}
+
+            {/* Pass button — always visible */}
+            <button className={styles.passBtn} onClick={onPass}>PASS</button>
+
+            {/* Moon button — below Pass, only when moonEligible */}
+            {moonEligible && (
+              <button className={styles.moonBtn} onClick={handleShootMoon}>
+                🌙 Shoot the Moon
+              </button>
+            )}
           </>
         )}
 
@@ -90,5 +153,51 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
         )}
       </div>
     </div>
+  );
+}
+
+// ── Stateful wrapper (the actual exported default) ────────────────────────────
+export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon }: Props) {
+  const { currentBid, rules } = gameState;
+  const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerAmount, setPickerAmount] = useState(minNextBid);
+
+  // When minNextBid changes (another player bid while picker is open), reset pickerAmount
+  useEffect(() => {
+    setPickerAmount(minNextBid);
+  }, [minNextBid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openPicker() {
+    setPickerAmount(minNextBid);
+    setPickerOpen(true);
+  }
+
+  function closePicker() {
+    setPickerOpen(false);
+  }
+
+  function increment() {
+    setPickerAmount((a) => Math.min(a + rules.bidIncrement, rules.maximumBid));
+  }
+
+  function decrement() {
+    setPickerAmount((a) => Math.max(a - rules.bidIncrement, minNextBid));
+  }
+
+  return (
+    <BiddingOverlayView
+      gameState={gameState}
+      onPlaceBid={onPlaceBid}
+      onPass={onPass}
+      onShootMoon={onShootMoon}
+      pickerOpen={pickerOpen}
+      pickerAmount={pickerAmount}
+      onOpenPicker={openPicker}
+      onClosePicker={closePicker}
+      onIncrement={increment}
+      onDecrement={decrement}
+    />
   );
 }

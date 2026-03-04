@@ -200,8 +200,16 @@ export const useGameStore = create<AppStore>((set, get) => ({
   },
 
   humanPlayCard: (cardId) => {
-    const { gameState } = get();
+    const { gameState, botTimeoutId } = get();
     if (!gameState) return;
+
+    // Guard against the split-animation race window: when a bot has just played
+    // the trick-completing card, botTimeoutId is non-null while TrickCompleted is
+    // pending. activePlayer may temporarily read as "N" during this window.
+    // Reject the click to prevent injecting a card into an already-full trick.
+    if (botTimeoutId !== null) {
+      return;
+    }
 
     const result = validateCommand(
       gameState,

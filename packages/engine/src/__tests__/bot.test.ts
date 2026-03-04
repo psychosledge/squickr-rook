@@ -287,3 +287,116 @@ describe("botChooseCommand - bidding phase", () => {
     }
   });
 });
+
+// ── Helper: build a bidding-phase state with a custom hand for a seat ─────────
+
+function makeBiddingStateWithHand(seat: Seat, hand: import("../types.js").CardId[]): GameState {
+  // Start from a real game-started state and override the seat's hand
+  const base = applyEvent(INITIAL_STATE, {
+    type: "GameStarted",
+    seed: 42,
+    dealer: "N",
+    players: [
+      { seat: "N", name: "Alice", kind: "human" },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS.easy },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS.normal },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS.hard },
+    ],
+    rules: DEFAULT_RULES,
+    timestamp: 1000,
+  });
+  // Force the seat's hand to the given cards and make that seat active
+  return {
+    ...base,
+    activePlayer: seat,
+    hands: { ...base.hands, [seat]: hand },
+  };
+}
+
+describe("botChooseCommand - bidWillingness thresholds", () => {
+  // estimateBidStrength: ROOK=15, value1(Ace)=15, value14=10, value10=8, value5=5
+
+  it("normal bot passes when strength < 40 (no scoring cards)", () => {
+    // Weak hand: no point-value cards → strength = 0
+    const weakHand: import("../types.js").CardId[] = ["B2", "B3", "B4", "B6", "B7", "B8", "B9", "R2", "R3", "R4"];
+    const state = makeBiddingStateWithHand("E", weakHand);
+    state.currentBid; // just to use it
+    const profile = BOT_PRESETS.normal;
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PassBid");
+  });
+
+  it("normal bot passes when minNextBid > bidWillingness(strength ~50)", () => {
+    // strength ~50: ROOK(15) + B1(15) + R14(10) + G5(5) + Y5(5) = 50 → willingness = 110
+    // Set currentBid = 110 so minNextBid = 115 > 110
+    const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"];
+    const base = makeBiddingStateWithHand("E", hand);
+    const state = { ...base, currentBid: 110 };
+    const profile = BOT_PRESETS.normal;
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PassBid");
+  });
+
+  it("hard bot passes when minNextBid > bidWillingness(strength ~50) + 10", () => {
+    // strength ~50: willingness = 110; hard ceiling = 110 + 10 = 120
+    // Set currentBid = 120 so minNextBid = 125 > 120
+    const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"];
+    const base = makeBiddingStateWithHand("E", hand);
+    const state = { ...base, currentBid: 120 };
+    const profile = BOT_PRESETS.hard;
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PassBid");
+  });
+
+  it("normal bot bids when minNextBid <= bidWillingness(strength ~50)", () => {
+    // strength ~50 → willingness = 110; minNextBid at 100 (currentBid = 0)
+    const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"];
+    const state = makeBiddingStateWithHand("E", hand);
+    const profile = BOT_PRESETS.normal;
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlaceBid");
+    if (cmd.type === "PlaceBid") {
+      expect(cmd.amount).toBe(DEFAULT_RULES.minimumBid); // 100
+    }
+  });
+
+  it("normal bot passes when minNextBid > bidWillingness(strength ~75)", () => {
+    // strength ~75: ROOK(15) + B1(15) + R1(15) + R14(10) + G14(10) + B10(8) = 73
+    // add Y5(5) = 78 → bidWillingness(78) = 150 (75 <= 78 < 85)
+    // Set currentBid = 150 so minNextBid = 155 > 150
+    const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R1", "R14", "G14", "B10", "Y5", "B2", "B3", "B4"];
+    const base = makeBiddingStateWithHand("E", hand);
+    const state = { ...base, currentBid: 150 };
+    const profile = BOT_PRESETS.normal;
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PassBid");
+  });
+
+  it("normal bot never bids above 180 on a non-Moon normal hand (regression)", () => {
+    // Even with a super-strong hand (strength ~123), normal bot ceiling = 180
+    // Strength: ROOK(15)+B1(15)+R1(15)+G1(15)+Y1(15)+R14(10)+G14(10)+B14(10)+Y14(10)+B10(8) = 123
+    // strength >= 95 → willingness = 180; minNextBid = 180 <= 180 → should bid 180 (not 185)
+    // Block ShootMoon by putting the seat in moonShooters so we test the bid ceiling
+    const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10"];
+    const base = makeBiddingStateWithHand("E", hand);
+    const state = { ...base, currentBid: 175, moonShooters: ["E"] as import("../types.js").Seat[] };
+    const profile = BOT_PRESETS.normal;
+    const cmd = botChooseCommand(state, "E", profile);
+    // With currentBid=175, minNextBid=180 which equals the ceiling (180) → bot bids 180
+    expect(cmd.type).toBe("PlaceBid");
+    if (cmd.type === "PlaceBid") {
+      expect(cmd.amount).toBe(180);
+    }
+  });
+
+  it("normal bot passes rather than bidding above 180 (regression cap)", () => {
+    // Same strong hand, but currentBid = 180 → minNextBid = 185 > 180 → should pass
+    const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10"];
+    const base = makeBiddingStateWithHand("E", hand);
+    const state = { ...base, currentBid: 180, moonShooters: ["E"] as import("../types.js").Seat[] };
+    const profile = BOT_PRESETS.normal;
+    const cmd = botChooseCommand(state, "E", profile);
+    // minNextBid = 185 > 180 → should pass
+    expect(cmd.type).toBe("PassBid");
+  });
+});
