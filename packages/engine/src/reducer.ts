@@ -1,6 +1,6 @@
 import { deriveDeal } from "./deal.js";
 import type { GameEvent } from "./events.js";
-import type { GameState, Seat, Team } from "./types.js";
+import type { GameState, Team } from "./types.js";
 import {
   DEFAULT_RULES,
   SEAT_TEAM,

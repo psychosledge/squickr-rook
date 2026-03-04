@@ -1,4 +1,3 @@
-import { getNextBidder } from "./bidding.js";
 import type { GameCommand } from "./commands.js";
 import { compareTrickCards, cardFromId } from "./deck.js";
 import type { GameEvent, TrickCompleted, HandScored, GameFinished, HandStarted } from "./events.js";
