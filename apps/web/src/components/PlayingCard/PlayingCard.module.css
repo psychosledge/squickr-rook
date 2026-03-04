@@ -84,7 +84,18 @@
 }
 
 .fromNest {
-  border: 2px solid var(--color-accent);
-  box-shadow: 0 0 8px 2px rgba(243, 156, 18, 0.4); /* fallback for older browsers */
-  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  overflow: visible; /* defensive: allows pip to overhang if a parent ever gains overflow:hidden */
+}
+
+.fromNest::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 1.5px solid var(--color-bg);
+  z-index: 2;
 }
