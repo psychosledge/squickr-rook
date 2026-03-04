@@ -4,6 +4,17 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v0.4.0] — 2026-03-04
+
+### New Features
+- **Score History / Hand Log** — track every hand's outcome across the full game
+  - 📋 history button in ScoreBar opens a full hand-log modal at any point during the game
+  - **History tab** in the post-hand result overlay shows cumulative scores after each hand
+  - **Hand Log section** on the Game Over screen shows the complete match history with a collapsible toggle
+  - Each row shows: hand #, bid team, bid amount, points taken, outcome badge (Made / Set / Moon), and running NS/EW scores
+
+---
+
 ## [v0.3.0] — 2026-03-04
 
 ### New Features
