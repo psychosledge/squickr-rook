@@ -4,6 +4,19 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v0.4.1] — 2026-03-04
+
+### New Features
+- **Nest card indicator** — during the discard phase, cards that came from the nest show a small amber pip (●) in the top-left corner so you can instantly tell them apart from your hand cards
+- **Bid amount in NestOverlay** — the discard screen now shows the winning bid amount (and 🌙 if Shoot the Moon was called) so you know your target while choosing discards
+- **Hand History table redesign** — 5-column layout: outcome icon (✓/✗), Bidder, Bid (with 🌙 for moon bids), NS score (cumulative + delta), EW score (cumulative + delta)
+
+### Bug Fixes
+- **Hand History EW column** — EW score column was blank due to `display: flex` applied directly to `<td>`; fixed by wrapping content in an inner `<div>`
+- **Hand History dark theme** — modal now uses correct CSS surface/text tokens instead of hardcoded light colours
+
+---
+
 ## [v0.4.0] — 2026-03-04
 
 ### New Features
