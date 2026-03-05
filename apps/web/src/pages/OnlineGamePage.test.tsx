@@ -262,7 +262,7 @@ describe("OnlineGamePageView", () => {
     expect(p.hand).toEqual(eHand);
   });
 
-  it("9. NestOverlay.hand falls back to 'N' hand when mySeat=null", () => {
+  it("9. NestOverlay is NOT rendered when overlay='nest' but mySeat=null", () => {
     const nHand = ["N1", "N2"] as unknown as import("@rook/engine").CardId[];
     const gameState = makeGameState({
       hands: { N: nHand, E: [], S: [], W: [] },
@@ -270,9 +270,7 @@ describe("OnlineGamePageView", () => {
     const tree = OnlineGamePageView(makeProps({ overlay: "nest", gameState, mySeat: null }));
     const all = flattenElements(tree);
     const nestOverlays = findByType(all, NestOverlay);
-    expect(nestOverlays).toHaveLength(1);
-    const p = nestOverlays[0].props as Record<string, unknown>;
-    expect(p.hand).toEqual(nHand);
+    expect(nestOverlays).toHaveLength(0);
   });
 
   it("10. renders TrumpPicker when overlay='trump'", () => {
@@ -325,6 +323,44 @@ describe("OnlineGamePageView", () => {
     const tree = OnlineGamePageView(makeProps({ historyModalOpen: false }));
     const all = flattenElements(tree);
     expect(findByType(all, HandHistoryModal)).toHaveLength(0);
+  });
+
+  it("17. GameTable receives seatNames prop when seatNames is provided", () => {
+    const seatNames = { N: "Alice", E: "Bob" };
+    const tree = OnlineGamePageView(makeProps({ seatNames }));
+    const all = flattenElements(tree);
+    const tables = findByType(all, GameTable);
+    expect(tables).toHaveLength(1);
+    const p = tables[0].props as Record<string, unknown>;
+    expect(p.seatNames).toEqual(seatNames);
+  });
+
+  it("18. GameTable receives undefined seatNames when prop is omitted", () => {
+    const tree = OnlineGamePageView(makeProps());
+    const all = flattenElements(tree);
+    const tables = findByType(all, GameTable);
+    expect(tables).toHaveLength(1);
+    const p = tables[0].props as Record<string, unknown>;
+    expect(p.seatNames).toBeUndefined();
+  });
+
+  it("19. NestOverlay is NOT rendered when overlay='nest' and mySeat=null (guard test)", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "nest", mySeat: null }));
+    const all = flattenElements(tree);
+    expect(findByType(all, NestOverlay)).toHaveLength(0);
+  });
+
+  it("20. NestOverlay uses mySeat hand directly when mySeat is non-null", () => {
+    const wHand = ["W1", "W2", "W3"] as unknown as import("@rook/engine").CardId[];
+    const gameState = makeGameState({
+      hands: { N: [], E: [], S: [], W: wHand },
+    });
+    const tree = OnlineGamePageView(makeProps({ overlay: "nest", gameState, mySeat: "W" }));
+    const all = flattenElements(tree);
+    const nestOverlays = findByType(all, NestOverlay);
+    expect(nestOverlays).toHaveLength(1);
+    const p = nestOverlays[0].props as Record<string, unknown>;
+    expect(p.hand).toEqual(wHand);
   });
 });
 

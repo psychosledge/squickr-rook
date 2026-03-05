@@ -1,18 +1,19 @@
 import { useMemo } from "react";
 import PlayerSeat from "@/components/PlayerSeat/PlayerSeat";
 import CurrentTrick from "@/components/CurrentTrick/CurrentTrick";
-import type { GameState, CardId } from "@rook/engine";
+import type { GameState, CardId, Seat } from "@rook/engine";
 import { sortHand } from "@/utils/sortHand";
 import styles from "./GameTable.module.css";
 
 type Props = {
   gameState: GameState;
   onPlayCard: (cardId: CardId) => void;
+  seatNames?: Partial<Record<Seat, string>>;
 };
 
 const HUMAN = "N" as const;
 
-export default function GameTable({ gameState, onPlayCard }: Props) {
+export default function GameTable({ gameState, onPlayCard, seatNames }: Props) {
   const { hands, activePlayer, currentTrick, trump, phase, dealer, bidder } = gameState;
   const isHumanTurn = phase === "playing" && activePlayer === HUMAN;
 
@@ -25,12 +26,12 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
     <div className={styles.table}>
       {/* Partner S — top center */}
       <div className={styles.top}>
-        <PlayerSeat seat="S" cards={hands["S"] ?? []} faceDown isActive={activePlayer === "S"} isBidder={bidder === "S"} isDealer={dealer === "S"} phase={phase} />
+        <PlayerSeat seat="S" cards={hands["S"] ?? []} faceDown isActive={activePlayer === "S"} isBidder={bidder === "S"} isDealer={dealer === "S"} phase={phase} displayName={seatNames?.["S"]} />
       </div>
 
       {/* Opponent E — screen-left (N=bottom, clockwise: N→E→S→W, so E is to N's left) */}
       <div className={styles.left}>
-        <PlayerSeat seat="E" cards={hands["E"] ?? []} faceDown isActive={activePlayer === "E"} isBidder={bidder === "E"} isDealer={dealer === "E"} phase={phase} />
+        <PlayerSeat seat="E" cards={hands["E"] ?? []} faceDown isActive={activePlayer === "E"} isBidder={bidder === "E"} isDealer={dealer === "E"} phase={phase} displayName={seatNames?.["E"]} />
       </div>
 
       {/* Center trick area */}
@@ -40,7 +41,7 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
 
       {/* Opponent W — screen-right (N=bottom, clockwise: N→E→S→W, so W is to N's right) */}
       <div className={styles.right}>
-        <PlayerSeat seat="W" cards={hands["W"] ?? []} faceDown isActive={activePlayer === "W"} isBidder={bidder === "W"} isDealer={dealer === "W"} phase={phase} />
+        <PlayerSeat seat="W" cards={hands["W"] ?? []} faceDown isActive={activePlayer === "W"} isBidder={bidder === "W"} isDealer={dealer === "W"} phase={phase} displayName={seatNames?.["W"]} />
       </div>
 
       {/* Human N — bottom */}
@@ -54,6 +55,7 @@ export default function GameTable({ gameState, onPlayCard }: Props) {
           isDealer={dealer === "N"}
           phase={phase}
           onCardClick={isHumanTurn ? onPlayCard : undefined}
+          displayName={seatNames?.["N"]}
         />
       </div>
     </div>

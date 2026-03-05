@@ -98,6 +98,43 @@ describe("PlayerSeat", () => {
     });
   });
 
+  describe("displayName prop", () => {
+    it("uses displayName as the label when provided", () => {
+      const element = PlayerSeat({ ...baseProps, displayName: "Alice" });
+      const elements = flattenElements(element);
+
+      const nameSpans = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("name")
+        );
+      });
+
+      expect(nameSpans).toHaveLength(1);
+      expect((nameSpans[0].props as Record<string, unknown>).children).toBe("Alice");
+    });
+
+    it("falls back to getSeatLabel when displayName is not provided", () => {
+      const element = PlayerSeat({ ...baseProps }); // seat = "S"
+      const elements = flattenElements(element);
+
+      const nameSpans = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("name")
+        );
+      });
+
+      expect(nameSpans).toHaveLength(1);
+      // getSeatLabel("S") returns "P3"
+      expect((nameSpans[0].props as Record<string, unknown>).children).toBe("P3");
+    });
+  });
+
   describe("card count display", () => {
     it("does not render a count span for a face-down player", () => {
       const element = PlayerSeat(baseProps);

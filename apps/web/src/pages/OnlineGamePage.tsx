@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useOnlineGameStore } from "@/store/onlineGameStore";
+import type { SeatInfo } from "@/store/onlineGameStore.types";
 import type { OverlayKind } from "@/store/gameStore.types";
 import type { GameState, HandScore, Seat, CardId, Color } from "@rook/engine";
 import ScoreBar from "@/components/ScoreBar/ScoreBar";
@@ -28,6 +29,7 @@ export type OnlineGamePageViewProps = {
   gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
   historyModalOpen: boolean;
   biddingThinkingSeat: Seat | null;
+  seatNames?: Partial<Record<Seat, string>>;
   onPlayCard: (cardId: CardId) => void;
   onToggleDiscard: (cardId: CardId) => void;
   onConfirmDiscards: () => void;
@@ -54,6 +56,7 @@ export function OnlineGamePageView({
   gameOverReason,
   historyModalOpen,
   biddingThinkingSeat,
+  seatNames,
   onPlayCard,
   onToggleDiscard,
   onConfirmDiscards,
@@ -98,11 +101,11 @@ export function OnlineGamePageView({
         <TrumpPicker onSelect={onSelectTrump} />
       )}
 
-      <GameTable gameState={gameState} onPlayCard={onPlayCard} />
+      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} />
 
-      {overlay === "nest" && (
+      {overlay === "nest" && mySeat !== null && (
         <NestOverlay
-          hand={sortHand(gameState.hands[humanSeat] ?? [], trump).filter((c) => c !== "ROOK")}
+          hand={sortHand(gameState.hands[mySeat] ?? [], trump).filter((c) => c !== "ROOK")}
           nestCardIds={gameState.originalNest}
           pendingDiscards={pendingDiscards}
           onToggleDiscard={onToggleDiscard}
@@ -149,6 +152,7 @@ export default function OnlineGamePage() {
   const gameOverReason = useOnlineGameStore((s) => s.gameOverReason);
   const historyModalOpen = useOnlineGameStore((s) => s.historyModalOpen);
   const biddingThinkingSeat = useOnlineGameStore((s) => s.biddingThinkingSeat);
+  const seats = useOnlineGameStore((s) => s.seats);
   const humanPlayCard = useOnlineGameStore((s) => s.humanPlayCard);
   const toggleDiscard = useOnlineGameStore((s) => s.toggleDiscard);
   const confirmDiscards = useOnlineGameStore((s) => s.confirmDiscards);
@@ -171,6 +175,12 @@ export default function OnlineGamePage() {
 
   if (!gameState) return null;
 
+  const seatNames: Partial<Record<Seat, string>> = Object.fromEntries(
+    seats
+      .filter((s): s is SeatInfo & { displayName: string } => s.displayName !== null)
+      .map((s) => [s.seat, s.displayName]),
+  );
+
   function handlePlayAgain() {
     // disconnect() resets store state. OnlineLobbyPage will reconnect
     // via its useEffect when it mounts at /online/:code.
@@ -189,6 +199,7 @@ export default function OnlineGamePage() {
       gameOverReason={gameOverReason}
       historyModalOpen={historyModalOpen}
       biddingThinkingSeat={biddingThinkingSeat}
+      seatNames={seatNames}
       onPlayCard={humanPlayCard}
       onToggleDiscard={toggleDiscard}
       onConfirmDiscards={confirmDiscards}

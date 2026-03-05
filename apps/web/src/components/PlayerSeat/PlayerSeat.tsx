@@ -13,13 +13,14 @@ type Props = {
   isDealer?: boolean;
   phase: GamePhase;
   onCardClick?: (cardId: CardId) => void;
+  displayName?: string;
 };
 
 const BIDDER_PHASES: GamePhase[] = ["nest", "trump", "playing", "scoring"];
 
-export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, onCardClick }: Props) {
+export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, onCardClick, displayName }: Props) {
   const legalCards = useLegalCards(seat);
-  const label = getSeatLabel(seat);
+  const label = displayName ?? getSeatLabel(seat);
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
 
   return (
