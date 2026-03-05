@@ -202,11 +202,20 @@ export default class RookRoom implements Party.Server {
   // ── Private handlers ────────────────────────────────────────────────────────
 
   private async handleJoinRoom(msg: JoinRoom, conn: Party.Connection): Promise<void> {
+    // Resolve seat BEFORE calling setState so the Welcome snapshot is correct
+    const seat = this.getSeatForPlayerId(msg.playerId);
+
     setState(conn, {
       playerId: msg.playerId,
       displayName: msg.displayName,
-      seat: null,
+      seat,
     });
+
+    // Update the seatedPlayers entry's connId so future routing is correct
+    if (seat !== null) {
+      const entry = this.seatedPlayers.get(seat);
+      if (entry) this.seatedPlayers.set(seat, { ...entry, connId: conn.id });
+    }
 
     if (!this.joinOrder.includes(conn.id)) {
       this.joinOrder.push(conn.id);
@@ -217,7 +226,6 @@ export default class RookRoom implements Party.Server {
     }
 
     // Build Welcome for this connection
-    const seat = this.getSeatForConn(conn);
     const welcome: Welcome = {
       type: "Welcome",
       roomCode: this.room.id,
@@ -486,8 +494,12 @@ export default class RookRoom implements Party.Server {
     });
   }
 
-  private getSeatForConn(conn: Party.Connection): Seat | null {
-    return getState(conn)?.seat ?? null;
+  /** Returns the seat for a given playerId by scanning seatedPlayers, or null. */
+  private getSeatForPlayerId(playerId: string): Seat | null {
+    for (const [seat, entry] of this.seatedPlayers.entries()) {
+      if (entry.playerId === playerId) return seat;
+    }
+    return null;
   }
 
   /** Returns the live connection for a given seat, or undefined if not connected. */

@@ -1,25 +1,26 @@
 import PlayingCard from "@/components/PlayingCard/PlayingCard";
 import { getSeatLabel } from "@/utils/seatLabel";
+import { deriveSlots } from "@/utils/seatPositions";
 import type { PlayedCard, Color, Seat } from "@rook/engine";
 import styles from "./CurrentTrick.module.css";
 
 type Props = {
   trick: PlayedCard[];
   trump: Color | null;
-};
-
-// Positions are from the local player (N=bottom) perspective.
-// Clockwise: N(bottom) → E(screen-left) → S(top) → W(screen-right)
-const SEAT_AREA: Record<Seat, string> = {
-  S: "top",
-  E: "left",
-  W: "right",
-  N: "bottom",
+  humanSeat?: Seat;
 };
 
 const ALL_SEATS: Seat[] = ["S", "E", "W", "N"];
 
-export default function CurrentTrick({ trick, trump: _trump }: Props) {
+export default function CurrentTrick({ trick, trump: _trump, humanSeat }: Props) {
+  const { bottom, top, left, right } = deriveSlots(humanSeat ?? "N");
+  const seatArea: Record<Seat, string> = {
+    [bottom]: "bottom",
+    [top]: "top",
+    [left]: "left",
+    [right]: "right",
+  } as Record<Seat, string>;
+
   // Build a lookup: seat → cardId (only for played cards)
   const playedBySeat: Partial<Record<Seat, string>> = {};
   for (const { seat, cardId } of trick) {
@@ -36,7 +37,7 @@ export default function CurrentTrick({ trick, trump: _trump }: Props) {
             key={seat}
             data-seat={seat}
             className={cardId ? styles.play : styles.placeholder}
-            style={{ gridArea: SEAT_AREA[seat] }}
+            style={{ gridArea: seatArea[seat] }}
           >
             {cardId ? (
               <>

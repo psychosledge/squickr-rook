@@ -329,6 +329,58 @@ describe("CurrentTrick — spatial 3×3 grid layout", () => {
     });
   });
 
+  describe("humanSeat prop — dynamic position mapping", () => {
+    it("humanSeat='E': card played by E gets gridArea 'bottom'", () => {
+      const trick: PlayedCard[] = [{ seat: "E", cardId: "G7" }];
+      const element = CurrentTrick({ trick, trump: null, humanSeat: "E" });
+      const { elements } = collectTree(element);
+      const slot = findSlotBySeat(elements, "E");
+      expect(slot).toBeDefined();
+      const style = (slot!.props as Record<string, unknown>).style as Record<string, unknown>;
+      expect(style?.gridArea).toBe("bottom");
+    });
+
+    it("humanSeat='E': card played by W gets gridArea 'top'", () => {
+      const trick: PlayedCard[] = [{ seat: "W", cardId: "R9" }];
+      const element = CurrentTrick({ trick, trump: null, humanSeat: "E" });
+      const { elements } = collectTree(element);
+      const slot = findSlotBySeat(elements, "W");
+      expect(slot).toBeDefined();
+      const style = (slot!.props as Record<string, unknown>).style as Record<string, unknown>;
+      expect(style?.gridArea).toBe("top");
+    });
+
+    it("humanSeat='E': card played by S gets gridArea 'left'", () => {
+      const trick: PlayedCard[] = [{ seat: "S", cardId: "B3" }];
+      const element = CurrentTrick({ trick, trump: null, humanSeat: "E" });
+      const { elements } = collectTree(element);
+      const slot = findSlotBySeat(elements, "S");
+      expect(slot).toBeDefined();
+      const style = (slot!.props as Record<string, unknown>).style as Record<string, unknown>;
+      expect(style?.gridArea).toBe("left");
+    });
+
+    it("humanSeat='E': card played by N gets gridArea 'right'", () => {
+      const trick: PlayedCard[] = [{ seat: "N", cardId: "Y1" }];
+      const element = CurrentTrick({ trick, trump: null, humanSeat: "E" });
+      const { elements } = collectTree(element);
+      const slot = findSlotBySeat(elements, "N");
+      expect(slot).toBeDefined();
+      const style = (slot!.props as Record<string, unknown>).style as Record<string, unknown>;
+      expect(style?.gridArea).toBe("right");
+    });
+
+    it("humanSeat omitted (default N): seat N gets gridArea 'bottom'", () => {
+      const trick: PlayedCard[] = [{ seat: "N", cardId: "Y1" }];
+      const element = CurrentTrick({ trick, trump: null });
+      const { elements } = collectTree(element);
+      const slot = findSlotBySeat(elements, "N");
+      expect(slot).toBeDefined();
+      const style = (slot!.props as Record<string, unknown>).style as Record<string, unknown>;
+      expect(style?.gridArea).toBe("bottom");
+    });
+  });
+
   describe("accessibility — root region landmark", () => {
     it("root div has role='region'", () => {
       const element = CurrentTrick({ trick: [], trump: null });
