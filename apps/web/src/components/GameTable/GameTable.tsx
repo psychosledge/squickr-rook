@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import PlayerSeat from "@/components/PlayerSeat/PlayerSeat";
 import CurrentTrick from "@/components/CurrentTrick/CurrentTrick";
 import type { GameState, CardId, Seat } from "@rook/engine";
@@ -9,29 +8,51 @@ type Props = {
   gameState: GameState;
   onPlayCard: (cardId: CardId) => void;
   seatNames?: Partial<Record<Seat, string>>;
+  humanSeat?: Seat;
 };
 
-const HUMAN = "N" as const;
+/** Clockwise seat order */
+const CLOCKWISE: Seat[] = ["N", "E", "S", "W"];
 
-export default function GameTable({ gameState, onPlayCard, seatNames }: Props) {
+/**
+ * Derive the 4 positional display slots from the human's seat.
+ *
+ * Screen layout (cardinal directions are the seat labels, not screen positions):
+ *   - bottom = humanSeat (face-up, interactive)
+ *   - top    = opposite seat (partner, 2 steps clockwise)
+ *   - left   = next clockwise seat (1 step clockwise)
+ *   - right  = previous clockwise seat (1 step counter-clockwise)
+ *
+ * Mnemonic: N→E→S→W clockwise, so from N's perspective E is to the left
+ * and W is to the right on screen.
+ */
+function deriveSlots(humanSeat: Seat): { bottom: Seat; top: Seat; left: Seat; right: Seat } {
+  const idx = CLOCKWISE.indexOf(humanSeat);
+  const bottom = humanSeat;
+  const top = CLOCKWISE[(idx + 2) % 4];
+  const left = CLOCKWISE[(idx + 1) % 4];
+  const right = CLOCKWISE[(idx + 3) % 4];
+  return { bottom, top, left, right };
+}
+
+export default function GameTable({ gameState, onPlayCard, seatNames, humanSeat = "N" }: Props) {
   const { hands, activePlayer, currentTrick, trump, phase, dealer, bidder } = gameState;
-  const isHumanTurn = phase === "playing" && activePlayer === HUMAN;
+  const isHumanTurn = phase === "playing" && activePlayer === humanSeat;
 
-  const sortedNorthHand = useMemo(
-    () => sortHand(hands["N"] ?? [], trump),
-    [hands, trump],
-  );
+  const { bottom, top, left, right } = deriveSlots(humanSeat);
+
+  const sortedHumanHand = sortHand(hands[humanSeat] ?? [], trump);
 
   return (
     <div className={styles.table}>
-      {/* Partner S — top center */}
+      {/* Partner — top center */}
       <div className={styles.top}>
-        <PlayerSeat seat="S" cards={hands["S"] ?? []} faceDown isActive={activePlayer === "S"} isBidder={bidder === "S"} isDealer={dealer === "S"} phase={phase} displayName={seatNames?.["S"]} />
+        <PlayerSeat seat={top} cards={hands[top] ?? []} faceDown isActive={activePlayer === top} isBidder={bidder === top} isDealer={dealer === top} phase={phase} displayName={seatNames?.[top]} />
       </div>
 
-      {/* Opponent E — screen-left (N=bottom, clockwise: N→E→S→W, so E is to N's left) */}
+      {/* Opponent — screen-left (next clockwise from human) */}
       <div className={styles.left}>
-        <PlayerSeat seat="E" cards={hands["E"] ?? []} faceDown isActive={activePlayer === "E"} isBidder={bidder === "E"} isDealer={dealer === "E"} phase={phase} displayName={seatNames?.["E"]} />
+        <PlayerSeat seat={left} cards={hands[left] ?? []} faceDown isActive={activePlayer === left} isBidder={bidder === left} isDealer={dealer === left} phase={phase} displayName={seatNames?.[left]} />
       </div>
 
       {/* Center trick area */}
@@ -39,23 +60,23 @@ export default function GameTable({ gameState, onPlayCard, seatNames }: Props) {
         <CurrentTrick trick={currentTrick} trump={trump} />
       </div>
 
-      {/* Opponent W — screen-right (N=bottom, clockwise: N→E→S→W, so W is to N's right) */}
+      {/* Opponent — screen-right (previous clockwise from human) */}
       <div className={styles.right}>
-        <PlayerSeat seat="W" cards={hands["W"] ?? []} faceDown isActive={activePlayer === "W"} isBidder={bidder === "W"} isDealer={dealer === "W"} phase={phase} displayName={seatNames?.["W"]} />
+        <PlayerSeat seat={right} cards={hands[right] ?? []} faceDown isActive={activePlayer === right} isBidder={bidder === right} isDealer={dealer === right} phase={phase} displayName={seatNames?.[right]} />
       </div>
 
-      {/* Human N — bottom */}
+      {/* Human — bottom */}
       <div className={styles.bottom}>
         <PlayerSeat
-          seat="N"
-          cards={sortedNorthHand}
+          seat={bottom}
+          cards={sortedHumanHand}
           faceDown={false}
-          isActive={activePlayer === HUMAN}
-          isBidder={bidder === "N"}
-          isDealer={dealer === "N"}
+          isActive={activePlayer === humanSeat}
+          isBidder={bidder === humanSeat}
+          isDealer={dealer === humanSeat}
           phase={phase}
           onCardClick={isHumanTurn ? onPlayCard : undefined}
-          displayName={seatNames?.["N"]}
+          displayName={seatNames?.[humanSeat]}
         />
       </div>
     </div>

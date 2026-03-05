@@ -373,6 +373,24 @@ describe("OnlineGamePageView", () => {
     expect(p.seatNames).toEqual(seatNames);
   });
 
+  it("22. GameTable receives humanSeat=mySeat when mySeat is non-null", () => {
+    const tree = OnlineGamePageView(makeProps({ mySeat: "E" }));
+    const all = flattenElements(tree);
+    const tables = findByType(all, GameTable);
+    expect(tables).toHaveLength(1);
+    const p = tables[0].props as Record<string, unknown>;
+    expect(p.humanSeat).toBe("E");
+  });
+
+  it("23. GameTable receives humanSeat='N' when mySeat=null", () => {
+    const tree = OnlineGamePageView(makeProps({ mySeat: null }));
+    const all = flattenElements(tree);
+    const tables = findByType(all, GameTable);
+    expect(tables).toHaveLength(1);
+    const p = tables[0].props as Record<string, unknown>;
+    expect(p.humanSeat).toBe("N");
+  });
+
 });
 
 // Suppress unused import warnings

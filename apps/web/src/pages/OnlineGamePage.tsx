@@ -102,7 +102,7 @@ export function OnlineGamePageView({
         <TrumpPicker onSelect={onSelectTrump} />
       )}
 
-      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} />
+      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} humanSeat={humanSeat} />
 
       {overlay === "nest" && mySeat !== null && (
         <NestOverlay
