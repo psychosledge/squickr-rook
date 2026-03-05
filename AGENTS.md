@@ -199,6 +199,7 @@ User performs manual testing (all items from session)
 5. **Full test suite before commit** — Not just the new tests
 6. **UAT at end of session** — Unless user explicitly asks for it earlier
 7. **Any agent may ask clarifying questions at any time** — Questions are not restricted to before work begins
+8. **ADR lifecycle** — When Alex locks architecture decisions, the ADR goes in `docs/` and is committed immediately. When the feature ships, the doc is deleted in the same (or a follow-up) commit. ADRs live in `docs/`, never only in `.opencode/` (which is gitignored).
 
 ---
 
