@@ -1,0 +1,5 @@
+{
+  "name":  "squickr-rook",
+  "main":  "src/room.ts",
+  "compatibilityDate": "2024-01-01"
+}
