@@ -10,6 +10,7 @@ type Props = {
   onShootMoon: () => void;
   biddingThinkingSeat?: Seat | null;
   humanSeat?: Seat;
+  seatNames?: Partial<Record<Seat, string>>;
 };
 
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
@@ -30,6 +31,7 @@ export function BiddingOverlayView({
   onDecrement,
   biddingThinkingSeat,
   humanSeat = "N",
+  seatNames,
 }: BiddingOverlayViewProps) {
   const { bids, currentBid, activePlayer, rules, moonShooters } = gameState;
   const isMyTurn = activePlayer === humanSeat;
@@ -70,7 +72,7 @@ export function BiddingOverlayView({
               else if (typeof bid === "number") display = isMoonShooter ? `${bid} 🌙` : String(bid);
               return (
                 <tr key={seat} className={isActive ? styles.activeRow : undefined}>
-                  <td className={styles.seatName}>{getSeatLabel(seat)}</td>
+                  <td className={styles.seatName}>{seatNames?.[seat] ?? getSeatLabel(seat)}</td>
                   <td className={bid === "pass" ? styles.passed : styles.bidVal}>{display}</td>
                 </tr>
               );
@@ -126,9 +128,9 @@ export function BiddingOverlayView({
           <div className={styles.waiting}>
             <span className={biddingThinkingSeat ? styles.thinking : undefined}>
               {biddingThinkingSeat
-                ? `${getSeatLabel(biddingThinkingSeat)} is thinking…`
+                ? `${seatNames?.[biddingThinkingSeat] ?? getSeatLabel(biddingThinkingSeat)} is thinking…`
                 : activePlayer
-                ? `${getSeatLabel(activePlayer)} is bidding…`
+                ? `${seatNames?.[activePlayer] ?? getSeatLabel(activePlayer)} is bidding…`
                 : ""}
             </span>
           </div>
@@ -139,7 +141,7 @@ export function BiddingOverlayView({
 }
 
 // ── Stateful wrapper (the actual exported default) ────────────────────────────
-export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, biddingThinkingSeat, humanSeat = "N" }: Props) {
+export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, biddingThinkingSeat, humanSeat = "N", seatNames }: Props) {
   const { currentBid, rules } = gameState;
   const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
 
@@ -171,6 +173,7 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
       onDecrement={decrement}
       biddingThinkingSeat={biddingThinkingSeat}
       humanSeat={humanSeat}
+      seatNames={seatNames}
     />
   );
 }

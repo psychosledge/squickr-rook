@@ -419,8 +419,8 @@ describe("onlineGameStore", () => {
 
   // ── Test 12: _updateOverlayAfterBatch — nest, human's turn ───────────────
   describe("_updateOverlayAfterBatch — nest phase", () => {
-    it("sets overlay to 'nest' when it is the human's turn in nest phase", () => {
-      const nestState = makeNestState("N"); // N is active in nest
+    it("sets overlay to 'nest' when it is the human's turn in nest phase AND nest already taken (originalNest.length > 0)", () => {
+      const nestState = makeNestState("N"); // N is active in nest, NestTaken already applied
 
       useOnlineGameStore.setState({
         ...INITIAL_ONLINE_STATE,
@@ -433,6 +433,45 @@ describe("onlineGameStore", () => {
       useOnlineGameStore.getState()._updateOverlayAfterBatch();
 
       expect(useOnlineGameStore.getState().overlay).toBe("nest");
+    });
+
+    // ── Test 12b: _updateOverlayAfterBatch — nest, human's turn, nest NOT yet taken ───
+    it("sends TakeNest command (not overlay:'nest') when phase=nest, activePlayer=mySeat, originalNest is empty", () => {
+      const { sent } = injectMockSocket();
+
+      // Build a state in nest phase but originalNest is still empty (NestTaken not applied yet)
+      let state = makeBiddingState("N");
+      state = applyEvent(state, { type: "BidPlaced", seat: "N", amount: 100, handNumber: 0, timestamp: 1001 });
+      state = applyEvent(state, { type: "BidPassed", seat: "E", handNumber: 0, timestamp: 1002 });
+      state = applyEvent(state, { type: "BidPassed", seat: "S", handNumber: 0, timestamp: 1003 });
+      state = applyEvent(state, { type: "BidPassed", seat: "W", handNumber: 0, timestamp: 1004 });
+      state = applyEvent(state, { type: "BiddingComplete", winner: "N", amount: 100, forced: false, shotMoon: false, handNumber: 0, timestamp: 1005 });
+      // Do NOT apply NestTaken — originalNest is still []
+
+      expect(state.phase).toBe("nest");
+      expect(state.originalNest).toHaveLength(0);
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: state,
+        _socket: useOnlineGameStore.getState()._socket,
+      });
+
+      useOnlineGameStore.getState()._updateOverlayAfterBatch();
+
+      // Should send TakeNest, NOT open nest overlay
+      const messages = sent.map((s) => JSON.parse(s));
+      const takeNestMsgs = messages.filter(
+        (m) => m.type === "SendCommand" && m.command?.type === "TakeNest",
+      );
+      expect(takeNestMsgs).toHaveLength(1);
+      expect(takeNestMsgs[0].command.seat).toBe("N");
+
+      // Overlay must NOT be set to "nest" yet
+      expect(useOnlineGameStore.getState().overlay).toBe("none");
     });
 
     // ── Test 13: _updateOverlayAfterBatch — nest, not human's turn ───────────

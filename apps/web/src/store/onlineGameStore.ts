@@ -323,8 +323,16 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     }
 
     if (phase === "nest") {
-      if (activePlayer === mySeat) {
-        set({ overlay: "nest", biddingThinkingSeat: null });
+      if (mySeat !== null && activePlayer === mySeat) {
+        if (gameState.originalNest.length > 0) {
+          // Nest already taken — show discard modal (hand has 15 cards)
+          set({ overlay: "nest", biddingThinkingSeat: null });
+        } else {
+          // Nest not yet taken — send TakeNest first; server will reply with NestTaken event
+          // which will re-trigger _updateOverlayAfterBatch with originalNest populated
+          get()._sendCommand({ type: "TakeNest", seat: mySeat });
+          set({ overlay: "none", biddingThinkingSeat: null });
+        }
       } else {
         set({ overlay: "none", biddingThinkingSeat: null });
       }

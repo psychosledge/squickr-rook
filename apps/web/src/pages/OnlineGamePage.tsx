@@ -94,6 +94,7 @@ export function OnlineGamePageView({
           onShootMoon={onShootMoon}
           biddingThinkingSeat={biddingThinkingSeat}
           humanSeat={humanSeat}
+          seatNames={seatNames}
         />
       )}
 

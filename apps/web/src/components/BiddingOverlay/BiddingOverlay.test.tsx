@@ -444,3 +444,70 @@ describe("BiddingOverlay — thinking / waiting messages", () => {
     expect(waitingEls).toHaveLength(0);
   });
 });
+
+describe("BiddingOverlay — seatNames override", () => {
+  // ── Test 18 ──────────────────────────────────────────────────────────────
+  it("18. bid table uses seatNames display name when provided for a seat", () => {
+    const seatNames = { N: "Alice", E: "Bob", S: "Carol", W: "Dave" };
+    const props = makeViewProps({}, { seatNames });
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    // Find all seatName cells
+    const seatCells = findByClass(all, "seatName");
+    const texts = seatCells.map((el) => flattenStrings(el).join(""));
+    expect(texts).toContain("Alice");
+    expect(texts).toContain("Bob");
+    expect(texts).toContain("Carol");
+    expect(texts).toContain("Dave");
+    // Should NOT use the getSeatLabel fallback for those seats
+    expect(texts).not.toContain("Label-N");
+    expect(texts).not.toContain("Label-E");
+  });
+
+  // ── Test 19 ──────────────────────────────────────────────────────────────
+  it("19. bid table falls back to getSeatLabel when seatNames not provided", () => {
+    const props = makeViewProps();
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const seatCells = findByClass(all, "seatName");
+    const texts = seatCells.map((el) => flattenStrings(el).join(""));
+    expect(texts).toContain("Label-N");
+    expect(texts).toContain("Label-E");
+    expect(texts).toContain("Label-S");
+    expect(texts).toContain("Label-W");
+  });
+
+  // ── Test 20 ──────────────────────────────────────────────────────────────
+  it("20. waiting message uses seatNames when biddingThinkingSeat is set", () => {
+    const seatNames = { E: "Bob" };
+    const props = makeViewProps(
+      { activePlayer: "E" as const },
+      { biddingThinkingSeat: "E" as const, seatNames },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const waitingEls = findByClass(all, "waiting");
+    const text = flattenStrings(waitingEls[0]).join("");
+    expect(text).toContain("Bob is thinking…");
+    expect(text).not.toContain("Label-E");
+  });
+
+  // ── Test 21 ──────────────────────────────────────────────────────────────
+  it("21. waiting message uses seatNames when activePlayer is bidding (no thinking seat)", () => {
+    const seatNames = { S: "Carol" };
+    const props = makeViewProps(
+      { activePlayer: "S" as const },
+      { biddingThinkingSeat: null, seatNames },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const waitingEls = findByClass(all, "waiting");
+    const text = flattenStrings(waitingEls[0]).join("");
+    expect(text).toContain("Carol is bidding…");
+    expect(text).not.toContain("Label-S");
+  });
+});
