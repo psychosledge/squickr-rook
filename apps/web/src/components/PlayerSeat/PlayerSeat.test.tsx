@@ -135,6 +135,22 @@ describe("PlayerSeat", () => {
     });
   });
 
+  describe("data-face-down attribute", () => {
+    it("sets data-face-down='true' on the seat div when faceDown is true", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: true });
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-face-down"]).toBe("true");
+    });
+
+    it("does not set data-face-down when faceDown is false", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: false });
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-face-down"]).toBeUndefined();
+    });
+  });
+
   describe("card count display", () => {
     it("does not render a count span for a face-down player", () => {
       const element = PlayerSeat(baseProps);

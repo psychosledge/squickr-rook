@@ -52,10 +52,10 @@
   min-width: 0;
 }
 
-/* S, E, W: never show the hand — always faceDown, badge conveys all needed info */
-.seat[data-seat="S"] .handWrap,
-.seat[data-seat="E"] .handWrap,
-.seat[data-seat="W"] .handWrap {
+/* Opponent seats (face-down): hide the hand — badge conveys all needed info */
+.seat[data-face-down="true"][data-seat="S"] .handWrap,
+.seat[data-face-down="true"][data-seat="E"] .handWrap,
+.seat[data-face-down="true"][data-seat="W"] .handWrap {
   display: none;
 }
 

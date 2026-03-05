@@ -24,7 +24,7 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
 
   return (
-    <div className={`${styles.seat} ${isActive ? styles.active : ""}`} data-seat={seat}>
+    <div className={`${styles.seat} ${isActive ? styles.active : ""}`} data-seat={seat} data-face-down={faceDown ? "true" : undefined}>
       <div className={styles.nameRow}>
         <span className={styles.name}>{label}</span>
         {isDealer && <span className={styles.dealerBadge} aria-label="Dealer">D</span>}
