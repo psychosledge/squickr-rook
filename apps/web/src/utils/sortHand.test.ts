@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { MASKED_CARD } from "@rook/engine";
 import { sortHand } from "./sortHand";
 
 describe("sortHand", () => {
@@ -96,5 +97,29 @@ describe("sortHand", () => {
     expect(result[1]).toBe("B14");
     // Full expected order: B1, B14, B6, B5
     expect(result).toEqual(["B1", "B14", "B6", "B5"]);
+  });
+
+  // ── Fix: masked placeholder cards ("??") ─────────────────────────────────
+
+  it('all masked cards returns empty array', () => {
+    // Arrange: hand of only masked placeholders (e.g. opponent's hand)
+    // Act / Assert
+    expect(sortHand([MASKED_CARD, MASKED_CARD, MASKED_CARD], null)).toEqual([]);
+  });
+
+  it('masked cards are filtered out, real cards remain', () => {
+    // Arrange: mix of masked placeholders and one real card
+    // Act
+    const result = sortHand([MASKED_CARD, "R14", MASKED_CARD], null);
+    // Assert: only the real card survives
+    expect(result).toEqual(["R14"]);
+  });
+
+  it('masked cards are filtered out regardless of trump', () => {
+    // Arrange: mix of masked placeholders and one real card, with trump set
+    // Act
+    const result = sortHand([MASKED_CARD, "R14", MASKED_CARD], "Red");
+    // Assert: only the real card survives
+    expect(result).toEqual(["R14"]);
   });
 });

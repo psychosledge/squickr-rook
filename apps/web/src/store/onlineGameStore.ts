@@ -59,11 +59,14 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   // ── Connection ────────────────────────────────────────────────────────────
 
   connect: (roomCode) => {
-    // Resolve/persist playerId
-    let playerId = localStorage.getItem("rookPlayerId");
+    // Resolve/persist playerId using sessionStorage (tab-scoped) so that two
+    // browser tabs on the same origin get distinct player IDs, preventing the
+    // server from assigning them the same seat and sending a mis-masked state.
+    // displayName stays in localStorage so it persists across sessions.
+    let playerId = sessionStorage.getItem("rookPlayerId");
     if (!playerId) {
       playerId = nanoid();
-      localStorage.setItem("rookPlayerId", playerId);
+      sessionStorage.setItem("rookPlayerId", playerId);
     }
 
     // Resolve display name

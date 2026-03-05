@@ -1,4 +1,4 @@
-import { cardFromId, offSuitRank } from "@rook/engine";
+import { cardFromId, offSuitRank, MASKED_CARD } from "@rook/engine";
 import type { CardId, Color } from "@rook/engine";
 
 /** Color display order when no trump (or for non-trump groups with trump). */
@@ -13,11 +13,16 @@ const COLOR_ORDER: Color[] = ["Black", "Red", "Green", "Yellow"];
  * - Rook: at end of trump group (if trump known), or at very end of hand (if trump unknown)
  */
 export function sortHand(cards: CardId[], trump: Color | null): CardId[] {
-  if (cards.length === 0) return [];
+  // Drop masked placeholder cards ("??") — these appear when a client receives
+  // a state snapshot masked for another seat. They are not real cards and
+  // cardFromId() would throw on them.
+  const knownCards = cards.filter((id) => id !== MASKED_CARD);
+
+  if (knownCards.length === 0) return [];
 
   // Separate Rook from regular cards
-  const rook = cards.filter((id) => id === "ROOK");
-  const regular = cards.filter((id) => id !== "ROOK");
+  const rook = knownCards.filter((id) => id === "ROOK");
+  const regular = knownCards.filter((id) => id !== "ROOK");
 
   // Group regular cards by color
   const groups: Map<Color, CardId[]> = new Map();
