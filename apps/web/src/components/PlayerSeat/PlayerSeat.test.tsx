@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import PlayerSeat from "./PlayerSeat";
 
-// Mock the useLegalCards hook — it depends on Zustand store
+// Mock the useLegalCards hook — now accepts (gameState, seat) signature
 vi.mock("@/hooks/useLegalCards", () => ({
-  useLegalCards: () => [],
+  useLegalCards: (_gameState: unknown, _seat: unknown) => [],
 }));
 
 // Mock CSS modules — Vitest doesn't process them by default
@@ -44,6 +44,7 @@ const baseProps = {
   faceDown: true,
   isActive: false,
   phase: "bidding" as import("@rook/engine").GamePhase,
+  gameState: null as import("@rook/engine").GameState | null,
 };
 
 describe("PlayerSeat", () => {
@@ -217,9 +218,9 @@ describe("PlayerSeat", () => {
   });
 
   describe("legalCardIds prop passed to CardHand", () => {
-    it("passes legalCardIds=[] to CardHand when faceDown=false and onCardClick is undefined (not your turn — all cards dimmed)", () => {
-      // faceDown=false, no onCardClick → legalCardIds should be [] (not undefined)
-      const element = PlayerSeat({ ...baseProps, faceDown: false, onCardClick: undefined });
+    it("passes legalCardIds=[] to CardHand when faceDown=false, phase='playing', and onCardClick is undefined (not your turn — all cards dimmed)", () => {
+      // faceDown=false, phase=playing, no onCardClick → legalCardIds should be [] (dim all — not your turn)
+      const element = PlayerSeat({ ...baseProps, faceDown: false, phase: "playing", onCardClick: undefined });
       const elements = flattenElements(element);
 
       // Find the CardHand element (its type will be the CardHand function)
@@ -247,6 +248,67 @@ describe("PlayerSeat", () => {
       expect(cardHandEls).toHaveLength(1);
       const props = cardHandEls[0].props as Record<string, unknown>;
       expect(props.legalCardIds).toBeUndefined();
+    });
+
+    it("passes legalCardIds=undefined to CardHand when faceDown=false and phase='bidding' (cards visible, not dimmed)", () => {
+      // Bug 2 fix: during bidding phase, cards must NOT be dimmed regardless of onCardClick
+      const element = PlayerSeat({ ...baseProps, faceDown: false, phase: "bidding", onCardClick: undefined });
+      const elements = flattenElements(element);
+
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "legalCardIds" in p;
+      });
+
+      expect(cardHandEls).toHaveLength(1);
+      const props = cardHandEls[0].props as Record<string, unknown>;
+      expect(props.legalCardIds).toBeUndefined();
+    });
+
+    it("passes legalCardIds=undefined to CardHand when faceDown=false and phase='nest' (cards visible)", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: false, phase: "nest", onCardClick: undefined });
+      const elements = flattenElements(element);
+
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "legalCardIds" in p;
+      });
+
+      expect(cardHandEls).toHaveLength(1);
+      const props = cardHandEls[0].props as Record<string, unknown>;
+      expect(props.legalCardIds).toBeUndefined();
+    });
+
+    it("passes legalCardIds=undefined to CardHand when faceDown=false and phase='trump' (cards visible)", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: false, phase: "trump", onCardClick: undefined });
+      const elements = flattenElements(element);
+
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "legalCardIds" in p;
+      });
+
+      expect(cardHandEls).toHaveLength(1);
+      const props = cardHandEls[0].props as Record<string, unknown>;
+      expect(props.legalCardIds).toBeUndefined();
+    });
+  });
+
+  describe("gameState prop (Bug 1: useLegalCards accepts gameState parameter)", () => {
+    it("accepts gameState=null without error", () => {
+      // Should render without throwing — useLegalCards(null, seat) returns []
+      const element = PlayerSeat({ ...baseProps, gameState: null });
+      expect(element).not.toBeNull();
+    });
+
+    it("accepts gameState as a non-null object without error", () => {
+      const minimalGameState = {
+        phase: "playing",
+        activePlayer: "S",
+        hands: { N: [], E: [], S: [], W: [] },
+      } as unknown as import("@rook/engine").GameState;
+      const element = PlayerSeat({ ...baseProps, gameState: minimalGameState });
+      expect(element).not.toBeNull();
     });
   });
 });

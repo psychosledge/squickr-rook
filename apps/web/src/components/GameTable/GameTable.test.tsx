@@ -244,4 +244,18 @@ describe("GameTable", () => {
     expect((leftSeat!.props as Record<string, unknown>).position).toBe("left");
     expect((rightSeat!.props as Record<string, unknown>).position).toBe("right");
   });
+
+  it("9. gameState is threaded into all 4 PlayerSeat instances", () => {
+    // Bug 1 fix: GameTable must pass gameState to every PlayerSeat so that
+    // useLegalCards(gameState, seat) works in online play
+    const gameState = makeGameState();
+    const tree = GameTable({ gameState, onPlayCard });
+    const seats = getPlayerSeats(tree);
+
+    expect(seats).toHaveLength(4);
+    for (const seat of seats) {
+      const p = seat.props as Record<string, unknown>;
+      expect(p.gameState).toBe(gameState);
+    }
+  });
 });

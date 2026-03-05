@@ -1,7 +1,7 @@
 import CardHand from "@/components/CardHand/CardHand";
 import { useLegalCards } from "@/hooks/useLegalCards";
 import { getSeatLabel } from "@/utils/seatLabel";
-import type { Seat, CardId, GamePhase } from "@rook/engine";
+import type { Seat, CardId, GamePhase, GameState } from "@rook/engine";
 import styles from "./PlayerSeat.module.css";
 
 type Props = {
@@ -12,6 +12,7 @@ type Props = {
   isBidder?: boolean;
   isDealer?: boolean;
   phase: GamePhase;
+  gameState: GameState | null;
   onCardClick?: (cardId: CardId) => void;
   displayName?: string;
   position?: "bottom" | "top" | "left" | "right";
@@ -19,8 +20,8 @@ type Props = {
 
 const BIDDER_PHASES: GamePhase[] = ["nest", "trump", "playing", "scoring"];
 
-export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, onCardClick, displayName, position }: Props) {
-  const legalCards = useLegalCards(seat);
+export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, gameState, onCardClick, displayName, position }: Props) {
+  const legalCards = useLegalCards(gameState, seat);
   const label = displayName ?? getSeatLabel(seat);
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
 
@@ -36,7 +37,7 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
         <CardHand
           cards={cards}
           faceDown={faceDown}
-          legalCardIds={faceDown ? undefined : (onCardClick ? legalCards : [])}
+          legalCardIds={faceDown ? undefined : (phase === "playing" ? (onCardClick ? legalCards : []) : undefined)}
           onCardClick={!faceDown ? onCardClick : undefined}
         />
       </div>
