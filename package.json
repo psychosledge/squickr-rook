@@ -10,7 +10,7 @@
     "typecheck":     "pnpm -r typecheck",
     "lint":          "pnpm -r lint",
     "server:dev":    "pnpm --filter @rook/server dev",
-    "server:deploy": "pnpm --filter @rook/server deploy"
+    "server:ship":   "pnpm --filter @rook/server ship"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

@@ -6,7 +6,7 @@
   "main": "src/room.ts",
   "scripts": {
     "dev":       "partykit dev",
-    "deploy":    "partykit deploy",
+    "ship":      "partykit deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
