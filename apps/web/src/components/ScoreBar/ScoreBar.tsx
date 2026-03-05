@@ -1,8 +1,8 @@
-import type { GameState } from "@rook/engine";
+import type { GameState, Seat } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./ScoreBar.module.css";
 
-type Props = { gameState: GameState; onOpenHistory?: () => void };
+type Props = { gameState: GameState; onOpenHistory?: () => void; seatNames?: Partial<Record<Seat, string>>; humanSeat?: Seat };
 
 const TRUMP_COLORS: Record<string, string> = {
   Black:  "#aaaaaa",
@@ -11,9 +11,16 @@ const TRUMP_COLORS: Record<string, string> = {
   Yellow: "#f1c40f",
 };
 
-export default function ScoreBar({ gameState, onOpenHistory }: Props) {
+export default function ScoreBar({ gameState, onOpenHistory, seatNames, humanSeat }: Props) {
   const { scores, handNumber, trump, phase, activePlayer, bidder, bidAmount, shotMoon, handHistory } = gameState;
-  const activeName = activePlayer ? getSeatLabel(activePlayer) : "";
+
+  function resolveName(seat: Seat): string {
+    if (seatNames?.[seat]) return seatNames[seat]!;
+    if (seat === (humanSeat ?? "N")) return "You";
+    return getSeatLabel(seat);
+  }
+
+  const activeName = activePlayer ? resolveName(activePlayer) : "";
 
   const showBidBadge =
     bidder !== null &&
@@ -21,7 +28,7 @@ export default function ScoreBar({ gameState, onOpenHistory }: Props) {
     (phase === "playing" || phase === "nest" || phase === "trump" || phase === "scoring");
 
   const bidBadgeText = showBidBadge
-    ? `${getSeatLabel(bidder!)} bid ${bidAmount}${shotMoon ? " 🌙" : ""}`
+    ? `${resolveName(bidder!)} bid ${bidAmount}${shotMoon ? " 🌙" : ""}`
     : null;
 
   return (

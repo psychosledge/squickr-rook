@@ -219,7 +219,8 @@ describe("ScoreBar — bid badge", () => {
     const badges = findByClass(elements, "bidBadge");
 
     expect(badges).toHaveLength(1);
-    expect(flattenText(badges[0])).toBe("Label-N bid 100");
+    // bidder="N" with no humanSeat → defaults to "N" → resolveName returns "You"
+    expect(flattenText(badges[0])).toBe("You bid 100");
   });
 
   it('renders bid badge during "scoring" phase', () => {
@@ -305,5 +306,71 @@ describe("ScoreBar — history button", () => {
     const p = btn.props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onOpenHistory).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveName tests
+// ---------------------------------------------------------------------------
+
+describe("ScoreBar — resolveName", () => {
+  it("uses seatNames when provided: seatNames={{ N: 'Alice' }} with activePlayer='N' shows 'Alice bidding…'", () => {
+    const gs = makeGameState({
+      phase: "bidding",
+      activePlayer: "N",
+    });
+    const tree = ScoreBar({ gameState: gs, seatNames: { N: "Alice" } });
+    const elements = flattenElements(tree);
+    const activeSpans = findByClass(elements, "active");
+    expect(activeSpans).toHaveLength(1);
+    expect(flattenText(activeSpans[0])).toContain("Alice");
+  });
+
+  it("returns 'You' for humanSeat='E' when no seatNames, and getSeatLabel fallback for seat='N'", () => {
+    // activePlayer="E" → humanSeat="E" → "You"
+    const gs = makeGameState({
+      phase: "bidding",
+      activePlayer: "E",
+    });
+    const tree = ScoreBar({ gameState: gs, humanSeat: "E" });
+    const elements = flattenElements(tree);
+    const activeSpans = findByClass(elements, "active");
+    expect(activeSpans).toHaveLength(1);
+    expect(flattenText(activeSpans[0])).toContain("You");
+
+    // Also verify that seat "N" (non-humanSeat) falls back to getSeatLabel("N") = "Label-N"
+    const gs2 = makeGameState({
+      phase: "bidding",
+      activePlayer: "N",
+    });
+    const tree2 = ScoreBar({ gameState: gs2, humanSeat: "E" });
+    const elements2 = flattenElements(tree2);
+    const activeSpans2 = findByClass(elements2, "active");
+    expect(activeSpans2).toHaveLength(1);
+    expect(flattenText(activeSpans2[0])).toContain("Label-N");
+  });
+
+  it("falls back to 'You' for seat='N' and getSeatLabel for others when neither seatNames nor humanSeat is provided (backward compat)", () => {
+    // activePlayer="N" with no seatNames/humanSeat → "You" (default humanSeat is "N")
+    const gs = makeGameState({
+      phase: "bidding",
+      activePlayer: "N",
+    });
+    const tree = ScoreBar({ gameState: gs });
+    const elements = flattenElements(tree);
+    const activeSpans = findByClass(elements, "active");
+    expect(activeSpans).toHaveLength(1);
+    expect(flattenText(activeSpans[0])).toContain("You");
+
+    // activePlayer="S" with no seatNames/humanSeat → getSeatLabel("S") = "Label-S"
+    const gs2 = makeGameState({
+      phase: "bidding",
+      activePlayer: "S",
+    });
+    const tree2 = ScoreBar({ gameState: gs2 });
+    const elements2 = flattenElements(tree2);
+    const activeSpans2 = findByClass(elements2, "active");
+    expect(activeSpans2).toHaveLength(1);
+    expect(flattenText(activeSpans2[0])).toContain("Label-S");
   });
 });

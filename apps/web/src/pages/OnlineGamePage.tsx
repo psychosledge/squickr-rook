@@ -75,7 +75,7 @@ export function OnlineGamePageView({
 
   return (
     <div className={styles.page}>
-      <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} />
+      <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} seatNames={seatNames} humanSeat={humanSeat} />
 
       <AnnouncementBanner announcement={announcement} clearAnnouncement={clearAnnouncement} />
 

@@ -215,4 +215,38 @@ describe("PlayerSeat", () => {
       expect(countSpans).toHaveLength(0);
     });
   });
+
+  describe("legalCardIds prop passed to CardHand", () => {
+    it("passes legalCardIds=[] to CardHand when faceDown=false and onCardClick is undefined (not your turn — all cards dimmed)", () => {
+      // faceDown=false, no onCardClick → legalCardIds should be [] (not undefined)
+      const element = PlayerSeat({ ...baseProps, faceDown: false, onCardClick: undefined });
+      const elements = flattenElements(element);
+
+      // Find the CardHand element (its type will be the CardHand function)
+      const cardHandEls = elements.filter((el) => {
+        // CardHand is rendered inside a div.handWrap; detect it by the legalCardIds prop being present or as an array
+        const p = el.props as Record<string, unknown>;
+        return "legalCardIds" in p;
+      });
+
+      expect(cardHandEls).toHaveLength(1);
+      const props = cardHandEls[0].props as Record<string, unknown>;
+      expect(props.legalCardIds).toEqual([]);
+    });
+
+    it("passes legalCardIds=undefined to CardHand when faceDown=true (face-down, playability irrelevant)", () => {
+      // faceDown=true → legalCardIds should be undefined regardless of onCardClick
+      const element = PlayerSeat({ ...baseProps, faceDown: true, onCardClick: vi.fn() });
+      const elements = flattenElements(element);
+
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "legalCardIds" in p;
+      });
+
+      expect(cardHandEls).toHaveLength(1);
+      const props = cardHandEls[0].props as Record<string, unknown>;
+      expect(props.legalCardIds).toBeUndefined();
+    });
+  });
 });
