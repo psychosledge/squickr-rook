@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 declare const __APP_VERSION__: string;
 
+interface ImportMetaEnv {
+  readonly VITE_PARTYKIT_HOST?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 declare module "virtual:pwa-register/react" {
   import type { Dispatch, SetStateAction } from "react";
   export function useRegisterSW(options?: {
