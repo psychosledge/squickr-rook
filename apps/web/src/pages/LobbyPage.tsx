@@ -16,6 +16,10 @@ export default function LobbyPage() {
     void navigate("/game");
   }
 
+  function handleOnline() {
+    void navigate("/online");
+  }
+
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Squickr Rook</h1>
@@ -38,6 +42,9 @@ export default function LobbyPage() {
 
       <button className={styles.startBtn} onClick={handleStart}>
         New Game
+      </button>
+      <button className={styles.onlineBtn} onClick={handleOnline}>
+        Play Online
       </button>
       <span className={styles.version}>v{__APP_VERSION__}</span>
     </div>

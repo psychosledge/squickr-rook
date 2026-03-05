@@ -34,6 +34,8 @@ export default function GamePage() {
   const openHistoryModal = useGameStore((s) => s.openHistoryModal);
   const closeHistoryModal = useGameStore((s) => s.closeHistoryModal);
   const biddingThinkingSeat = useGameStore((s) => s.biddingThinkingSeat);
+  const announcement = useGameStore((s) => s.announcement);
+  const clearAnnouncement = useGameStore((s) => s.clearAnnouncement);
 
   // Redirect to lobby if no game active
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function GamePage() {
     <div className={styles.page}>
       <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} />
 
-      <AnnouncementBanner />
+      <AnnouncementBanner announcement={announcement} clearAnnouncement={clearAnnouncement} />
 
       {historyModalOpen && (
         <HandHistoryModal

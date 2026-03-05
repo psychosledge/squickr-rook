@@ -9,9 +9,8 @@ type Props = {
   onPass: () => void;
   onShootMoon: () => void;
   biddingThinkingSeat?: Seat | null;
+  humanSeat?: Seat;
 };
-
-const HUMAN = "N" as const;
 
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
 // This is exported so tests can call it directly without hitting React hooks.
@@ -30,16 +29,17 @@ export function BiddingOverlayView({
   onIncrement,
   onDecrement,
   biddingThinkingSeat,
+  humanSeat = "N",
 }: BiddingOverlayViewProps) {
   const { bids, currentBid, activePlayer, rules, moonShooters } = gameState;
-  const isMyTurn = activePlayer === HUMAN;
+  const isMyTurn = activePlayer === humanSeat;
   const { minimumBid, bidIncrement, maximumBid } = rules;
 
   const minNextBid = currentBid === 0 ? minimumBid : currentBid + bidIncrement;
 
   // moonEligible: human has not placed a numeric bid and is not already a moon shooter
-  const iAlreadyMoon = moonShooters.includes(HUMAN);
-  const humanBid = bids[HUMAN];
+  const iAlreadyMoon = moonShooters.includes(humanSeat);
+  const humanBid = bids[humanSeat];
   const moonEligible = !iAlreadyMoon && typeof humanBid !== "number";
 
   const seats = ["N", "E", "S", "W"] as const;
@@ -139,7 +139,7 @@ export function BiddingOverlayView({
 }
 
 // ── Stateful wrapper (the actual exported default) ────────────────────────────
-export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, biddingThinkingSeat }: Props) {
+export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, biddingThinkingSeat, humanSeat = "N" }: Props) {
   const { currentBid, rules } = gameState;
   const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
 
@@ -170,6 +170,7 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
       onIncrement={increment}
       onDecrement={decrement}
       biddingThinkingSeat={biddingThinkingSeat}
+      humanSeat={humanSeat}
     />
   );
 }

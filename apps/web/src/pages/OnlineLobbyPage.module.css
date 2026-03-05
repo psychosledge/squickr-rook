@@ -1,0 +1,257 @@
+/* OnlineLobbyPage.module.css */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  gap: 20px;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  letter-spacing: -1px;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: #888;
+  margin-top: -16px;
+}
+
+.label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+}
+
+.startBtn {
+  padding: 14px 48px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-accent);
+  color: #1a1a2e;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.startBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .startBtn:not(:disabled):hover {
+    opacity: 0.9;
+  }
+}
+
+.onlineBtn {
+  padding: 14px 48px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 2px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+@media (hover: hover) {
+  .onlineBtn:hover {
+    background: var(--color-accent);
+    color: #1a1a2e;
+  }
+}
+
+@media (max-width: 600px) {
+  .onlineBtn {
+    min-height: 56px;
+    width: 100%;
+    max-width: 280px;
+    font-size: 1.1rem;
+  }
+}
+
+/* Form */
+.nameForm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.nameInput {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.nameInput:focus {
+  border-color: var(--color-accent);
+}
+
+.codeInput {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-align: center;
+  text-transform: uppercase;
+  border-radius: 8px;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  max-width: 200px;
+  transition: border-color 0.15s;
+}
+
+.codeInput:focus {
+  border-color: var(--color-accent);
+}
+
+.actionGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Room info */
+.roomCode {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: var(--color-accent);
+}
+
+.shareUrl {
+  font-size: 0.75rem;
+  color: #888;
+  word-break: break-all;
+  max-width: 300px;
+  text-align: center;
+}
+
+.roomInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Seat grid */
+.seatGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+}
+
+@media (min-width: 480px) {
+  .seatGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.seatCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: 10px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  min-height: 100px;
+}
+
+.mySeat {
+  border-color: var(--color-accent);
+  background: #2a1f0a;
+}
+
+.seatLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+}
+
+.seatName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+  word-break: break-word;
+}
+
+.seatEmpty {
+  font-size: 0.85rem;
+  color: #555;
+  font-style: italic;
+}
+
+.seatBtn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-top: auto;
+}
+
+@media (hover: hover) {
+  .seatBtn:hover {
+    background: var(--color-accent);
+    color: #1a1a2e;
+  }
+}
+
+/* Spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error */
+.errorMsg {
+  color: #e07070;
+  font-size: 0.9rem;
+  text-align: center;
+  max-width: 320px;
+}

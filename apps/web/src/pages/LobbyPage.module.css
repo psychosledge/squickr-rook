@@ -102,6 +102,34 @@
   }
 }
 
+.onlineBtn {
+  padding: 14px 48px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 2px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+@media (hover: hover) {
+  .onlineBtn:hover {
+    background: var(--color-accent);
+    color: #1a1a2e;
+  }
+}
+
+@media (max-width: 600px) {
+  .onlineBtn {
+    min-height: 56px;
+    width: 100%;
+    max-width: 280px;
+    font-size: 1.1rem;
+  }
+}
+
 .version {
   position: absolute;
   bottom: 12px;

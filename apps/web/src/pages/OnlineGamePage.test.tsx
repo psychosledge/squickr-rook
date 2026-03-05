@@ -1,0 +1,332 @@
+import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import type { GameState } from "@rook/engine";
+import { DEFAULT_RULES } from "@rook/engine";
+import { OnlineGamePageView } from "./OnlineGamePage";
+import type { OnlineGamePageViewProps } from "./OnlineGamePage";
+
+// Mock CSS modules
+vi.mock("./OnlineGamePage.module.css", () => ({
+  default: { page: "page" },
+}));
+
+// Mock all child components — they stay as function-type elements in the tree
+vi.mock("@/components/ScoreBar/ScoreBar", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/AnnouncementBanner/AnnouncementBanner", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/BiddingOverlay/BiddingOverlay", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/NestOverlay/NestOverlay", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/TrumpPicker/TrumpPicker", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/HandResultOverlay/HandResultOverlay", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/GameOverScreen/GameOverScreen", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/GameTable/GameTable", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/components/HandHistoryModal/HandHistoryModal", () => ({
+  default: (_props: unknown) => null,
+}));
+
+vi.mock("@/utils/sortHand", () => ({
+  sortHand: (hand: unknown[]) => hand,
+}));
+
+vi.mock("@/utils/handHistory", () => ({
+  buildHandHistoryRows: (h: unknown[]) => h,
+}));
+
+// ---------------------------------------------------------------------------
+// Import mocked modules to get function references for comparison
+// ---------------------------------------------------------------------------
+
+import ScoreBar from "@/components/ScoreBar/ScoreBar";
+import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
+import BiddingOverlay from "@/components/BiddingOverlay/BiddingOverlay";
+import NestOverlay from "@/components/NestOverlay/NestOverlay";
+import TrumpPicker from "@/components/TrumpPicker/TrumpPicker";
+import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay";
+import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
+import GameTable from "@/components/GameTable/GameTable";
+import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+
+// ---------------------------------------------------------------------------
+// Tree helpers
+// ---------------------------------------------------------------------------
+
+function flattenElements(node: React.ReactNode): React.ReactElement[] {
+  if (node == null || typeof node !== "object") return [];
+  if (!React.isValidElement(node)) return [];
+  const el = node as React.ReactElement;
+  const p = el.props as Record<string, unknown>;
+  const childrenProp = p.children as React.ReactNode | undefined;
+  const childNodes: React.ReactNode[] = Array.isArray(childrenProp)
+    ? childrenProp
+    : childrenProp != null
+    ? [childrenProp]
+    : [];
+  return [el, ...childNodes.flatMap(flattenElements)];
+}
+
+/** Find elements whose React element type equals the given component function */
+function findByType(
+  elements: React.ReactElement[],
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  componentType: Function,
+): React.ReactElement[] {
+  return elements.filter((el) => el.type === componentType);
+}
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+function makeGameState(overrides: Partial<GameState> = {}): GameState {
+  return {
+    version: 1,
+    phase: "bidding",
+    rules: DEFAULT_RULES,
+    players: [
+      { seat: "N", name: "You", kind: "human" },
+      { seat: "E", name: "P2", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+      { seat: "S", name: "P3", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+      { seat: "W", name: "P4", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+    ],
+    handNumber: 1,
+    dealer: "W",
+    seed: 42,
+    activePlayer: "N",
+    hands: { N: [], E: [], S: [], W: [] },
+    nest: [],
+    originalNest: [],
+    discarded: [],
+    trump: null,
+    currentTrick: [],
+    tricksPlayed: 0,
+    completedTricks: [],
+    capturedCards: { NS: [], EW: [] },
+    scores: { NS: 0, EW: 0 },
+    handHistory: [],
+    winner: null,
+    playedCards: [],
+    bids: { N: null, E: null, S: null, W: null },
+    moonShooters: [],
+    currentBid: 0,
+    bidder: null,
+    bidAmount: 0,
+    shotMoon: false,
+    ...overrides,
+  };
+}
+
+function makeHandScore() {
+  return {
+    hand: 1,
+    bidder: "N" as const,
+    bidAmount: 120,
+    nestCards: [] as string[],
+    discarded: [] as string[],
+    nsPointCards: 120,
+    ewPointCards: 0,
+    nsMostCardsBonus: 0,
+    ewMostCardsBonus: 0,
+    nsNestBonus: 0,
+    ewNestBonus: 0,
+    nsWonLastTrick: false,
+    ewWonLastTrick: false,
+    nsTotal: 120,
+    ewTotal: 0,
+    nsDelta: 120,
+    ewDelta: -120,
+    shotMoon: false,
+    moonShooterWentSet: false,
+  };
+}
+
+function makeProps(overrides: Partial<OnlineGamePageViewProps> = {}): OnlineGamePageViewProps {
+  return {
+    gameState: makeGameState(),
+    overlay: "none",
+    pendingDiscards: [],
+    pendingHandScore: null,
+    mySeat: "N",
+    announcement: null,
+    gameOverReason: null,
+    historyModalOpen: false,
+    biddingThinkingSeat: null,
+    onPlayCard: vi.fn(),
+    onToggleDiscard: vi.fn(),
+    onConfirmDiscards: vi.fn(),
+    onSelectTrump: vi.fn(),
+    onAcknowledgeHandResult: vi.fn(),
+    onPlaceBid: vi.fn(),
+    onPassBid: vi.fn(),
+    onShootMoon: vi.fn(),
+    clearAnnouncement: vi.fn(),
+    openHistoryModal: vi.fn(),
+    closeHistoryModal: vi.fn(),
+    onPlayAgain: vi.fn(),
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("OnlineGamePageView", () => {
+
+  it("1. renders ScoreBar", () => {
+    const tree = OnlineGamePageView(makeProps());
+    const all = flattenElements(tree);
+    expect(findByType(all, ScoreBar)).toHaveLength(1);
+  });
+
+  it("2. renders AnnouncementBanner with announcement + clearAnnouncement props", () => {
+    const clearAnnouncement = vi.fn();
+    const tree = OnlineGamePageView(makeProps({ announcement: "Hello!", clearAnnouncement }));
+    const all = flattenElements(tree);
+    const banners = findByType(all, AnnouncementBanner);
+    expect(banners).toHaveLength(1);
+    const p = banners[0].props as Record<string, unknown>;
+    expect(p.announcement).toBe("Hello!");
+    expect(p.clearAnnouncement).toBe(clearAnnouncement);
+  });
+
+  it("3. renders BiddingOverlay when overlay='bidding'", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "bidding" }));
+    const all = flattenElements(tree);
+    expect(findByType(all, BiddingOverlay)).toHaveLength(1);
+  });
+
+  it("4. does NOT render BiddingOverlay when overlay='none'", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "none" }));
+    const all = flattenElements(tree);
+    expect(findByType(all, BiddingOverlay)).toHaveLength(0);
+  });
+
+  it("5. BiddingOverlay gets humanSeat='E' when mySeat='E'", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "bidding", mySeat: "E" }));
+    const all = flattenElements(tree);
+    const overlays = findByType(all, BiddingOverlay);
+    expect(overlays).toHaveLength(1);
+    const p = overlays[0].props as Record<string, unknown>;
+    expect(p.humanSeat).toBe("E");
+  });
+
+  it("6. BiddingOverlay gets humanSeat='N' when mySeat=null", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "bidding", mySeat: null }));
+    const all = flattenElements(tree);
+    const overlays = findByType(all, BiddingOverlay);
+    expect(overlays).toHaveLength(1);
+    const p = overlays[0].props as Record<string, unknown>;
+    expect(p.humanSeat).toBe("N");
+  });
+
+  it("7. renders NestOverlay when overlay='nest'", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "nest" }));
+    const all = flattenElements(tree);
+    expect(findByType(all, NestOverlay)).toHaveLength(1);
+  });
+
+  it("8. NestOverlay.hand uses mySeat's hand (not hardcoded 'N')", () => {
+    const eHand = ["E1", "E2", "E3"] as unknown as import("@rook/engine").CardId[];
+    const gameState = makeGameState({
+      hands: { N: [], E: eHand, S: [], W: [] },
+    });
+    const tree = OnlineGamePageView(makeProps({ overlay: "nest", gameState, mySeat: "E" }));
+    const all = flattenElements(tree);
+    const nestOverlays = findByType(all, NestOverlay);
+    expect(nestOverlays).toHaveLength(1);
+    const p = nestOverlays[0].props as Record<string, unknown>;
+    // sortHand is mocked to return its input, filter removes "ROOK"
+    expect(p.hand).toEqual(eHand);
+  });
+
+  it("9. NestOverlay.hand falls back to 'N' hand when mySeat=null", () => {
+    const nHand = ["N1", "N2"] as unknown as import("@rook/engine").CardId[];
+    const gameState = makeGameState({
+      hands: { N: nHand, E: [], S: [], W: [] },
+    });
+    const tree = OnlineGamePageView(makeProps({ overlay: "nest", gameState, mySeat: null }));
+    const all = flattenElements(tree);
+    const nestOverlays = findByType(all, NestOverlay);
+    expect(nestOverlays).toHaveLength(1);
+    const p = nestOverlays[0].props as Record<string, unknown>;
+    expect(p.hand).toEqual(nHand);
+  });
+
+  it("10. renders TrumpPicker when overlay='trump'", () => {
+    const tree = OnlineGamePageView(makeProps({ overlay: "trump" }));
+    const all = flattenElements(tree);
+    expect(findByType(all, TrumpPicker)).toHaveLength(1);
+  });
+
+  it("11. renders HandResultOverlay when overlay='hand-result' AND pendingHandScore non-null", () => {
+    const tree = OnlineGamePageView(
+      makeProps({ overlay: "hand-result", pendingHandScore: makeHandScore() }),
+    );
+    const all = flattenElements(tree);
+    expect(findByType(all, HandResultOverlay)).toHaveLength(1);
+  });
+
+  it("12. HandResultOverlay NOT rendered when pendingHandScore is null", () => {
+    const tree = OnlineGamePageView(
+      makeProps({ overlay: "hand-result", pendingHandScore: null }),
+    );
+    const all = flattenElements(tree);
+    expect(findByType(all, HandResultOverlay)).toHaveLength(0);
+  });
+
+  it("13. renders GameOverScreen when overlay='game-over' AND gameState.winner set", () => {
+    const gameState = makeGameState({ winner: "NS", phase: "finished" });
+    const tree = OnlineGamePageView(
+      makeProps({ overlay: "game-over", gameState }),
+    );
+    const all = flattenElements(tree);
+    expect(findByType(all, GameOverScreen)).toHaveLength(1);
+  });
+
+  it("14. GameOverScreen NOT rendered when winner is null", () => {
+    const gameState = makeGameState({ winner: null });
+    const tree = OnlineGamePageView(
+      makeProps({ overlay: "game-over", gameState }),
+    );
+    const all = flattenElements(tree);
+    expect(findByType(all, GameOverScreen)).toHaveLength(0);
+  });
+
+  it("15. renders HandHistoryModal when historyModalOpen=true", () => {
+    const tree = OnlineGamePageView(makeProps({ historyModalOpen: true }));
+    const all = flattenElements(tree);
+    expect(findByType(all, HandHistoryModal)).toHaveLength(1);
+  });
+
+  it("16. HandHistoryModal NOT rendered when historyModalOpen=false", () => {
+    const tree = OnlineGamePageView(makeProps({ historyModalOpen: false }));
+    const all = flattenElements(tree);
+    expect(findByType(all, HandHistoryModal)).toHaveLength(0);
+  });
+});
+
+// Suppress unused import warnings
+void GameTable;

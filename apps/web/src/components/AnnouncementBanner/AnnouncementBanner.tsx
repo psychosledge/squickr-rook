@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { useGameStore } from "@/store/gameStore";
 import styles from "./AnnouncementBanner.module.css";
 
 const VISIBLE_MS = 2700;   // how long the banner stays fully visible
 const EXIT_MS   = 300;     // duration of the slide-out animation (matches CSS transition)
 
-export default function AnnouncementBanner() {
-  const announcement = useGameStore((s) => s.announcement);
-  const clearAnnouncement = useGameStore((s) => s.clearAnnouncement);
+type Props = {
+  announcement: string | null;
+  clearAnnouncement: () => void;
+};
+
+export default function AnnouncementBanner({ announcement, clearAnnouncement }: Props) {
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
