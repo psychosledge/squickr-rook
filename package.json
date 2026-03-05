@@ -5,6 +5,7 @@
   "scripts": {
     "dev":           "pnpm --filter @rook/web dev",
     "build":         "pnpm --filter @rook/engine build && pnpm --filter @rook/web build",
+    "preview":       "pnpm build && pnpm --filter @rook/web preview",
     "test":          "pnpm --filter @rook/engine test",
     "test:watch":    "pnpm --filter @rook/engine test:watch",
     "typecheck":     "pnpm -r typecheck",
