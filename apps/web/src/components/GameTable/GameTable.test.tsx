@@ -229,4 +229,19 @@ describe("GameTable", () => {
     const seats = getPlayerSeats(tree);
     expect(seats).toHaveLength(4);
   });
+
+  it("8. position prop is correctly passed to each PlayerSeat slot", () => {
+    const gameState = makeGameState();
+    const tree = GameTable({ gameState, onPlayCard });
+
+    const bottomSeat = getSeatByPosition(tree, "bottom");
+    const topSeat = getSeatByPosition(tree, "top");
+    const leftSeat = getSeatByPosition(tree, "left");
+    const rightSeat = getSeatByPosition(tree, "right");
+
+    expect((bottomSeat!.props as Record<string, unknown>).position).toBe("bottom");
+    expect((topSeat!.props as Record<string, unknown>).position).toBe("top");
+    expect((leftSeat!.props as Record<string, unknown>).position).toBe("left");
+    expect((rightSeat!.props as Record<string, unknown>).position).toBe("right");
+  });
 });

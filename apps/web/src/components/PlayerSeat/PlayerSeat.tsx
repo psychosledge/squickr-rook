@@ -14,17 +14,18 @@ type Props = {
   phase: GamePhase;
   onCardClick?: (cardId: CardId) => void;
   displayName?: string;
+  position?: "bottom" | "top" | "left" | "right";
 };
 
 const BIDDER_PHASES: GamePhase[] = ["nest", "trump", "playing", "scoring"];
 
-export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, onCardClick, displayName }: Props) {
+export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, onCardClick, displayName, position }: Props) {
   const legalCards = useLegalCards(seat);
   const label = displayName ?? getSeatLabel(seat);
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
 
   return (
-    <div className={`${styles.seat} ${isActive ? styles.active : ""}`} data-seat={seat} data-face-down={faceDown ? "true" : undefined}>
+    <div className={`${styles.seat} ${isActive ? styles.active : ""}`} data-seat={seat} data-face-down={faceDown ? "true" : undefined} data-position={position}>
       <div className={styles.nameRow}>
         <span className={styles.name}>{label}</span>
         {isDealer && <span className={styles.dealerBadge} aria-label="Dealer">D</span>}

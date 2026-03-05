@@ -151,6 +151,43 @@ describe("PlayerSeat", () => {
     });
   });
 
+  describe("data-position attribute", () => {
+    it("sets data-position on the seat div when position prop is provided", () => {
+      const element = PlayerSeat({ ...baseProps, position: "bottom" });
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-position"]).toBe("bottom");
+    });
+
+    it("sets data-position='top' when position='top'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "top" });
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-position"]).toBe("top");
+    });
+
+    it("sets data-position='left' when position='left'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "left" });
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-position"]).toBe("left");
+    });
+
+    it("sets data-position='right' when position='right'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "right" });
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-position"]).toBe("right");
+    });
+
+    it("does not set data-position when position is omitted", () => {
+      const element = PlayerSeat(baseProps);
+      const seatDiv = element as React.ReactElement;
+      const p = seatDiv.props as Record<string, unknown>;
+      expect(p["data-position"]).toBeUndefined();
+    });
+  });
+
   describe("card count display", () => {
     it("does not render a count span for a face-down player", () => {
       const element = PlayerSeat(baseProps);
