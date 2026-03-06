@@ -1981,6 +1981,63 @@ describe("onlineGameStore", () => {
     });
   });
 
+  // ── RCA-2: Welcome playing with no state prevents redirect loop ──────────
+  describe("Welcome handler — redirect loop prevention (RCA-2)", () => {
+    it("Welcome playing with no state and no client gameState sets lobbyPhase to lobby (prevents redirect loop)", () => {
+      // Arrange: client has NO existing gameState (fresh join, not a mid-game reconnect)
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        myDisplayName: "Alice",
+        gameState: null, // no client game state
+      });
+
+      // Act: server sends Welcome with phase "playing" but NO state attached
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        // no state field
+      };
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert: lobbyPhase should be "lobby" (not "playing") to prevent redirect loop
+      const state = useOnlineGameStore.getState();
+      expect(state.lobbyPhase).toBe("lobby");
+    });
+
+    it("Welcome playing with state sets gameState and lobbyPhase to playing (normal reconnect path works)", () => {
+      // Arrange: client is reconnecting mid-game
+      const freshGameState = makeBiddingState("E");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        myDisplayName: "Alice",
+        gameState: null,
+      });
+
+      // Act: server sends Welcome with phase "playing" AND a state
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        state: freshGameState,
+      };
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert: gameState set, lobbyPhase = "playing"
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState).toEqual(freshGameState);
+      expect(state.lobbyPhase).toBe("playing");
+    });
+  });
+
   // ── Reconnect race condition: isReconnecting flag ─────────────────────────
   describe("isReconnecting flag — mid-game reconnect race condition", () => {
     const localStorageStore: Record<string, string> = {};

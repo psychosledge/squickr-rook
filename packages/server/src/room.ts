@@ -244,12 +244,8 @@ export default class RookRoom implements Party.Server {
           } satisfies PlayerDisconnected);
         }
         this.broadcastLobbyUpdated();
-        // Pause if the disconnected player is the active player, otherwise let bots run
-        if (this.gameState.activePlayer === seat) {
-          this.gamePaused = true;
-        } else {
-          this.processBotTurns();
-        }
+        // Always pause when any human player disconnects mid-game
+        this.gamePaused = true;
       }
     }
   }

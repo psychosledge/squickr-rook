@@ -293,6 +293,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
         if (msg.state) {
           set({ gameState: msg.state, lobbyPhase: "playing" });
           get()._updateOverlayAfterBatch();
+        } else if (msg.phase === "playing" && get().gameState === null) {
+          // Server says game is in progress but sent no state snapshot and we
+          // have no local state — fall back to lobby so the UI doesn't spin
+          // forever trying to render a null game (redirect loop prevention).
+          set({ lobbyPhase: "lobby" });
         }
 
         // Drain pending batch (events that arrived before Welcome)
