@@ -7,6 +7,8 @@ import {
   HomeView,
   ConnectingView,
   LobbyView,
+  shouldSkipConnect,
+  shouldRedirectToGame,
 } from "./OnlineLobbyPage";
 import type {
   NameEntryViewProps,
@@ -910,6 +912,78 @@ describe("LobbyNameEditForm", () => {
     const p = cancelBtns[0].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shouldSkipConnect — connect guard logic (tests 58–62)
+// ---------------------------------------------------------------------------
+//
+// The connect guard in OnlineLobbyPage reads current store state and skips
+// connect() when already connected/connecting to the same room. We export
+// this logic as `shouldSkipConnect` so it can be tested as a pure function.
+
+describe("shouldSkipConnect", () => {
+  it("58. returns false when lobbyPhase is idle (should call connect)", () => {
+    const result = shouldSkipConnect({ roomCode: "ABC123", lobbyPhase: "idle" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("59. returns false when roomCode differs even if phase is playing", () => {
+    const result = shouldSkipConnect({ roomCode: "XXXXXX", lobbyPhase: "playing" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("60. returns false when roomCode differs and phase is connecting", () => {
+    const result = shouldSkipConnect({ roomCode: "XXXXXX", lobbyPhase: "connecting" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("61. returns true when phase is connecting and roomCode matches (skip connect)", () => {
+    const result = shouldSkipConnect({ roomCode: "ABC123", lobbyPhase: "connecting" }, "ABC123");
+    expect(result).toBe(true);
+  });
+
+  it("62. returns true when phase is playing and roomCode matches (skip connect)", () => {
+    const result = shouldSkipConnect({ roomCode: "ABC123", lobbyPhase: "playing" }, "ABC123");
+    expect(result).toBe(true);
+  });
+
+  it("63. returns false when roomCode is null and phase is idle", () => {
+    const result = shouldSkipConnect({ roomCode: null, lobbyPhase: "idle" }, "ABC123");
+    expect(result).toBe(false);
+  });
+});
+
+describe("shouldRedirectToGame", () => {
+  it("64. returns true when lobbyPhase is playing and roomCode matches the route code", () => {
+    const result = shouldRedirectToGame({ roomCode: "ABC123", lobbyPhase: "playing" }, "ABC123");
+    expect(result).toBe(true);
+  });
+
+  it("65. returns false when lobbyPhase is playing but roomCode does not match", () => {
+    const result = shouldRedirectToGame({ roomCode: "XXXXXX", lobbyPhase: "playing" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("66. returns false when lobbyPhase is lobby (game not yet started)", () => {
+    const result = shouldRedirectToGame({ roomCode: "ABC123", lobbyPhase: "lobby" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("67. returns false when lobbyPhase is connecting", () => {
+    const result = shouldRedirectToGame({ roomCode: "ABC123", lobbyPhase: "connecting" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("68. returns false when lobbyPhase is idle", () => {
+    const result = shouldRedirectToGame({ roomCode: "ABC123", lobbyPhase: "idle" }, "ABC123");
+    expect(result).toBe(false);
+  });
+
+  it("69. returns false when roomCode is null", () => {
+    const result = shouldRedirectToGame({ roomCode: null, lobbyPhase: "playing" }, "ABC123");
+    expect(result).toBe(false);
   });
 });
 

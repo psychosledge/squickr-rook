@@ -354,6 +354,30 @@ export function LobbyView({
   );
 }
 
+// ── Connect guard helpers (exported for testing) ─────────────────────────────
+
+/** Returns true when connect() should be skipped — already connected/connecting to this room. */
+export function shouldSkipConnect(
+  currentState: { roomCode: string | null; lobbyPhase: string },
+  routeCode: string,
+): boolean {
+  return (
+    currentState.roomCode === routeCode &&
+    (currentState.lobbyPhase === "playing" || currentState.lobbyPhase === "connecting")
+  );
+}
+
+/** Returns true when the lobby page should immediately redirect to the game. */
+export function shouldRedirectToGame(
+  currentState: { roomCode: string | null; lobbyPhase: string },
+  routeCode: string,
+): boolean {
+  return (
+    currentState.lobbyPhase === "playing" &&
+    currentState.roomCode === routeCode
+  );
+}
+
 // ── Default Export: OnlineLobbyPage ──────────────────────────────────────────
 
 export default function OnlineLobbyPage() {
@@ -383,9 +407,20 @@ export default function OnlineLobbyPage() {
   const [codeInput, setCodeInput] = useState("");
   const [joinMode, setJoinMode] = useState(false);
 
-  // Effect: connect when code + displayName both present
+  // Effect: redirect immediately if already in-game for this room (e.g. navigating back)
+  useEffect(() => {
+    if (!code) return;
+    const currentState = useOnlineGameStore.getState();
+    if (shouldRedirectToGame(currentState, code)) {
+      void navigate(`/online/${code}/game`, { replace: true });
+    }
+  }, [code, navigate]);
+
+  // Effect: connect when code + displayName both present (skip if already connected/connecting)
   useEffect(() => {
     if (!code || !displayName) return;
+    const currentState = useOnlineGameStore.getState();
+    if (shouldSkipConnect(currentState, code)) return;
     connect(code);
   }, [code, displayName, connect]); // connect is a stable Zustand action reference
 
