@@ -1980,4 +1980,170 @@ describe("onlineGameStore", () => {
       expect(useOnlineGameStore.getState().lobbyPhase).toBe("connecting");
     });
   });
+
+  // ── Reconnect race condition: isReconnecting flag ─────────────────────────
+  describe("isReconnecting flag — mid-game reconnect race condition", () => {
+    const localStorageStore: Record<string, string> = {};
+    const sessionStorageStore: Record<string, string> = {};
+
+    beforeEach(() => {
+      vi.stubGlobal("localStorage", {
+        getItem: (k: string) => localStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { localStorageStore[k] = v; },
+        removeItem: (k: string) => { delete localStorageStore[k]; },
+      });
+      vi.stubGlobal("sessionStorage", {
+        getItem: (k: string) => sessionStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { sessionStorageStore[k] = v; },
+        removeItem: (k: string) => { delete sessionStorageStore[k]; },
+      });
+      sessionStorageStore["rookPlayerId"] = "p1";
+      localStorageStore["rookDisplayName"] = "Alice";
+      vi.stubGlobal("WebSocket", class {
+        readyState = WebSocket.CONNECTING;
+        onopen: (() => void) | null = null;
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onclose: (() => void) | null = null;
+        close() {}
+        send() {}
+      });
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const k of Object.keys(localStorageStore)) delete localStorageStore[k];
+      for (const k of Object.keys(sessionStorageStore)) delete sessionStorageStore[k];
+    });
+
+    it("initial state has isReconnecting: false", () => {
+      const state = useOnlineGameStore.getState();
+      expect(state.isReconnecting).toBe(false);
+    });
+
+    it("connect() sets isReconnecting: true when gameState exists (mid-game reconnect)", () => {
+      // Arrange: store has an active game
+      const existingGameState = makeBiddingState("N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        roomCode: "ROOM1",
+        seats: makeSeats("p1", "N"),
+        gameState: existingGameState,
+        connectionError: "Disconnected from server.",
+      });
+
+      // Act: reconnect
+      useOnlineGameStore.getState().connect("ROOM1");
+
+      // Assert: isReconnecting is true to prevent premature redirect
+      const state = useOnlineGameStore.getState();
+      expect(state.isReconnecting).toBe(true);
+      // gameState still preserved
+      expect(state.gameState).not.toBeNull();
+      expect(state.gameState).toEqual(existingGameState);
+    });
+
+    it("connect() does not set isReconnecting when no gameState (fresh join)", () => {
+      // Arrange: fresh store with no game
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "idle",
+        myPlayerId: "p1",
+        gameState: null,
+      });
+
+      // Act: fresh connect
+      useOnlineGameStore.getState().connect("ROOM2");
+
+      // Assert: isReconnecting should stay false on fresh connect
+      const state = useOnlineGameStore.getState();
+      expect(state.isReconnecting).toBe(false);
+      expect(state.gameState).toBeNull();
+    });
+
+    it("Welcome clears isReconnecting regardless of payload", () => {
+      // Arrange: set up a reconnecting state
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        isReconnecting: true,
+        gameState: makeBiddingState("N"),
+      });
+
+      // Act: Welcome arrives (lobby phase, no state)
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "lobby",
+      };
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert: isReconnecting cleared
+      expect(useOnlineGameStore.getState().isReconnecting).toBe(false);
+    });
+
+    it("Welcome with state and isReconnecting: true correctly updates game and clears flag", () => {
+      // Arrange: set up a reconnecting state mid-game
+      const existingGameState = makeBiddingState("N");
+      const freshGameState = makeBiddingState("E"); // different state from server
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        mySeat: "N",
+        isReconnecting: true,
+        gameState: existingGameState,
+        seats: makeSeats("p1", "N"),
+      });
+
+      // Act: Welcome arrives with full game state (reconnect path)
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        state: freshGameState,
+      };
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert: gameState updated to server's fresh state, isReconnecting cleared
+      const state = useOnlineGameStore.getState();
+      expect(state.isReconnecting).toBe(false);
+      expect(state.gameState).toEqual(freshGameState);
+      expect(state.lobbyPhase).toBe("playing");
+    });
+
+    it("Welcome with phase='playing' but no state still clears isReconnecting", () => {
+      // Arrange
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        isReconnecting: true,
+        gameState: makeBiddingState("N"),
+      });
+
+      // Act: Welcome with playing phase but no state object
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        // no state field
+      };
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert
+      expect(useOnlineGameStore.getState().isReconnecting).toBe(false);
+    });
+  });
 });

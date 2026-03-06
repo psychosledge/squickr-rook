@@ -186,25 +186,50 @@ export default class RookRoom implements Party.Server {
     // Remove from join order
     this.joinOrder = this.joinOrder.filter((id) => id !== conn.id);
 
-    // If room empty, nothing to do
-    if (this.joinOrder.length === 0) {
-      return;
-    }
-
-    // Promote new host if needed
-    if (conn.id === this.hostConnId) {
-      this.promoteNewHost();
-    }
-
     if (this.phase === "lobby") {
+      // Always clean up seat even if room becomes empty (so future joiners see correct state)
       if (state?.seat != null) {
-        this.seatedPlayers.delete(state.seat);
+        // Only evict if this connection still owns the seat (stale-close guard)
+        const entry = this.seatedPlayers.get(state.seat);
+        if (entry?.connId === conn.id) {
+          this.seatedPlayers.delete(state.seat);
+        }
       }
+
+      // If room empty, nothing more to do
+      if (this.joinOrder.length === 0) {
+        return;
+      }
+
+      // Promote new host if needed
+      if (conn.id === this.hostConnId) {
+        this.promoteNewHost();
+      }
+
       this.broadcastLobbyUpdated();
     } else {
       // phase === "playing"
+
+      // If room empty, nothing more to do
+      if (this.joinOrder.length === 0) {
+        return;
+      }
+
+      // Promote new host if needed.
+      // NOTE: if the reconnecting player was the host, handleJoinRoom already
+      // updated hostConnId to the new connection's id — so this guard only
+      // fires for genuine disconnects, not stale closes from a reconnect.
+      if (conn.id === this.hostConnId) {
+        this.promoteNewHost();
+      }
+
       const seat = state?.seat ?? null;
       if (seat != null && this.gameState !== null) {
+        // Stale-connection guard: if player already reconnected on a new connection,
+        // seatedPlayers has the new connId — skip disconnect logic for this old socket.
+        if (this.seatedPlayers.get(seat)?.connId !== conn.id) {
+          return;
+        }
         const displayName = state?.displayName ?? "Player";
         // Track disconnection — do not convert to bot yet
         this.disconnectedSeats.set(seat, { playerId: state!.playerId, displayName });
@@ -312,7 +337,13 @@ export default class RookRoom implements Party.Server {
     // Update the seatedPlayers entry's connId so future routing is correct
     if (seat !== null) {
       const entry = this.seatedPlayers.get(seat);
-      if (entry) this.seatedPlayers.set(seat, { ...entry, connId: conn.id });
+      if (entry) {
+        this.seatedPlayers.set(seat, { ...entry, connId: conn.id });
+        // If this player was the host, update hostConnId to their new connection
+        if (entry.connId === this.hostConnId) {
+          this.hostConnId = conn.id;
+        }
+      }
     }
 
     if (!this.joinOrder.includes(conn.id)) {

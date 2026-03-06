@@ -16,3 +16,12 @@
   padding: 2rem;
   text-align: center;
 }
+
+.reconnecting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  font-size: 1.25rem;
+  color: #555;
+}

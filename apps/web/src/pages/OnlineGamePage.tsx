@@ -198,16 +198,22 @@ export default function OnlineGamePage() {
   const myPlayerId = useOnlineGameStore((s) => s.myPlayerId);
   const connectionError = useOnlineGameStore((s) => s.connectionError);
   const _socket = useOnlineGameStore((s) => s._socket);
+  const isReconnecting = useOnlineGameStore((s) => s.isReconnecting);
   const isHost = myPlayerId !== null && myPlayerId !== "" && myPlayerId === hostId;
 
   // Navigate back if no game state
   useEffect(() => {
-    if (!gameState) {
+    if (!gameState && !isReconnecting) {
       void navigate(code ? `/online/${code}` : "/online");
     }
-  }, [gameState, code, navigate]);
+  }, [gameState, isReconnecting, code, navigate]);
 
-  if (!gameState) return null;
+  if (!gameState) {
+    if (isReconnecting) {
+      return <div className={styles.reconnecting}><p>Reconnecting…</p></div>;
+    }
+    return null;
+  }
 
   // Disconnected self-panel
   if (connectionError !== null && !_socket && gameState !== null) {

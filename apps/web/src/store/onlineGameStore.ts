@@ -54,6 +54,7 @@ export const INITIAL_ONLINE_STATE: OnlineStoreState = {
   biddingThinkingSeat: null,
   disconnectedAlert: null,
   gamePaused: false,
+  isReconnecting: false,
   _socket: null,
   _pendingBatch: [],
   _deferredEventQueue: null,
@@ -91,7 +92,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     // navigation useEffect doesn't redirect back to the lobby on reconnect.
     const { gameState, mySeat, seats } = get();
     const preservedGame = gameState !== null
-      ? { gameState, mySeat, seats, roomCode } // seats is stale until Welcome arrives
+      ? { gameState, mySeat, seats, isReconnecting: true } // seats is stale until Welcome arrives
       : {};
 
     // Reset state (preserve game fields if reconnecting)
@@ -285,6 +286,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
           mySeat,
           roomCode: msg.roomCode,
           connectionError: null,
+          isReconnecting: false,
         });
 
         // If server sent a full game state, apply it

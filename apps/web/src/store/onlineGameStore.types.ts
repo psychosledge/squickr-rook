@@ -76,6 +76,7 @@ export type OnlineStoreState = {
   biddingThinkingSeat: Seat | null;
   disconnectedAlert: { seat: Seat; displayName: string } | null;
   gamePaused: boolean;
+  isReconnecting: boolean;
   _socket: WebSocket | null;
   _pendingBatch: GameEvent[];
   _deferredEventQueue: GameEvent[][] | null;

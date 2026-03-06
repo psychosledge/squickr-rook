@@ -5,15 +5,18 @@
   "type": "module",
   "main": "src/room.ts",
   "scripts": {
-    "dev":       "partykit dev",
-    "ship":      "partykit deploy",
-    "typecheck": "tsc --noEmit"
+    "dev": "partykit dev",
+    "ship": "partykit deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@rook/engine": "workspace:*",
-    "partykit":     "0.0.115"
+    "partykit": "0.0.115"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   }
 }
