@@ -13,6 +13,7 @@ import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay"
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
 import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+import { DisconnectAlert } from "@/components/DisconnectAlert/DisconnectAlert";
 import { sortHand } from "@/utils/sortHand";
 import { buildHandHistoryRows } from "@/utils/handHistory";
 import styles from "./OnlineGamePage.module.css";
@@ -31,6 +32,10 @@ export type OnlineGamePageViewProps = {
   biddingThinkingSeat: Seat | null;
   seatNames?: Partial<Record<Seat, string>>;
   humanTeam: Team;
+  disconnectedAlert: { seat: Seat; displayName: string } | null;
+  isHost: boolean;
+  onReplaceWithBot: (seat: Seat) => void;
+  onDismissDisconnectAlert: () => void;
   onPlayCard: (cardId: CardId) => void;
   onToggleDiscard: (cardId: CardId) => void;
   onConfirmDiscards: () => void;
@@ -59,6 +64,10 @@ export function OnlineGamePageView({
   biddingThinkingSeat,
   seatNames,
   humanTeam,
+  disconnectedAlert,
+  isHost,
+  onReplaceWithBot,
+  onDismissDisconnectAlert,
   onPlayCard,
   onToggleDiscard,
   onConfirmDiscards,
@@ -80,6 +89,16 @@ export function OnlineGamePageView({
       <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} seatNames={seatNames} humanSeat={humanSeat} />
 
       <AnnouncementBanner announcement={announcement} clearAnnouncement={clearAnnouncement} />
+
+      {disconnectedAlert !== null && (
+        <DisconnectAlert
+          displayName={disconnectedAlert.displayName}
+          seat={disconnectedAlert.seat}
+          isHost={isHost}
+          onReplaceWithBot={onReplaceWithBot}
+          onDismiss={onDismissDisconnectAlert}
+        />
+      )}
 
       {historyModalOpen && (
         <HandHistoryModal
@@ -171,6 +190,15 @@ export default function OnlineGamePage() {
   const openHistoryModal = useOnlineGameStore((s) => s.openHistoryModal);
   const closeHistoryModal = useOnlineGameStore((s) => s.closeHistoryModal);
   const disconnect = useOnlineGameStore((s) => s.disconnect);
+  const connect = useOnlineGameStore((s) => s.connect);
+  const disconnectedAlert = useOnlineGameStore((s) => s.disconnectedAlert);
+  const replaceWithBot = useOnlineGameStore((s) => s.replaceWithBot);
+  const dismissDisconnectAlert = useOnlineGameStore((s) => s.dismissDisconnectAlert);
+  const hostId = useOnlineGameStore((s) => s.hostId);
+  const myPlayerId = useOnlineGameStore((s) => s.myPlayerId);
+  const connectionError = useOnlineGameStore((s) => s.connectionError);
+  const _socket = useOnlineGameStore((s) => s._socket);
+  const isHost = myPlayerId !== null && myPlayerId !== "" && myPlayerId === hostId;
 
   // Navigate back if no game state
   useEffect(() => {
@@ -180,6 +208,19 @@ export default function OnlineGamePage() {
   }, [gameState, code, navigate]);
 
   if (!gameState) return null;
+
+  // Disconnected self-panel
+  if (connectionError !== null && !_socket && gameState !== null) {
+    return (
+      <div className={styles.disconnectedPanel}>
+        <p>You were disconnected from the game.</p>
+        <button onClick={() => code && connect(code)}>Reconnect</button>
+        <button onClick={() => { disconnect(); void navigate(code ? `/online/${code}` : "/online"); }}>
+          Leave Game
+        </button>
+      </div>
+    );
+  }
 
   const seatNames: Partial<Record<Seat, string>> = Object.fromEntries(
     seats
@@ -209,6 +250,10 @@ export default function OnlineGamePage() {
       biddingThinkingSeat={biddingThinkingSeat}
       seatNames={seatNames}
       humanTeam={humanTeam}
+      disconnectedAlert={disconnectedAlert}
+      isHost={isHost}
+      onReplaceWithBot={replaceWithBot}
+      onDismissDisconnectAlert={dismissDisconnectAlert}
       onPlayCard={humanPlayCard}
       onToggleDiscard={toggleDiscard}
       onConfirmDiscards={confirmDiscards}

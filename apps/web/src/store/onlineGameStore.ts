@@ -52,6 +52,8 @@ export const INITIAL_ONLINE_STATE: OnlineStoreState = {
   gameOverReason: null,
   historyModalOpen: false,
   biddingThinkingSeat: null,
+  disconnectedAlert: null,
+  gamePaused: false,
   _socket: null,
   _pendingBatch: [],
   _deferredEventQueue: null,
@@ -240,6 +242,17 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   openHistoryModal: () => set({ historyModalOpen: true }),
   closeHistoryModal: () => set({ historyModalOpen: false }),
 
+  replaceWithBot: (seat) => {
+    const { hostId, myPlayerId, _socket } = get();
+    if (!_socket || myPlayerId !== hostId) return;
+    get()._sendRaw({ type: "ReplaceWithBot", seat });
+  },
+
+  dismissDisconnectAlert: () => {
+    set({ disconnectedAlert: null, gamePaused: false });
+    get()._updateOverlayAfterBatch();
+  },
+
   // ── Internal message handling ─────────────────────────────────────────────
 
   _handleMessage: (msg) => {
@@ -295,6 +308,17 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
       case "CommandError": {
         console.error("CommandError from server:", msg.reason);
         set({ connectionError: msg.reason });
+        break;
+      }
+
+      case "PlayerDisconnected": {
+        set({ disconnectedAlert: { seat: msg.seat, displayName: msg.displayName }, gamePaused: true });
+        break;
+      }
+
+      case "PlayerReconnected": {
+        set({ disconnectedAlert: null, gamePaused: false });
+        get()._updateOverlayAfterBatch();
         break;
       }
     }
@@ -451,6 +475,13 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
 
     if (gameState.phase === "finished") {
       set({ overlay: "game-over", biddingThinkingSeat: null });
+      return;
+    }
+
+    // gamePaused short-circuit: if the active player disconnected, suppress overlays
+    const { gamePaused, disconnectedAlert } = get();
+    if (gamePaused && disconnectedAlert !== null && gameState.activePlayer === disconnectedAlert.seat) {
+      set({ overlay: "none", biddingThinkingSeat: null });
       return;
     }
 

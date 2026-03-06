@@ -34,7 +34,19 @@ export type CommandErrorMsg = {
   reason: string;
 };
 
-export type ServerMessage = WelcomeMsg | LobbyUpdatedMsg | EventBatchMsg | CommandErrorMsg;
+export type PlayerDisconnectedMsg = {
+  type: "PlayerDisconnected";
+  seat: Seat;
+  displayName: string;
+};
+
+export type PlayerReconnectedMsg = {
+  type: "PlayerReconnected";
+  seat: Seat;
+  displayName: string;
+};
+
+export type ServerMessage = WelcomeMsg | LobbyUpdatedMsg | EventBatchMsg | CommandErrorMsg | PlayerDisconnectedMsg | PlayerReconnectedMsg;
 
 export type ClientJoinRoom    = { type: "JoinRoom"; playerId: string; displayName: string; seat: Seat | null };
 export type ClientClaimSeat   = { type: "ClaimSeat"; seat: Seat };
@@ -42,7 +54,8 @@ export type ClientLeaveSeat   = { type: "LeaveSeat" };
 export type ClientStartGame   = { type: "StartGame" };
 export type ClientSendCommand = { type: "SendCommand"; command: GameCommand };
 export type ClientUpdateName  = { type: "UpdateName"; displayName: string };
-export type ClientMessage = ClientJoinRoom | ClientClaimSeat | ClientLeaveSeat | ClientStartGame | ClientSendCommand | ClientUpdateName;
+export type ClientReplaceWithBot = { type: "ReplaceWithBot"; seat: Seat };
+export type ClientMessage = ClientJoinRoom | ClientClaimSeat | ClientLeaveSeat | ClientStartGame | ClientSendCommand | ClientUpdateName | ClientReplaceWithBot;
 
 export type OnlineStoreState = {
   myPlayerId: string;
@@ -61,6 +74,8 @@ export type OnlineStoreState = {
   gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
   historyModalOpen: boolean;
   biddingThinkingSeat: Seat | null;
+  disconnectedAlert: { seat: Seat; displayName: string } | null;
+  gamePaused: boolean;
   _socket: WebSocket | null;
   _pendingBatch: GameEvent[];
   _deferredEventQueue: GameEvent[][] | null;
@@ -84,6 +99,8 @@ export type OnlineStoreActions = {
   clearAnnouncement: () => void;
   openHistoryModal: () => void;
   closeHistoryModal: () => void;
+  replaceWithBot: (seat: Seat) => void;
+  dismissDisconnectAlert: () => void;
   _handleMessage: (msg: ServerMessage) => void;
   _applyIncomingEvents: (events: GameEvent[]) => void;
   _updateOverlayAfterBatch: () => void;

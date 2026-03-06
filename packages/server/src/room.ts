@@ -45,7 +45,17 @@ type SendCommand = {
   command: GameCommand;
 };
 
-type ClientMessage = JoinRoom | ClaimSeat | LeaveSeat | StartGame | SendCommand;
+type UpdateName = {
+  type: "UpdateName";
+  displayName: string;
+};
+
+type ReplaceWithBot = {
+  type: "ReplaceWithBot";
+  seat: Seat;
+};
+
+type ClientMessage = JoinRoom | ClaimSeat | LeaveSeat | StartGame | SendCommand | UpdateName | ReplaceWithBot;
 
 // ── Server → Client message types ────────────────────────────────────────────
 
@@ -88,7 +98,19 @@ type CommandError = {
   reason: string;
 };
 
-type ServerMessage = Welcome | LobbyUpdated | EventBatch | CommandError;
+type PlayerDisconnected = {
+  type: "PlayerDisconnected";
+  seat: Seat;
+  displayName: string;
+};
+
+type PlayerReconnected = {
+  type: "PlayerReconnected";
+  seat: Seat;
+  displayName: string;
+};
+
+type ServerMessage = Welcome | LobbyUpdated | EventBatch | CommandError | PlayerDisconnected | PlayerReconnected;
 
 // Typed connection alias for convenience
 type Conn = Party.Connection<ConnectionState>;
@@ -110,6 +132,8 @@ export default class RookRoom implements Party.Server {
   private seatedPlayers: Map<Seat, { playerId: string; displayName: string; connId: string }> =
     new Map();
   private gameState: GameState | null = null;
+  private disconnectedSeats: Map<Seat, { playerId: string; displayName: string }> = new Map();
+  private gamePaused = false;
 
   constructor(readonly room: Party.Room) {}
 
@@ -141,6 +165,12 @@ export default class RookRoom implements Party.Server {
         break;
       case "SendCommand":
         await this.handleSendCommand(msg, sender);
+        break;
+      case "UpdateName":
+        await this.handleUpdateName(msg, sender);
+        break;
+      case "ReplaceWithBot":
+        await this.handleReplaceWithBot(msg, sender);
         break;
       default: {
         const _exhaustive: never = msg;
@@ -175,26 +205,26 @@ export default class RookRoom implements Party.Server {
       // phase === "playing"
       const seat = state?.seat ?? null;
       if (seat != null && this.gameState !== null) {
-        const displayName = state?.displayName ?? "Bot";
-        // Replace disconnected human with a bot
-        this.gameState = {
-          ...this.gameState,
-          players: this.gameState.players.map((p): PlayerInfo => {
-            if (p.seat === seat) {
-              return {
-                seat,
-                name: displayName,
-                kind: "bot",
-                botProfile: BOT_PRESETS["normal"],
-              };
-            }
-            return p;
-          }),
-        };
-        // Remove from seatedPlayers so the seat shows as bot
+        const displayName = state?.displayName ?? "Player";
+        // Track disconnection — do not convert to bot yet
+        this.disconnectedSeats.set(seat, { playerId: state!.playerId, displayName });
+        // Remove from seatedPlayers so buildSeatInfoArray sees it as disconnected
         this.seatedPlayers.delete(seat);
+        // Broadcast disconnection notification
+        for (const c of this.room.getConnections()) {
+          this.sendTo(c, {
+            type: "PlayerDisconnected",
+            seat,
+            displayName,
+          } satisfies PlayerDisconnected);
+        }
         this.broadcastLobbyUpdated();
-        this.processBotTurns();
+        // Pause if the disconnected player is the active player, otherwise let bots run
+        if (this.gameState.activePlayer === seat) {
+          this.gamePaused = true;
+        } else {
+          this.processBotTurns();
+        }
       }
     }
   }
@@ -351,6 +381,26 @@ export default class RookRoom implements Party.Server {
     this.processBotTurns();
   }
 
+  private async handleUpdateName(msg: UpdateName, conn: Party.Connection): Promise<void> {
+    const trimmed = msg.displayName.trim();
+    if (!trimmed) return;
+
+    const state = getState(conn);
+    if (!state) return;
+
+    setState(conn, { ...state, displayName: trimmed });
+
+    // Update seatedPlayers entry if this player is seated
+    if (state.seat !== null) {
+      const entry = this.seatedPlayers.get(state.seat);
+      if (entry) {
+        this.seatedPlayers.set(state.seat, { ...entry, displayName: trimmed });
+      }
+    }
+
+    this.broadcastLobbyUpdated();
+  }
+
   private async handleSendCommand(msg: SendCommand, conn: Party.Connection): Promise<void> {
     if (this.phase !== "playing") {
       this.sendError(conn, "Game is not in progress");
@@ -385,6 +435,37 @@ export default class RookRoom implements Party.Server {
     this.processBotTurns();
   }
 
+  private async handleReplaceWithBot(msg: ReplaceWithBot, conn: Party.Connection): Promise<void> {
+    const state = getState(conn);
+    if (state?.playerId !== this.getHostPlayerId()) {
+      this.sendError(conn, "Only the host can replace a player with a bot");
+      return;
+    }
+    if (this.phase !== "playing" || !this.gameState) return;
+    if (!this.disconnectedSeats.has(msg.seat)) return;
+
+    // Convert the disconnected seat to a bot in the engine's players array
+    this.gameState = {
+      ...this.gameState,
+      players: this.gameState.players.map((p): PlayerInfo => {
+        if (p.seat === msg.seat) {
+          return {
+            seat: msg.seat,
+            name: p.name,
+            kind: "bot",
+            botProfile: BOT_PRESETS["normal"],
+          };
+        }
+        return p;
+      }),
+    };
+
+    this.disconnectedSeats.delete(msg.seat);
+    this.gamePaused = false;
+    this.broadcastLobbyUpdated();
+    await this.processBotTurns();
+  }
+
   // ── Bot turns ───────────────────────────────────────────────────────────────
 
   private botTurnInProgress = false;
@@ -393,7 +474,7 @@ export default class RookRoom implements Party.Server {
     if (this.botTurnInProgress) return;
     this.botTurnInProgress = true;
     try {
-      while (this.gameState !== null && this.phase === "playing") {
+      while (this.gameState !== null && this.phase === "playing" && !this.gamePaused) {
         if (this.gameState.phase === "finished") break;
 
         const activePlayer = this.gameState.activePlayer;
@@ -478,6 +559,11 @@ export default class RookRoom implements Party.Server {
       if (human === undefined) {
         // Empty seat or bot (during playing phase)
         if (this.phase === "playing" && this.gameState !== null) {
+          // Check if this is a disconnected human seat
+          const disconnectedEntry = this.disconnectedSeats.get(seat);
+          if (disconnectedEntry !== undefined) {
+            return { seat, playerId: null, displayName: null, connected: false, isBot: false };
+          }
           const playerInfo = this.gameState.players.find((p) => p.seat === seat);
           if (playerInfo !== undefined) {
             return {

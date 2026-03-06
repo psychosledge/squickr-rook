@@ -47,6 +47,10 @@ vi.mock("@/components/HandHistoryModal/HandHistoryModal", () => ({
   default: (_props: unknown) => null,
 }));
 
+vi.mock("@/components/DisconnectAlert/DisconnectAlert", () => ({
+  DisconnectAlert: (_props: unknown) => null,
+}));
+
 vi.mock("@/utils/sortHand", () => ({
   sortHand: (hand: unknown[]) => hand,
 }));
@@ -68,6 +72,7 @@ import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay"
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import GameTable from "@/components/GameTable/GameTable";
 import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+import { DisconnectAlert } from "@/components/DisconnectAlert/DisconnectAlert";
 
 // ---------------------------------------------------------------------------
 // Tree helpers
@@ -174,6 +179,10 @@ function makeProps(overrides: Partial<OnlineGamePageViewProps> = {}): OnlineGame
     historyModalOpen: false,
     biddingThinkingSeat: null,
     humanTeam: "NS",
+    disconnectedAlert: null,
+    isHost: false,
+    onReplaceWithBot: vi.fn(),
+    onDismissDisconnectAlert: vi.fn(),
     onPlayCard: vi.fn(),
     onToggleDiscard: vi.fn(),
     onConfirmDiscards: vi.fn(),
@@ -418,5 +427,77 @@ describe("OnlineGamePageView", () => {
 
 });
 
+describe("DisconnectAlert rendering in OnlineGamePageView", () => {
+
+  it("26. renders DisconnectAlert when disconnectedAlert is non-null", () => {
+    const tree = OnlineGamePageView(makeProps({
+      disconnectedAlert: { seat: "E", displayName: "Bob" },
+    }));
+    const all = flattenElements(tree);
+    expect(findByType(all, DisconnectAlert)).toHaveLength(1);
+  });
+
+  it("27. does NOT render DisconnectAlert when disconnectedAlert is null", () => {
+    const tree = OnlineGamePageView(makeProps({ disconnectedAlert: null }));
+    const all = flattenElements(tree);
+    expect(findByType(all, DisconnectAlert)).toHaveLength(0);
+  });
+
+  it("28. passes isHost=true to DisconnectAlert when isHost prop is true", () => {
+    const tree = OnlineGamePageView(makeProps({
+      disconnectedAlert: { seat: "S", displayName: "Carol" },
+      isHost: true,
+    }));
+    const all = flattenElements(tree);
+    const alerts = findByType(all, DisconnectAlert);
+    expect(alerts).toHaveLength(1);
+    const p = alerts[0].props as Record<string, unknown>;
+    expect(p.isHost).toBe(true);
+  });
+
+  it("29. passes correct seat and displayName to DisconnectAlert", () => {
+    const tree = OnlineGamePageView(makeProps({
+      disconnectedAlert: { seat: "W", displayName: "Dave" },
+    }));
+    const all = flattenElements(tree);
+    const alerts = findByType(all, DisconnectAlert);
+    expect(alerts).toHaveLength(1);
+    const p = alerts[0].props as Record<string, unknown>;
+    expect(p.seat).toBe("W");
+    expect(p.displayName).toBe("Dave");
+  });
+
+  it("30. passes onReplaceWithBot and onDismissDisconnectAlert to DisconnectAlert", () => {
+    const onReplaceWithBot = vi.fn();
+    const onDismissDisconnectAlert = vi.fn();
+    const tree = OnlineGamePageView(makeProps({
+      disconnectedAlert: { seat: "E", displayName: "Bob" },
+      isHost: true,
+      onReplaceWithBot,
+      onDismissDisconnectAlert,
+    }));
+    const all = flattenElements(tree);
+    const alerts = findByType(all, DisconnectAlert);
+    expect(alerts).toHaveLength(1);
+    const p = alerts[0].props as Record<string, unknown>;
+    expect(p.onReplaceWithBot).toBe(onReplaceWithBot);
+    expect(p.onDismiss).toBe(onDismissDisconnectAlert);
+  });
+
+  it("31. passes isHost=false to DisconnectAlert when isHost prop is false", () => {
+    const tree = OnlineGamePageView(makeProps({
+      disconnectedAlert: { seat: "N", displayName: "Alice" },
+      isHost: false,
+    }));
+    const all = flattenElements(tree);
+    const alerts = findByType(all, DisconnectAlert);
+    expect(alerts).toHaveLength(1);
+    const p = alerts[0].props as Record<string, unknown>;
+    expect(p.isHost).toBe(false);
+  });
+
+});
+
 // Suppress unused import warnings
 void GameTable;
+void DisconnectAlert;

@@ -1538,4 +1538,216 @@ describe("onlineGameStore", () => {
       expect(announcement).toContain("Alice");
     });
   });
+
+  // ── PlayerDisconnected handling ───────────────────────────────────────────
+  describe("PlayerDisconnected handling", () => {
+    it("sets disconnectedAlert and gamePaused:true on PlayerDisconnected message", () => {
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: makeBiddingState("E"),
+      });
+
+      const msg: import("../onlineGameStore.types").PlayerDisconnectedMsg = {
+        type: "PlayerDisconnected",
+        seat: "E",
+        displayName: "Bob",
+      };
+
+      useOnlineGameStore.getState()._handleMessage(msg);
+
+      const state = useOnlineGameStore.getState();
+      expect(state.disconnectedAlert).toEqual({ seat: "E", displayName: "Bob" });
+      expect(state.gamePaused).toBe(true);
+    });
+  });
+
+  // ── PlayerReconnected handling ────────────────────────────────────────────
+  describe("PlayerReconnected handling", () => {
+    it("clears disconnectedAlert and gamePaused:false on PlayerReconnected message", () => {
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: makeBiddingState("E"),
+        disconnectedAlert: { seat: "E", displayName: "Bob" },
+        gamePaused: true,
+      });
+
+      const msg: import("../onlineGameStore.types").PlayerReconnectedMsg = {
+        type: "PlayerReconnected",
+        seat: "E",
+        displayName: "Bob",
+      };
+
+      useOnlineGameStore.getState()._handleMessage(msg);
+
+      const state = useOnlineGameStore.getState();
+      expect(state.disconnectedAlert).toBeNull();
+      expect(state.gamePaused).toBe(false);
+    });
+  });
+
+  // ── replaceWithBot action ─────────────────────────────────────────────────
+  describe("replaceWithBot action", () => {
+    it("sends ReplaceWithBot message when caller is host", () => {
+      const { sent } = injectMockSocket();
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        hostId: "p1",
+        _socket: useOnlineGameStore.getState()._socket,
+      });
+
+      useOnlineGameStore.getState().replaceWithBot("E");
+
+      const messages = sent.map((s) => JSON.parse(s));
+      expect(messages).toContainEqual({ type: "ReplaceWithBot", seat: "E" });
+    });
+
+    it("is no-op when caller is not host", () => {
+      const { sent } = injectMockSocket();
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        hostId: "p2", // different player is host
+        _socket: useOnlineGameStore.getState()._socket,
+      });
+
+      useOnlineGameStore.getState().replaceWithBot("E");
+
+      expect(sent).toHaveLength(0);
+    });
+
+    it("is no-op when _socket is null", () => {
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        hostId: "p1",
+        _socket: null,
+      });
+
+      expect(() => {
+        useOnlineGameStore.getState().replaceWithBot("E");
+      }).not.toThrow();
+
+      // No socket, nothing sent (can't assert sent here since no mock socket)
+      // Just verify it didn't crash
+      const state = useOnlineGameStore.getState();
+      expect(state._socket).toBeNull();
+    });
+  });
+
+  // ── dismissDisconnectAlert action ─────────────────────────────────────────
+  describe("dismissDisconnectAlert action", () => {
+    it("clears disconnectedAlert and sets gamePaused:false", () => {
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        disconnectedAlert: { seat: "W", displayName: "Dave" },
+        gamePaused: true,
+      });
+
+      useOnlineGameStore.getState().dismissDisconnectAlert();
+
+      const state = useOnlineGameStore.getState();
+      expect(state.disconnectedAlert).toBeNull();
+      expect(state.gamePaused).toBe(false);
+    });
+  });
+
+  // ── _updateOverlayAfterBatch — gamePaused short-circuit ───────────────────
+  describe("_updateOverlayAfterBatch — gamePaused short-circuit", () => {
+    it("sets overlay:'none' when gamePaused AND activePlayer is the disconnected seat", () => {
+      const gameState = makeBiddingState("E"); // E is active player
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState,
+        gamePaused: true,
+        disconnectedAlert: { seat: "E", displayName: "Bob" }, // E disconnected
+      });
+
+      useOnlineGameStore.getState()._updateOverlayAfterBatch();
+
+      const state = useOnlineGameStore.getState();
+      expect(state.overlay).toBe("none");
+      expect(state.biddingThinkingSeat).toBeNull();
+    });
+
+    it("does NOT short-circuit when gamePaused but activePlayer is NOT the disconnected seat", () => {
+      const gameState = makeBiddingState("N"); // N is active player, mySeat=N
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState,
+        gamePaused: true,
+        disconnectedAlert: { seat: "E", displayName: "Bob" }, // E disconnected, but N is active
+      });
+
+      useOnlineGameStore.getState()._updateOverlayAfterBatch();
+
+      // N is active and human's turn → overlay should be "bidding", not short-circuited to "none"
+      const state = useOnlineGameStore.getState();
+      expect(state.overlay).toBe("bidding");
+    });
+
+    it("still shows hand-result overlay even when gamePaused (pendingHandScore takes priority)", () => {
+      const gameState = makeBiddingState("E");
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState,
+        gamePaused: true,
+        disconnectedAlert: { seat: "E", displayName: "Bob" },
+        pendingHandScore: {
+          hand: 1, bidder: "N", bidAmount: 100, nestCards: [], discarded: [],
+          nsPointCards: 120, ewPointCards: 0, nsMostCardsBonus: 0, ewMostCardsBonus: 0,
+          nsNestBonus: 0, ewNestBonus: 0, nsWonLastTrick: true, ewWonLastTrick: false,
+          nsTotal: 120, ewTotal: 0, nsDelta: 100, ewDelta: 0, shotMoon: false, moonShooterWentSet: false,
+        },
+      });
+
+      useOnlineGameStore.getState()._updateOverlayAfterBatch();
+
+      expect(useOnlineGameStore.getState().overlay).toBe("hand-result");
+    });
+
+    it("still shows game-over overlay even when gamePaused (finished phase takes priority)", () => {
+      const gameState = { ...makeBiddingState("E"), phase: "finished" as const };
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState,
+        gamePaused: true,
+        disconnectedAlert: { seat: "E", displayName: "Bob" },
+      });
+
+      useOnlineGameStore.getState()._updateOverlayAfterBatch();
+
+      expect(useOnlineGameStore.getState().overlay).toBe("game-over");
+    });
+  });
 });
