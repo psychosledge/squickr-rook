@@ -37,7 +37,7 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
         <CardHand
           cards={cards}
           faceDown={faceDown}
-          legalCardIds={faceDown ? undefined : (phase === "playing" ? (onCardClick ? legalCards : []) : undefined)}
+          legalCardIds={faceDown ? undefined : (phase === "playing" && onCardClick ? legalCards : undefined)}
           onCardClick={!faceDown ? onCardClick : undefined}
         />
       </div>

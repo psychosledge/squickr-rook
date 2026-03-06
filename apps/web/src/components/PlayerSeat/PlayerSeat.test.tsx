@@ -218,8 +218,8 @@ describe("PlayerSeat", () => {
   });
 
   describe("legalCardIds prop passed to CardHand", () => {
-    it("passes legalCardIds=[] to CardHand when faceDown=false, phase='playing', and onCardClick is undefined (not your turn — all cards dimmed)", () => {
-      // faceDown=false, phase=playing, no onCardClick → legalCardIds should be [] (dim all — not your turn)
+    it("passes legalCardIds=undefined to CardHand when faceDown=false, phase='playing', and onCardClick is undefined (not your turn — cards fully visible)", () => {
+      // faceDown=false, phase=playing, no onCardClick → legalCardIds should be undefined (not your turn, show all cards)
       const element = PlayerSeat({ ...baseProps, faceDown: false, phase: "playing", onCardClick: undefined });
       const elements = flattenElements(element);
 
@@ -232,7 +232,23 @@ describe("PlayerSeat", () => {
 
       expect(cardHandEls).toHaveLength(1);
       const props = cardHandEls[0].props as Record<string, unknown>;
-      expect(props.legalCardIds).toEqual([]);
+      expect(props.legalCardIds).toBeUndefined();
+    });
+
+    it("passes legalCardIds (from useLegalCards) to CardHand when faceDown=false, phase='playing', and onCardClick is provided (your turn)", () => {
+      // faceDown=false, phase=playing, onCardClick present → legalCardIds should be the hook result ([] from mock)
+      const element = PlayerSeat({ ...baseProps, faceDown: false, phase: "playing", onCardClick: vi.fn() });
+      const elements = flattenElements(element);
+
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "legalCardIds" in p;
+      });
+
+      expect(cardHandEls).toHaveLength(1);
+      const props = cardHandEls[0].props as Record<string, unknown>;
+      // useLegalCards mock returns [] — the important thing is it's passed through (not undefined)
+      expect(Array.isArray(props.legalCardIds)).toBe(true);
     });
 
     it("passes legalCardIds=undefined to CardHand when faceDown=true (face-down, playability irrelevant)", () => {
