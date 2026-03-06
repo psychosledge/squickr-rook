@@ -363,27 +363,26 @@ export default class RookRoom implements Party.Server {
     };
     this.sendTo(conn, welcome);
 
-    // Normal-path mid-game reconnect: if the game is playing, this player has a seat,
-    // gamePaused is true, and there are no remaining disconnected seats, then clear
-    // gamePaused and broadcast PlayerReconnected (handles the case where JoinRoom
-    // arrives before onClose, so the player never entered disconnectedSeats).
-    if (
-      this.phase === "playing" &&
-      seat !== null &&
-      this.gameState !== null &&
-      this.gamePaused &&
-      this.disconnectedSeats.size === 0
-    ) {
-      this.gamePaused = false;
-      const seatEntry = this.seatedPlayers.get(seat);
-      const displayName = seatEntry?.displayName ?? msg.displayName;
-      for (const c of this.room.getConnections<ConnectionState>()) {
-        this.sendTo(c, {
-          type: "PlayerReconnected",
-          seat,
-          displayName,
-        } satisfies PlayerReconnected);
+    // Normal-path mid-game reconnect: if the game is playing and this player has a seat,
+    // always refresh lobby state. Additionally, if the game was paused and there are no
+    // remaining disconnected seats, clear gamePaused and broadcast PlayerReconnected
+    // (handles the case where JoinRoom arrives before onClose, so the player never
+    // entered disconnectedSeats).
+    if (this.phase === "playing" && seat !== null && this.gameState !== null) {
+      if (this.gamePaused && this.disconnectedSeats.size === 0) {
+        this.gamePaused = false;
+        const seatEntry = this.seatedPlayers.get(seat);
+        const displayName = seatEntry?.displayName ?? msg.displayName;
+        for (const c of this.room.getConnections<ConnectionState>()) {
+          this.sendTo(c, {
+            type: "PlayerReconnected",
+            seat,
+            displayName,
+          } satisfies PlayerReconnected);
+        }
       }
+      // Always refresh lobby state for any mid-game seated join
+      this.broadcastLobbyUpdated();
       await this.processBotTurns();
       return;
     }
@@ -667,7 +666,13 @@ export default class RookRoom implements Party.Server {
   }
 
   private sendTo(conn: Party.Connection, msg: ServerMessage): void {
-    conn.send(JSON.stringify(msg));
+    // Party.Connection doesn't expose readyState in its TS interface; cast to access the underlying WS property
+    if ((conn as any).readyState !== 1 /* WebSocket.OPEN */) return;
+    try {
+      conn.send(JSON.stringify(msg));
+    } catch (err) {
+      console.warn(`[RookRoom] sendTo ${conn.id} failed, skipping:`, err);
+    }
   }
 
   // ── State helpers ───────────────────────────────────────────────────────────

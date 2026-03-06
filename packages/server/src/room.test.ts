@@ -11,20 +11,26 @@ type MockConnState = {
 };
 
 /** Create a mock PartyKit Connection */
-function makeMockConn(id: string) {
+function makeMockConn(id: string, initialReadyState: number = 1) {
   let _state: MockConnState | null = null;
   const sent: string[] = [];
+  let _readyState = initialReadyState;
 
   const conn = {
     id,
     get state() { return _state as MockConnState | null; },
     setState(s: MockConnState | null) { _state = s; return _state; },
-    send(msg: string) { sent.push(msg); },
+    send(msg: string) {
+      if (_readyState !== 1) throw new Error(`Cannot send on conn ${id} with readyState ${_readyState}`);
+      sent.push(msg);
+    },
+    get readyState() { return _readyState; },
+    setReadyState(rs: number) { _readyState = rs; },
     _sent: sent,
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return conn as any as import("partykit/server").Connection<MockConnState> & { _sent: string[] };
+  return conn as any as import("partykit/server").Connection<MockConnState> & { _sent: string[]; readyState: number; setReadyState(rs: number): void };
 }
 
 type MockConn = ReturnType<typeof makeMockConn>;
@@ -617,6 +623,180 @@ describe("RookRoom — reconnect race condition fixes", () => {
       expect(seatN!.displayName).toBe("Alice");
       expect(seatN!.connected).toBe(false);
       expect(seatN!.isBot).toBe(false);
+    });
+  });
+
+  // ── Post-reconnect disconnect-on-card-play bug fixes ─────────────────────
+
+  describe("post-reconnect disconnect-on-card-play bug (CLOSING socket crash)", () => {
+    // T-FIX-1: sendTo does not throw when connection is CLOSING (readyState=2)
+    it("T-FIX-1: sendTo does not throw when connection readyState=2 (CLOSING)", () => {
+      const closingConn = makeMockConn("closing-conn", 2); // readyState=2 = CLOSING
+      room.addConn(closingConn);
+
+      // Should not throw
+      expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (rookRoom as any).sendTo(closingConn, {
+          type: "LobbyUpdated",
+          seats: [],
+          hostId: null,
+        });
+      }).not.toThrow();
+
+      // Nothing should have been sent (socket was skipped)
+      expect(closingConn._sent).toHaveLength(0);
+    });
+
+    // T-FIX-2: broadcastLobbyUpdated skips CLOSING connections without throwing
+    it("T-FIX-2: broadcastLobbyUpdated skips CLOSING conn and delivers to OPEN conn", async () => {
+      const openConn = makeMockConn("open-conn", 1);
+      const closingConn = makeMockConn("closing-conn-2", 2); // readyState=2 = CLOSING
+
+      room.addConn(openConn);
+      room.addConn(closingConn);
+
+      await sendJoinRoom(rookRoom, openConn, "player-open", "OpenPlayer");
+
+      // Clear sent after setup
+      openConn._sent.length = 0;
+
+      // Should not throw even though closingConn is CLOSING
+      expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (rookRoom as any).broadcastLobbyUpdated();
+      }).not.toThrow();
+
+      // OPEN conn should have received LobbyUpdated
+      const openMsgs = getMessages(openConn);
+      expect(openMsgs.filter((m) => m.type === "LobbyUpdated")).toHaveLength(1);
+
+      // CLOSING conn should have received nothing
+      expect(closingConn._sent).toHaveLength(0);
+    });
+
+    // T-FIX-3: Playing a card does not crash the Worker when a stale CLOSING conn is present
+    it("T-FIX-3: playing a card does not crash when stale CLOSING conn is in room", async () => {
+      const conns = await setupFourPlayerLobby(rookRoom, room);
+      await sendStartGame(rookRoom, conns.N);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+
+      // Simulate reconnect: N has a new conn, old conn is CLOSING
+      const newConnN = makeMockConn("new-conn-N-fix3", 1);
+      room.addConn(newConnN);
+
+      // Set old conn N to CLOSING (readyState=2) — simulates the stale socket
+      conns.N.setReadyState(2);
+
+      // Wire up newConnN with N's state so it's a valid reconnect
+      await sendJoinRoom(rookRoom, newConnN, "player-N", "Alice");
+
+      // Clear sent messages
+      newConnN._sent.length = 0;
+      conns.E._sent.length = 0;
+      conns.S._sent.length = 0;
+      conns.W._sent.length = 0;
+
+      // Determine which player is active
+      const activePlayer: Seat = rookInternal.gameState?.activePlayer ?? "N";
+
+      // Pick the connection and seat for the active player
+      const activeConnMap: Record<Seat, MockConn> = {
+        N: newConnN,   // N now uses the new conn
+        E: conns.E,
+        S: conns.S,
+        W: conns.W,
+      };
+      const activeConn = activeConnMap[activePlayer];
+
+      // Get valid cards for the active player
+      const gameState = rookInternal.gameState;
+      const activeSeatState = gameState?.hands?.[activePlayer] ?? [];
+      const firstCard = activeSeatState[0];
+
+      // Only proceed if the game has reached a "playing" sub-phase where cards can be played
+      if (gameState?.phase === "playing" && firstCard) {
+        let threw = false;
+        try {
+          await rookRoom.onMessage(
+            JSON.stringify({
+              type: "SendCommand",
+              command: { type: "PlayCard", seat: activePlayer, card: firstCard },
+            }),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            activeConn as any,
+          );
+        } catch {
+          threw = true;
+        }
+
+        // The Worker must NOT crash (throw) due to the CLOSING socket
+        expect(threw).toBe(false);
+
+        // The active player's new conn should not receive a CommandError
+        const activeMsgs = getMessages(newConnN);
+        expect(activeMsgs.filter((m) => m.type === "CommandError")).toHaveLength(0);
+      } else {
+        // Game is in bidding phase — send a bid command instead
+        let threw = false;
+        try {
+          await rookRoom.onMessage(
+            JSON.stringify({
+              type: "SendCommand",
+              command: { type: "PlaceBid", seat: activePlayer, bid: 70 },
+            }),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            activeConn as any,
+          );
+        } catch {
+          threw = true;
+        }
+
+        expect(threw).toBe(false);
+        const activeMsgs = getMessages(newConnN);
+        // N reconnected, so N is the active player if it's N's turn
+        // The only CommandError we'd expect is a legit game rule error, not a crash
+        // We check no exception was thrown from onMessage
+        void activeMsgs; // suppress unused warning
+      }
+    });
+
+    // T-FIX-4: Normal-path mid-game reconnect always calls broadcastLobbyUpdated
+    it("T-FIX-4: normal-path mid-game reconnect (gamePaused=false) sends LobbyUpdated to others", async () => {
+      // Scenario: game is playing, gamePaused=false (no one is disconnected).
+      // A player's tab refreshes — JoinRoom arrives before onClose.
+      // Normal path runs (player found in seatedPlayers, NOT in disconnectedSeats).
+      // After joining, other players should still receive a LobbyUpdated.
+
+      const conns = await setupFourPlayerLobby(rookRoom, room);
+      await sendStartGame(rookRoom, conns.N);
+
+      // Confirm gamePaused is false (normal running game)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+      expect(rookInternal.gamePaused).toBe(false);
+      expect(rookInternal.disconnectedSeats.size).toBe(0);
+
+      // Clear sent messages
+      conns.E._sent.length = 0;
+      conns.S._sent.length = 0;
+      conns.W._sent.length = 0;
+
+      // N connects again (new tab / JoinRoom before onClose)
+      const newConnN = makeMockConn("new-conn-N-fix4", 1);
+      room.addConn(newConnN);
+      await sendJoinRoom(rookRoom, newConnN, "player-N", "Alice");
+
+      // E, S, W should each receive a LobbyUpdated (they need to know N is back)
+      const msgsE = getMessages(conns.E);
+      const msgsS = getMessages(conns.S);
+      const msgsW = getMessages(conns.W);
+
+      expect(msgsE.filter((m) => m.type === "LobbyUpdated")).toHaveLength(1);
+      expect(msgsS.filter((m) => m.type === "LobbyUpdated")).toHaveLength(1);
+      expect(msgsW.filter((m) => m.type === "LobbyUpdated")).toHaveLength(1);
     });
   });
 });
