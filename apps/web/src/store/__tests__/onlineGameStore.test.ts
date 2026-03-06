@@ -1750,4 +1750,176 @@ describe("onlineGameStore", () => {
       expect(useOnlineGameStore.getState().overlay).toBe("game-over");
     });
   });
+
+  // ── connect() preserves gameState during reconnect ────────────────────────
+  describe("connect() preserves gameState during reconnect", () => {
+    // localStorage/sessionStorage stubs for the connect() call
+    const localStorageStore: Record<string, string> = {};
+    const sessionStorageStore: Record<string, string> = {};
+    const mockLocalStorage = {
+      getItem: (key: string) => localStorageStore[key] ?? null,
+      setItem: (key: string, value: string) => { localStorageStore[key] = value; },
+      removeItem: (key: string) => { delete localStorageStore[key]; },
+    };
+    const mockSessionStorage = {
+      getItem: (key: string) => sessionStorageStore[key] ?? null,
+      setItem: (key: string, value: string) => { sessionStorageStore[key] = value; },
+      removeItem: (key: string) => { delete sessionStorageStore[key]; },
+    };
+
+    beforeEach(() => {
+      vi.stubGlobal("localStorage", mockLocalStorage);
+      vi.stubGlobal("sessionStorage", mockSessionStorage);
+      // Pre-seed a playerId so connect() reuses it
+      sessionStorageStore["rookPlayerId"] = "p1";
+      localStorageStore["rookDisplayName"] = "Alice";
+      // Stub WebSocket so connect() doesn't blow up
+      vi.stubGlobal("WebSocket", class {
+        readyState = WebSocket.CONNECTING;
+        onopen: (() => void) | null = null;
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onclose: (() => void) | null = null;
+        close() {}
+        send() {}
+      });
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      // Reset storage
+      for (const k of Object.keys(localStorageStore)) delete localStorageStore[k];
+      for (const k of Object.keys(sessionStorageStore)) delete sessionStorageStore[k];
+    });
+
+    it("keeps existing gameState when connect() called with a game in progress", () => {
+      // Arrange: store is already in a playing state (mid-game reconnect scenario)
+      const existingGameState = makeBiddingState("N");
+      const existingSeats = makeSeats("p1", "N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        myDisplayName: "Alice",
+        mySeat: "N",
+        roomCode: "ROOM1",
+        seats: existingSeats,
+        gameState: existingGameState,
+        connectionError: "Disconnected from server.",
+      });
+
+      // Act: reconnect
+      useOnlineGameStore.getState().connect("ROOM1");
+
+      // Assert: gameState preserved
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState).not.toBeNull();
+      expect(state.gameState).toEqual(existingGameState);
+
+      // Assert: lobbyPhase is "connecting" (reset to connecting for the new socket)
+      expect(state.lobbyPhase).toBe("connecting");
+
+      // Assert: connectionError cleared
+      expect(state.connectionError).toBeNull();
+    });
+
+    it("resets gameState to null when connect() called without a prior game (fresh join)", () => {
+      // Arrange: store is in idle/connecting state with no game yet
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "idle",
+        myPlayerId: "p1",
+        myDisplayName: "Alice",
+        gameState: null,
+      });
+
+      // Act: fresh connect
+      useOnlineGameStore.getState().connect("ROOM2");
+
+      // Assert: gameState stays null (no game to preserve)
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState).toBeNull();
+      expect(state.lobbyPhase).toBe("connecting");
+    });
+
+    it("preserves mySeat during reconnect", () => {
+      // Arrange
+      const existingGameState = makeBiddingState("N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "S",
+        roomCode: "ROOM3",
+        gameState: existingGameState,
+      });
+
+      // Act
+      useOnlineGameStore.getState().connect("ROOM3");
+
+      // Assert: mySeat preserved
+      expect(useOnlineGameStore.getState().mySeat).toBe("S");
+    });
+
+    it("preserves seats during reconnect", () => {
+      // Arrange
+      const existingGameState = makeBiddingState("N");
+      const existingSeats = makeSeats("p1", "N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        roomCode: "ROOM4",
+        seats: existingSeats,
+        gameState: existingGameState,
+      });
+
+      // Act
+      useOnlineGameStore.getState().connect("ROOM4");
+
+      // Assert: seats preserved (stale until Welcome arrives, but not cleared)
+      expect(useOnlineGameStore.getState().seats).toEqual(existingSeats);
+    });
+  });
+
+  // ── PlayerReconnected overlay resume ──────────────────────────────────────
+  describe("PlayerReconnected handling — overlay resumes", () => {
+    it("calls _updateOverlayAfterBatch after PlayerReconnected — overlay resumes for active player", () => {
+      // Arrange: store in "playing" phase, gamePaused:true, E was disconnected
+      // mySeat=N, activePlayer=N (human's turn in bidding) — but paused because E disconnected
+      // (E is NOT the active player, so the gamePaused short-circuit doesn't fire for N)
+      const biddingGameState = makeBiddingState("N"); // N is the active player
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: biddingGameState,
+        gamePaused: true,
+        disconnectedAlert: { seat: "E", displayName: "Bob" },
+        overlay: "none", // paused, so overlay was suppressed
+      });
+
+      // Act: E reconnects
+      const reconnectedMsg: import("../onlineGameStore.types").PlayerReconnectedMsg = {
+        type: "PlayerReconnected",
+        seat: "E",
+        displayName: "Bob",
+      };
+      useOnlineGameStore.getState()._handleMessage(reconnectedMsg);
+
+      // Assert: gamePaused cleared, disconnectedAlert cleared
+      const state = useOnlineGameStore.getState();
+      expect(state.gamePaused).toBe(false);
+      expect(state.disconnectedAlert).toBeNull();
+
+      // Assert: _updateOverlayAfterBatch fired — N is active in bidding → overlay = "bidding"
+      // (i.e., overlay is NOT "none" — the game resumed normal overlay logic)
+      expect(state.overlay).not.toBe("none");
+      expect(state.overlay).toBe("bidding");
+    });
+  });
 });

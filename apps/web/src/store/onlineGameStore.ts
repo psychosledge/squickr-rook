@@ -86,9 +86,18 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
       existing.close();
     }
 
-    // Reset state
+    // If we're reconnecting mid-game (gameState is non-null), preserve the
+    // current game state, seat, and lobby info so that the OnlineGamePage
+    // navigation useEffect doesn't redirect back to the lobby on reconnect.
+    const { gameState, mySeat, seats } = get();
+    const preservedGame = gameState !== null
+      ? { gameState, mySeat, seats, roomCode } // seats is stale until Welcome arrives
+      : {};
+
+    // Reset state (preserve game fields if reconnecting)
     set({
       ...INITIAL_ONLINE_STATE,
+      ...preservedGame,
       roomCode,
       lobbyPhase: "connecting",
       myPlayerId: playerId,

@@ -232,6 +232,74 @@ export default class RookRoom implements Party.Server {
   // ── Private handlers ────────────────────────────────────────────────────────
 
   private async handleJoinRoom(msg: JoinRoom, conn: Party.Connection): Promise<void> {
+    // ── Reconnect path ────────────────────────────────────────────────────────
+    // Check if this player was disconnected mid-game and is rejoining.
+    const reconnectEntry = [...this.disconnectedSeats.entries()]
+      .find(([, entry]) => entry.playerId === msg.playerId);
+
+    if (reconnectEntry !== undefined) {
+      const [disconnectedSeat, entry] = reconnectEntry;
+
+      // Restore the player to seatedPlayers with the new connId
+      this.disconnectedSeats.delete(disconnectedSeat);
+      this.seatedPlayers.set(disconnectedSeat, {
+        playerId: msg.playerId,
+        displayName: entry.displayName,
+        connId: conn.id,
+      });
+
+      // Update connection state so future onClose can identify this player
+      setState(conn, {
+        playerId: msg.playerId,
+        displayName: entry.displayName,
+        seat: disconnectedSeat,
+      });
+
+      // Add to join order if not already present
+      if (!this.joinOrder.includes(conn.id)) {
+        this.joinOrder.push(conn.id);
+      }
+
+      // Assign host if none exists
+      if (this.hostConnId === null) {
+        this.hostConnId = conn.id;
+      }
+
+      // Send Welcome to the reconnecting player with their masked game state.
+      // NOTE: disconnectedSeats is only ever populated during phase === "playing",
+      // so gameState is guaranteed non-null here.
+      this.sendTo(conn, {
+        type: "Welcome",
+        roomCode: this.room.id,
+        hostId: this.getHostPlayerId(),
+        phase: "playing",
+        seats: this.buildSeatInfoArray(),
+        state: maskState(this.gameState!, disconnectedSeat),
+      } satisfies Welcome);
+
+      // Clear gamePaused if no more disconnected seats remain
+      if (this.disconnectedSeats.size === 0) {
+        this.gamePaused = false;
+      }
+
+      // Broadcast PlayerReconnected to all connections (including the rejoining player)
+      for (const c of this.room.getConnections<ConnectionState>()) {
+        this.sendTo(c, {
+          type: "PlayerReconnected",
+          seat: disconnectedSeat,
+          displayName: entry.displayName,
+        } satisfies PlayerReconnected);
+      }
+
+      // Refresh lobby state for everyone
+      this.broadcastLobbyUpdated();
+
+      // Resume bot turns if the game can proceed
+      await this.processBotTurns();
+      return;
+    }
+
+    // ── Normal join path ──────────────────────────────────────────────────────
     // Resolve seat BEFORE calling setState so the Welcome snapshot is correct
     const seat = this.getSeatForPlayerId(msg.playerId);
 
