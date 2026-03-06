@@ -4,6 +4,7 @@ import { customAlphabet } from "nanoid";
 import { useOnlineGameStore } from "@/store/onlineGameStore";
 import type { SeatInfo } from "@/store/onlineGameStore.types";
 import type { Seat } from "@rook/engine";
+import { getLobbyLabel } from "@/utils/seatLabel";
 import styles from "./OnlineLobbyPage.module.css";
 
 // ── Room code generator ──────────────────────────────────────────────────────
@@ -173,7 +174,46 @@ export function LobbyView({
   onStartGame,
   onBack,
 }: LobbyViewProps) {
-  const allSeats: Seat[] = ["N", "E", "S", "W"];
+  const nsPair: Seat[] = ["N", "S"];
+  const ewPair: Seat[] = ["E", "W"];
+
+  function renderSeatCard(seat: Seat) {
+    const info = seats.find((s) => s.seat === seat);
+    const isOccupied = !!info?.playerId;
+    const isMine = seat === mySeat;
+    const isBot = info?.isBot ?? false;
+    const isDisconnected = isOccupied && !info?.connected && !isBot;
+    let displayName = info?.displayName ?? null;
+    if (isBot) displayName = `${displayName ?? seat} (bot)`;
+    else if (isDisconnected) displayName = `${displayName ?? seat} (disconnected)`;
+
+    return (
+      <div
+        key={seat}
+        className={`${styles.seatCard}${isMine ? ` ${styles.mySeat}` : ""}`}
+      >
+        <span className={styles.seatLabel}>{getLobbyLabel(seat)}</span>
+        {isOccupied ? (
+          <span className={styles.seatName}>{displayName}</span>
+        ) : (
+          <span className={styles.seatEmpty}>Empty</span>
+        )}
+        {!isOccupied && !isMine && (
+          <button
+            className={styles.seatBtn}
+            onClick={() => onClaimSeat(seat)}
+          >
+            Sit Here
+          </button>
+        )}
+        {isMine && (
+          <button className={styles.seatBtn} onClick={onLeaveSeat}>
+            Leave
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -186,43 +226,13 @@ export function LobbyView({
       </div>
 
       <div className={styles.seatGrid}>
-        {allSeats.map((seat) => {
-          const info = seats.find((s) => s.seat === seat);
-          const isOccupied = !!info?.playerId;
-          const isMine = seat === mySeat;
-          const isBot = info?.isBot ?? false;
-          const isDisconnected = isOccupied && !info?.connected && !isBot;
-          let displayName = info?.displayName ?? null;
-          if (isBot) displayName = `${displayName ?? seat} (bot)`;
-          else if (isDisconnected) displayName = `${displayName ?? seat} (disconnected)`;
-
-          return (
-            <div
-              key={seat}
-              className={`${styles.seatCard}${isMine ? ` ${styles.mySeat}` : ""}`}
-            >
-              <span className={styles.seatLabel}>{seat}</span>
-              {isOccupied ? (
-                <span className={styles.seatName}>{displayName}</span>
-              ) : (
-                <span className={styles.seatEmpty}>Empty</span>
-              )}
-              {!isOccupied && !isMine && (
-                <button
-                  className={styles.seatBtn}
-                  onClick={() => onClaimSeat(seat)}
-                >
-                  Sit Here
-                </button>
-              )}
-              {isMine && (
-                <button className={styles.seatBtn} onClick={onLeaveSeat}>
-                  Leave
-                </button>
-              )}
-            </div>
-          );
-        })}
+        <div className={styles.seatPair}>
+          {nsPair.map(renderSeatCard)}
+        </div>
+        <div className={styles.seatDivider} />
+        <div className={styles.seatPair}>
+          {ewPair.map(renderSeatCard)}
+        </div>
       </div>
 
       {connectionError && <p className={styles.errorMsg}>{connectionError}</p>}

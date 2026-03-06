@@ -32,6 +32,8 @@ vi.mock("./OnlineLobbyPage.module.css", () => ({
     shareUrl: "shareUrl",
     roomInfo: "roomInfo",
     seatGrid: "seatGrid",
+    seatPair: "seatPair",
+    seatDivider: "seatDivider",
     seatCard: "seatCard",
     mySeat: "mySeat",
     seatLabel: "seatLabel",
@@ -640,6 +642,65 @@ describe("LobbyView", () => {
     const tree = LobbyView(makeLobbyProps({ seats }));
     const text = flattenText(tree);
     expect(text).toContain("(disconnected)");
+  });
+
+  it("42. seat labels show P1, P2, P3, P4 (not raw N, E, S, W)", () => {
+    const tree = LobbyView(makeLobbyProps());
+    const all = flattenElements(tree);
+    const seatLabels = findByClass(all, "seatLabel");
+    expect(seatLabels).toHaveLength(4);
+    const labelTexts = seatLabels.map((el) => flattenText(el));
+    expect(labelTexts).toContain("P1");
+    expect(labelTexts).toContain("P2");
+    expect(labelTexts).toContain("P3");
+    expect(labelTexts).toContain("P4");
+    // Raw compass letters must NOT appear as seat labels
+    expect(labelTexts).not.toContain("N");
+    expect(labelTexts).not.toContain("S");
+    expect(labelTexts).not.toContain("E");
+    expect(labelTexts).not.toContain("W");
+  });
+
+  it("43. seat render order is N, S, E, W (NS pair first, EW pair second)", () => {
+    const tree = LobbyView(makeLobbyProps());
+    const all = flattenElements(tree);
+    const seatCards = findByClass(all, "seatCard");
+    expect(seatCards).toHaveLength(4);
+    // Each seatCard contains a seatLabel child — check their text order
+    const labelTexts = seatCards.map((card) => {
+      const cardAll = flattenElements(card);
+      const label = findByClass(cardAll, "seatLabel");
+      return label.length > 0 ? flattenText(label[0]) : "";
+    });
+    expect(labelTexts).toEqual(["P1", "P2", "P3", "P4"]);
+  });
+
+  it("44. seatGrid contains two pair groups (seatPair class)", () => {
+    const tree = LobbyView(makeLobbyProps());
+    const all = flattenElements(tree);
+    const pairGroups = findByClass(all, "seatPair");
+    expect(pairGroups).toHaveLength(2);
+  });
+
+  it("45. a divider element exists between the two pair groups", () => {
+    const tree = LobbyView(makeLobbyProps());
+    const all = flattenElements(tree);
+    const dividers = findByClass(all, "seatDivider");
+    expect(dividers).toHaveLength(1);
+  });
+
+  it("46. onClaimSeat called with 'S' when Sit Here clicked for second card (S, rendered at index 1)", () => {
+    const onClaimSeat = vi.fn();
+    const tree = LobbyView(makeLobbyProps({ onClaimSeat, mySeat: null }));
+    const all = flattenElements(tree);
+    const sitBtns = findButtons(all, "seatBtn").filter((el) =>
+      flattenText(el).includes("Sit Here"),
+    );
+    // With order N,S,E,W the second Sit Here button is for S
+    expect(sitBtns.length).toBeGreaterThanOrEqual(2);
+    const p = sitBtns[1].props as Record<string, unknown>;
+    (p.onClick as () => void)();
+    expect(onClaimSeat).toHaveBeenCalledWith("S");
   });
 });
 

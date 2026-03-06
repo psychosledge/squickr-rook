@@ -10,10 +10,20 @@ export function getSeatLabel(seat: Seat): string {
   return labels[seat];
 }
 
+export function getLobbyLabel(seat: Seat): string {
+  const labels: Record<Seat, string> = {
+    N: "P1",
+    S: "P2",
+    E: "P3",
+    W: "P4",
+  };
+  return labels[seat];
+}
+
 export function getTeamLabel(team: Team): string {
   const labels: Record<Team, string> = {
-    NS: "P1 & P3",
-    EW: "P2 & P4",
+    NS: "P1 & P2",
+    EW: "P3 & P4",
   };
   return labels[team];
 }
