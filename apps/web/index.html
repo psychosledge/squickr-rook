@@ -9,6 +9,20 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <title>Squickr Rook</title>
+    <script>
+      // GitHub Pages SPA redirect — restore the original URL from the ?p= query
+      // parameter that 404.html encoded before redirecting here.
+      (function () {
+        var p = new URLSearchParams(window.location.search).get("p");
+        var h = new URLSearchParams(window.location.search).get("h");
+        if (p) {
+          window.history.replaceState(
+            null, null,
+            p + (h ? h : "") + window.location.hash
+          );
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

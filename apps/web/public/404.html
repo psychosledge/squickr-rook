@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Squickr Rook</title>
+    <script>
+      // GitHub Pages SPA redirect.
+      // When GitHub Pages returns a 404 for a deep link, this page redirects
+      // back to the root with the original path encoded as a query parameter.
+      // index.html then restores the URL before React Router boots.
+      var l = window.location;
+      l.replace(
+        l.protocol + "//" + l.hostname + (l.port ? ":" + l.port : "") +
+        l.pathname.split("/").slice(0, 1).join("/") +
+        "/?p=" + encodeURIComponent(l.pathname + l.search) +
+        (l.hash ? "&h=" + encodeURIComponent(l.hash) : "")
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
