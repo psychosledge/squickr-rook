@@ -86,6 +86,13 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     // Resolve display name
     const myDisplayName = localStorage.getItem("rookDisplayName") ?? "Player";
 
+    console.log('[connect] called | lobbyPhase=%s | isInMemoryReconnect=%s | isCrossRefreshReconnect=%s | hasMidGameFlag=%s',
+      get().lobbyPhase,
+      get().gameState !== null,
+      !!(globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === roomCode && get().gameState === null),
+      !!globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY)
+    );
+
     // Close existing socket if present
     const existing = get()._socket;
     if (existing) {
@@ -144,6 +151,10 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     ws.onerror = () => {
       // Only act if this is still the current socket
       if (get()._socket !== ws) return;
+      console.log('[ws.onerror] fired | stale=%s | lobbyPhase=%s',
+        get()._socket !== ws,
+        get().lobbyPhase
+      );
       set({ connectionError: "WebSocket error" });
     };
 
@@ -151,6 +162,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
       // Only act if this is still the current socket.
       // If connect() was called again it closed this socket itself — ignore the stale close.
       if (get()._socket !== ws) return;
+      console.log('[ws.onclose] fired | stale=%s | lobbyPhase=%s | gameState=%s',
+        get()._socket !== ws,
+        get().lobbyPhase,
+        !!get().gameState
+      );
       const { lobbyPhase } = get();
       if (lobbyPhase === "playing") {
         set({ connectionError: "Disconnected from server.", _socket: null });
@@ -286,6 +302,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   // ── Internal message handling ─────────────────────────────────────────────
 
   _handleMessage: (msg) => {
+    console.log('[_handleMessage] type=%s | lobbyPhase=%s | gameState=%s',
+      msg.type,
+      get().lobbyPhase,
+      !!get().gameState
+    );
     // Guard: drop messages when idle
     if (get().lobbyPhase === "idle") return;
 
@@ -316,6 +337,14 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
           isReconnecting: false,
           ...(msg.state ? { gameState: msg.state } : {}),
         });
+
+        console.log('[Welcome] after set | lobbyPhase=%s | gameState=%s | isReconnecting=%s | mySeat=%s | msgHasState=%s',
+          get().lobbyPhase,
+          !!get().gameState,
+          get().isReconnecting,
+          get().mySeat,
+          !!(msg as any).state
+        );
 
         if (msg.state) {
           get()._updateOverlayAfterBatch();
@@ -367,6 +396,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   },
 
   _applyIncomingEvents: (events) => {
+    console.log('[_applyIncomingEvents] applying %d events | gameState=%s | events=%s',
+      events.length,
+      !!get().gameState,
+      events.map((e: any) => e.type).join(',')
+    );
     // If a deferred TrickCompleted is in flight, buffer all incoming events
     if (get()._deferredEventQueue !== null) {
       set((s) => ({
@@ -514,6 +548,12 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
 
       return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
     });
+
+    console.log('[_applyIncomingEvents] done | gameState=%s | phase=%s | overlay=%s',
+      !!get().gameState,
+      get().gameState?.phase ?? 'null',
+      get().overlay
+    );
 
     get()._updateOverlayAfterBatch();
   },
