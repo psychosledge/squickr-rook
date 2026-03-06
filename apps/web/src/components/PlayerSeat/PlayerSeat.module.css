@@ -8,8 +8,20 @@
   transition: background 0.15s;
 }
 
+@keyframes seatPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.0); }
+  50%       { box-shadow: 0 0 0 6px rgba(243, 156, 18, 0.3); }
+}
+
 .seat.active {
   background: rgba(243, 156, 18, 0.08);
+  animation: seatPulse 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat.active {
+    animation: none;
+  }
 }
 
 .nameRow {

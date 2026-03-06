@@ -396,6 +396,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
 
     // No TrickCompleted — original behaviour
     set((s) => {
+      const prevActive = s.gameState?.activePlayer ?? null;
       let gs = s.gameState ?? INITIAL_STATE;
       let pendingHandScore = s.pendingHandScore;
       let announcement = s.announcement;
@@ -413,6 +414,15 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
         const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
         if (next !== null) announcement = next;
       }
+
+      const nextActive = gs.activePlayer ?? null;
+      const shouldAnnounceYourTurn =
+        s.mySeat !== null &&
+        nextActive === s.mySeat &&
+        prevActive !== s.mySeat &&
+        gs.phase === "playing" &&
+        !announcement;
+      if (shouldAnnounceYourTurn) announcement = "Your Turn!";
 
       return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
     });

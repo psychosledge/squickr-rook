@@ -1150,6 +1150,249 @@ describe("onlineGameStore", () => {
     });
   });
 
+  // ── Test: "Your Turn!" announcement ──────────────────────────────────────
+  describe("_applyIncomingEvents — 'Your Turn!' announcement", () => {
+    /** Build a minimal playing-phase GameState with the given activePlayer */
+    function makePlayingState(activePlayer: Seat): GameState {
+      return {
+        ...INITIAL_STATE,
+        phase: "playing",
+        rules: { ...DEFAULT_RULES, botDelayMs: 0 },
+        activePlayer,
+        currentTrick: [],
+        tricksPlayed: 0,
+      };
+    }
+
+    it("sets announcement to 'Your Turn!' when activePlayer transitions to mySeat (playing phase)", () => {
+      // Arrange: playing state with activePlayer=W (mySeat=N is NOT active)
+      // CardPlayed(W) uses nextSeat(W)=N, so after applying it activePlayer becomes N.
+      const prevPlayingState = makePlayingState("W");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: prevPlayingState,
+        announcement: null,
+      });
+
+      // CardPlayed(W) → engine sets activePlayer = nextSeat(W) = N
+      const cardPlayedEvent: GameEvent = {
+        type: "CardPlayed",
+        seat: "W",
+        cardId: "Black-10" as import("@rook/engine").CardId,
+        trickIndex: 0,
+        handNumber: 0,
+        timestamp: Date.now(),
+      };
+
+      // Act
+      useOnlineGameStore.getState()._applyIncomingEvents([cardPlayedEvent]);
+
+      // Assert: nextActive = N (mySeat), prevActive = W, phase = playing → "Your Turn!"
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState?.activePlayer).toBe("N");
+      expect(state.gameState?.phase).toBe("playing");
+      expect(state.announcement).toBe("Your Turn!");
+    });
+
+    it("does NOT set 'Your Turn!' when activePlayer transitions to a different seat (not mySeat)", () => {
+      // Playing state where N is active; CardPlayed(N) → nextSeat(N) = E (not mySeat=N)
+      const prevPlayingState = makePlayingState("N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: prevPlayingState,
+        announcement: null,
+      });
+
+      // CardPlayed(N) → engine sets activePlayer = nextSeat(N) = E
+      const cardPlayedEvent: GameEvent = {
+        type: "CardPlayed",
+        seat: "N",
+        cardId: "Black-10" as import("@rook/engine").CardId,
+        trickIndex: 0,
+        handNumber: 0,
+        timestamp: Date.now(),
+      };
+
+      // Act
+      useOnlineGameStore.getState()._applyIncomingEvents([cardPlayedEvent]);
+
+      // Assert: nextActive = E (not mySeat N) → no "Your Turn!"
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState?.activePlayer).toBe("E");
+      expect(state.announcement).not.toBe("Your Turn!");
+    });
+
+    it("does NOT set 'Your Turn!' during bidding phase (even if activePlayer === mySeat)", () => {
+      // mySeat = N, activePlayer was E (bidding), then transitions to N during bidding
+      const prevBiddingState = makeBiddingState("E"); // E's turn to bid
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: prevBiddingState,
+        announcement: null,
+      });
+
+      // Apply BidPassed for E → active moves to S... still not N in bidding.
+      // Actually to get N as next bidder after E in a 4-seat game:
+      // If E passes, S passes, W passes → N wins by force, → BiddingComplete, not helpful.
+      // Easier: use a state where E bids, and BidPlaced advances to S.
+      // Or: just set up state directly. prev=S (bidding), apply BidPassed for S → next=W.
+      // The point is: whatever the transition, if phase=bidding, no "Your Turn!".
+      //
+      // Let's use BidPlaced(E) from prevBiddingState(E) → advances to S (still bidding).
+      // That means nextActive=S != mySeat=N → announcement won't fire regardless.
+      // To isolate the "bidding phase" rule, we need nextActive=N but phase=bidding.
+      // BidPlaced(E) → S, BidPlaced(S) → W, BidPlaced(W) → N (N is back to bid).
+      // After 3 BidPlaced events applied in sequence, nextActive = N, phase = bidding.
+      const events: GameEvent[] = [
+        { type: "BidPlaced", seat: "E", amount: 70, handNumber: 0, timestamp: 1001 },
+        { type: "BidPlaced", seat: "S", amount: 75, handNumber: 0, timestamp: 1002 },
+        { type: "BidPlaced", seat: "W", amount: 80, handNumber: 0, timestamp: 1003 },
+      ];
+
+      // Act
+      useOnlineGameStore.getState()._applyIncomingEvents(events);
+
+      // Assert: nextActive = N, phase = bidding → no "Your Turn!"
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState?.activePlayer).toBe("N");
+      expect(state.gameState?.phase).toBe("bidding");
+      expect(state.announcement).not.toBe("Your Turn!");
+    });
+
+    it("does NOT stomp a BiddingComplete/TrumpSelected announcement from the same batch", () => {
+      // Build a state with bidder=W in trump phase.
+      // TrumpSelected(W) → phase="playing", activePlayer=leftOf(W)=N (mySeat).
+      // buildAnnouncementFromEvent sets announcement="W chose Red as trump" first,
+      // so shouldAnnounceYourTurn must be false (announcement already set in this batch).
+      let state2 = makeBiddingState("N");
+      state2 = applyEvent(state2, { type: "BidPassed", seat: "N", handNumber: 0, timestamp: 1001 });
+      state2 = applyEvent(state2, { type: "BidPassed", seat: "E", handNumber: 0, timestamp: 1002 });
+      state2 = applyEvent(state2, { type: "BidPassed", seat: "S", handNumber: 0, timestamp: 1003 });
+      state2 = applyEvent(state2, { type: "BiddingComplete", winner: "W", amount: 70, forced: true, shotMoon: false, handNumber: 0, timestamp: 1005 });
+      state2 = applyEvent(state2, { type: "NestTaken", seat: "W", nestCards: [...state2.nest], handNumber: 0, timestamp: 2000 });
+      // Skip discards — force into trump phase directly
+      state2 = { ...state2, phase: "trump" as const, activePlayer: "W" as Seat };
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: { ...state2, phase: "trump", activePlayer: "W" },
+        announcement: null,
+      });
+
+      // Apply TrumpSelected(W) → phase=playing, activePlayer= leftOf(W) = N
+      const trumpSelectedEvent: GameEvent = {
+        type: "TrumpSelected",
+        seat: "W",
+        color: "Red",
+        handNumber: state2.handNumber,
+        timestamp: Date.now(),
+      };
+
+      // Act
+      useOnlineGameStore.getState()._applyIncomingEvents([trumpSelectedEvent]);
+
+      // Assert: announcement should be "W chose Red as trump", NOT "Your Turn!"
+      const s = useOnlineGameStore.getState();
+      expect(s.gameState?.activePlayer).toBe("N"); // next active is N (mySeat)
+      expect(s.gameState?.phase).toBe("playing");   // transitioned to playing
+      expect(s.announcement).not.toBe("Your Turn!"); // TrumpSelected announcement wins
+      expect(s.announcement).toContain("Red");       // TrumpSelected announcement is present
+    });
+
+    it("does NOT set 'Your Turn!' when mySeat is null (single-player / spectator)", () => {
+      // Arrange: mySeat is null — no seat assigned (spectator / single-player mode)
+      // Playing state with activePlayer=W; CardPlayed(W) → nextActive=N
+      const prevPlayingState = makePlayingState("W");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: null, // no seat
+        gameState: prevPlayingState,
+        announcement: null,
+      });
+
+      // CardPlayed(W) → engine sets activePlayer = nextSeat(W) = N
+      const cardPlayedEvent: GameEvent = {
+        type: "CardPlayed",
+        seat: "W",
+        cardId: "Black-10" as import("@rook/engine").CardId,
+        trickIndex: 0,
+        handNumber: 0,
+        timestamp: Date.now(),
+      };
+
+      // Act
+      useOnlineGameStore.getState()._applyIncomingEvents([cardPlayedEvent]);
+
+      // Assert: mySeat is null → no "Your Turn!" regardless of activePlayer transition
+      const state = useOnlineGameStore.getState();
+      expect(state.announcement).not.toBe("Your Turn!");
+    });
+
+    it("does NOT set 'Your Turn!' when the transition arrives via TrickCompleted path (deferred)", () => {
+      vi.useFakeTimers();
+      try {
+        // Arrange: playing state where W is active; TrickCompleted(winner=W) → after trick, activePlayer=N=mySeat
+        const prevPlayingState: GameState = {
+          ...INITIAL_STATE,
+          phase: "playing",
+          rules: { ...DEFAULT_RULES, botDelayMs: 0 },
+          activePlayer: "W",
+          currentTrick: [],
+          tricksPlayed: 0,
+        };
+        useOnlineGameStore.setState({
+          ...INITIAL_ONLINE_STATE,
+          lobbyPhase: "playing",
+          myPlayerId: "p1",
+          mySeat: "N",
+          gameState: prevPlayingState,
+          announcement: null,
+        });
+
+        const trickCompleted: GameEvent = {
+          type: "TrickCompleted",
+          plays: [
+            { seat: "N", cardId: "Black-10" as import("@rook/engine").CardId },
+            { seat: "E", cardId: "Red-5" as import("@rook/engine").CardId },
+            { seat: "S", cardId: "Green-7" as import("@rook/engine").CardId },
+            { seat: "W", cardId: "Yellow-3" as import("@rook/engine").CardId },
+          ],
+          winner: "N",
+          leadColor: "Black",
+          trickIndex: 0,
+          handNumber: 1,
+          timestamp: Date.now(),
+        };
+
+        // Act: TrickCompleted batch — takes the deferred setTimeout path, not the "Your Turn!" path
+        useOnlineGameStore.getState()._applyIncomingEvents([trickCompleted]);
+
+        // Before timer fires: announcement should still be null (not "Your Turn!")
+        expect(useOnlineGameStore.getState().announcement).not.toBe("Your Turn!");
+
+        // After timer fires: still no "Your Turn!" — the TrickCompleted path never sets it
+        vi.runAllTimers();
+        expect(useOnlineGameStore.getState().announcement).not.toBe("Your Turn!");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   // ── buildAnnouncementFromEvent — seatNames display names ─────────────────
   describe("buildAnnouncementFromEvent — display names in announcements", () => {
     it("BiddingComplete announcement uses display name from seats when available", () => {
