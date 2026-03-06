@@ -30,7 +30,7 @@ export function HandResultOverlayView({
   activeTab,
   onTabChange,
 }: HandResultOverlayViewProps) {
-  const { bidder, bidAmount, nsDelta, ewDelta, nsTotal, ewTotal } = score;
+  const { bidder, bidAmount, nsDelta, ewDelta, nsTotal, ewTotal, shotMoon } = score;
   const bidderTeam: Team = SEAT_TEAM[bidder];
   const bidderPoints = bidderTeam === "NS" ? nsTotal : ewTotal;
   const bidWon = bidderPoints >= bidAmount || (score.shotMoon && !score.moonShooterWentSet);
@@ -74,26 +74,30 @@ export function HandResultOverlayView({
               <thead>
                 <tr>
                   <th>Team</th>
-                  <th>Points</th>
-                  <th>Delta</th>
+                  {!shotMoon && <th>Points</th>}
+                  {!shotMoon && <th>Delta</th>}
                   <th>Total</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>{teamDisplay("NS", seatNames)}</td>
-                  <td>{nsTotal}</td>
-                  <td className={nsDelta >= 0 ? styles.pos : styles.neg}>
-                    {nsDelta >= 0 ? "+" : ""}{nsDelta}
-                  </td>
+                  {!shotMoon && <td>{nsTotal}</td>}
+                  {!shotMoon && (
+                    <td className={nsDelta >= 0 ? styles.pos : styles.neg}>
+                      {nsDelta >= 0 ? "+" : ""}{nsDelta}
+                    </td>
+                  )}
                   <td><strong>{runningScores.NS}</strong></td>
                 </tr>
                 <tr>
                   <td>{teamDisplay("EW", seatNames)}</td>
-                  <td>{ewTotal}</td>
-                  <td className={ewDelta >= 0 ? styles.pos : styles.neg}>
-                    {ewDelta >= 0 ? "+" : ""}{ewDelta}
-                  </td>
+                  {!shotMoon && <td>{ewTotal}</td>}
+                  {!shotMoon && (
+                    <td className={ewDelta >= 0 ? styles.pos : styles.neg}>
+                      {ewDelta >= 0 ? "+" : ""}{ewDelta}
+                    </td>
+                  )}
                   <td><strong>{runningScores.EW}</strong></td>
                 </tr>
               </tbody>

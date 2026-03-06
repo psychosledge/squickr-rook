@@ -373,3 +373,88 @@ describe("HandResultOverlay", () => {
     expect(lastBuildHandHistoryRowsArgs[2]).toEqual(seatNames);
   });
 });
+
+describe("HandResultOverlay — moon hand display (hide Points/Delta columns)", () => {
+  // ── Test 14 ────────────────────────────────────────────────────────────────
+  it("14. When shotMoon=true, Points column header is NOT rendered", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ score: makeHandScore({ shotMoon: true }) }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).not.toContain("Points");
+  });
+
+  // ── Test 15 ────────────────────────────────────────────────────────────────
+  it("15. When shotMoon=true, Delta column header is NOT rendered", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ score: makeHandScore({ shotMoon: true }) }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).not.toContain("Delta");
+  });
+
+  // ── Test 16 ────────────────────────────────────────────────────────────────
+  it("16. When shotMoon=true, Team and Total column headers ARE rendered", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ score: makeHandScore({ shotMoon: true }) }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("Team");
+    expect(allText).toContain("Total");
+  });
+
+  // ── Test 17 ────────────────────────────────────────────────────────────────
+  it("17. When shotMoon=true, individual Points cells are NOT in table", () => {
+    const score = makeHandScore({ shotMoon: true, nsTotal: 120, ewTotal: 0 });
+    const tree = HandResultOverlayView(makeViewProps({ score }));
+    const all = flattenElements(tree);
+
+    // Find the table body rows
+    const trs = all.filter((el) => el.type === "tr");
+    // The data rows should have 2 cells each (Team + Total), not 4
+    const dataTrs = trs.filter((tr) => {
+      // tbody rows exist — filter by having td children
+      const cells = flattenElements(tr).filter((el) => el.type === "td");
+      return cells.length > 0;
+    });
+    // Each data row should have exactly 2 tds
+    for (const tr of dataTrs) {
+      const tds = flattenElements(tr).filter((el) => el.type === "td");
+      expect(tds).toHaveLength(2);
+    }
+  });
+
+  // ── Test 18 ────────────────────────────────────────────────────────────────
+  it("18. When shotMoon=true, individual Delta cells are NOT in table", () => {
+    // nsDelta=+200 would render as "+200", ewDelta=-200 as "-200"
+    // Neither should appear in the tree
+    const score = makeHandScore({ shotMoon: true, nsDelta: 200, ewDelta: -200 });
+    const tree = HandResultOverlayView(makeViewProps({ score }));
+    const allText = flattenText(tree);
+    expect(allText).not.toContain("+200");
+    expect(allText).not.toContain("-200");
+  });
+
+  // ── Test 19 ────────────────────────────────────────────────────────────────
+  it("19. When shotMoon=false, all four column headers ARE rendered", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({ score: makeHandScore({ shotMoon: false }) }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("Team");
+    expect(allText).toContain("Points");
+    expect(allText).toContain("Delta");
+    expect(allText).toContain("Total");
+  });
+
+  // ── Test 20 ────────────────────────────────────────────────────────────────
+  it("20. When shotMoon=true, the moon badge (🌙) still renders", () => {
+    const tree = HandResultOverlayView(
+      makeViewProps({
+        score: makeHandScore({ shotMoon: true, moonShooterWentSet: false }),
+      }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("🌙");
+  });
+});

@@ -511,3 +511,74 @@ describe("BiddingOverlay — seatNames override", () => {
     expect(text).not.toContain("Label-S");
   });
 });
+
+describe("BiddingOverlay — moon lockout (once someone has shot the moon)", () => {
+  // State where E already shot the moon: currentBid=200, moonShooters=["E"]
+  function makeMoonShotState(humanBid: number | null | "pass" = null): Partial<GameState> {
+    return {
+      activePlayer: HUMAN,
+      currentBid: 200,
+      bids: { N: humanBid, E: 200, S: "pass", W: "pass" },
+      moonShooters: ["E" as const],
+    };
+  }
+
+  // ── Test 22 ──────────────────────────────────────────────────────────────
+  it("22. numeric stepper (picker div) is NOT rendered when moonShooters.length > 0", () => {
+    const props = makeViewProps(makeMoonShotState(), { pickerAmount: 200 });
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const pickerDivs = findByClass(all, "picker", true);
+    expect(pickerDivs).toHaveLength(0);
+  });
+
+  // ── Test 23 ──────────────────────────────────────────────────────────────
+  it("23. 'Confirm bid' button is NOT rendered when moonShooters.length > 0", () => {
+    const props = makeViewProps(makeMoonShotState(), { pickerAmount: 200 });
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const confirmBtns = findButtons(all, "confirmBidBtn");
+    expect(confirmBtns).toHaveLength(0);
+  });
+
+  // ── Test 24 ──────────────────────────────────────────────────────────────
+  it("24. PASS button IS still rendered when moonShooters.length > 0", () => {
+    const props = makeViewProps(makeMoonShotState(), { pickerAmount: 200 });
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const passBtns = findButtons(all, "passBtn");
+    expect(passBtns).toHaveLength(1);
+  });
+
+  // ── Test 25 ──────────────────────────────────────────────────────────────
+  it("25. Moon button IS shown when moonShooters.length > 0 but human has not yet shot or passed", () => {
+    // Human has null bid, E already shot moon — human is still moonEligible
+    const props = makeViewProps(makeMoonShotState(null), { pickerAmount: 200 });
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const moonBtns = findButtons(all, "moonBtn");
+    expect(moonBtns).toHaveLength(1);
+  });
+
+  // ── Test 26 ──────────────────────────────────────────────────────────────
+  it("26. Moon button is NOT shown when human is already in moonShooters (even if moonAlreadyShot=true)", () => {
+    const props = makeViewProps(
+      {
+        activePlayer: HUMAN,
+        currentBid: 200,
+        bids: { N: 200, E: 200, S: "pass", W: "pass" },
+        moonShooters: [HUMAN, "E" as const],
+      },
+      { pickerAmount: 200 },
+    );
+    const element = BiddingOverlayView(props);
+    const all = flattenElements(element);
+
+    const moonBtns = findButtons(all, "moonBtn");
+    expect(moonBtns).toHaveLength(0);
+  });
+});
