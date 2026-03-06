@@ -806,6 +806,207 @@ describe("onlineGameStore", () => {
     });
   });
 
+  // ── Tests: _applyIncomingEvents — TrickCompleted queue ────────────────────
+  describe("_applyIncomingEvents — TrickCompleted queue", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const makeTrickCompleted = (): GameEvent => ({
+      type: "TrickCompleted",
+      plays: [
+        { seat: "N", cardId: "Black-10" },
+        { seat: "E", cardId: "Red-5" },
+        { seat: "S", cardId: "Green-7" },
+        { seat: "W", cardId: "Yellow-3" },
+      ],
+      winner: "N",
+      leadColor: "Black",
+      trickIndex: 0,
+      handNumber: 1,
+      timestamp: Date.now(),
+    });
+
+    const makeCardPlayed = (seat: "N" | "E" | "S" | "W", cardId: string): GameEvent => ({
+      type: "CardPlayed",
+      seat,
+      cardId: cardId as import("@rook/engine").CardId,
+      trickIndex: 1,
+      handNumber: 1,
+      timestamp: Date.now(),
+    });
+
+    const makeHandScored = (): GameEvent => ({
+      type: "HandScored",
+      score: {
+        hand: 1,
+        bidder: "N" as const,
+        bidAmount: 100,
+        nestCards: [],
+        discarded: [],
+        nsPointCards: 120,
+        ewPointCards: 0,
+        nsMostCardsBonus: 0,
+        ewMostCardsBonus: 0,
+        nsNestBonus: 0,
+        ewNestBonus: 0,
+        nsWonLastTrick: true,
+        ewWonLastTrick: false,
+        nsTotal: 120,
+        ewTotal: 0,
+        nsDelta: 100,
+        ewDelta: 0,
+        shotMoon: false,
+        moonShooterWentSet: false,
+      },
+      handNumber: 1,
+      timestamp: Date.now(),
+    });
+
+    const makeFakePlayingState = (): GameState => ({
+      ...INITIAL_STATE,
+      phase: "playing",
+      rules: { ...DEFAULT_RULES, botDelayMs: 100 },
+      currentTrick: [],
+      tricksPlayed: 0,
+      activePlayer: "N",
+    });
+
+    it("buffers batches that arrive during TrickCompleted defer window", () => {
+      const playingState = makeFakePlayingState();
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: playingState,
+        _deferredEventQueue: [], // simulating mid-defer
+      });
+
+      const cardPlayed = makeCardPlayed("E", "Red-5");
+
+      // Call _applyIncomingEvents while deferred queue is open
+      useOnlineGameStore.getState()._applyIncomingEvents([cardPlayed]);
+
+      // Batch should be buffered, NOT applied
+      const state = useOnlineGameStore.getState();
+      expect(state._deferredEventQueue).toHaveLength(1);
+      // gameState should NOT have changed (no CardPlayed applied)
+      expect(state.gameState).toEqual(playingState);
+    });
+
+    it("drains queued batches after TrickCompleted is applied", async () => {
+      const playingState = makeFakePlayingState();
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: playingState,
+      });
+
+      const trickCompleted = makeTrickCompleted();
+      const anotherCardPlayed = makeCardPlayed("E", "Red-5");
+
+      // Call with TrickCompleted — should open the deferred queue
+      useOnlineGameStore.getState()._applyIncomingEvents([trickCompleted]);
+
+      // Queue should be open (empty array, not null)
+      expect(useOnlineGameStore.getState()._deferredEventQueue).toEqual([]);
+
+      // Another batch arrives during the defer window — should be buffered
+      useOnlineGameStore.getState()._applyIncomingEvents([anotherCardPlayed]);
+      expect(useOnlineGameStore.getState()._deferredEventQueue).toHaveLength(1);
+
+      // Advance past botDelayMs (100ms) + microtask (0ms)
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Queue should be closed (null) after drain
+      expect(useOnlineGameStore.getState()._deferredEventQueue).toBeNull();
+    });
+
+    it("processes afterTrickEvents inline without going through queue", async () => {
+      const playingState = makeFakePlayingState();
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: playingState,
+      });
+
+      const trickCompleted = makeTrickCompleted();
+      const handScored = makeHandScored();
+
+      // Batch with TrickCompleted followed by HandScored
+      useOnlineGameStore.getState()._applyIncomingEvents([trickCompleted, handScored]);
+
+      // Before timers fire, pendingHandScore should be null
+      expect(useOnlineGameStore.getState().pendingHandScore).toBeNull();
+
+      // Advance past botDelayMs (100ms) — TrickCompleted applied
+      await vi.advanceTimersByTimeAsync(100);
+      // Flush the nested 0ms microtask timer — afterTrickEvents applied
+      await vi.runAllTimersAsync();
+
+      // pendingHandScore should now be set (HandScored was applied after TrickCompleted)
+      expect(useOnlineGameStore.getState().pendingHandScore).not.toBeNull();
+    });
+
+    it("acknowledgeHandResult drains queued batches and closes the queue", async () => {
+      const playingState = makeFakePlayingState();
+      const cardPlayed = makeCardPlayed("E", "Red-5");
+
+      // Simulate a state where the deferred queue has a buffered batch
+      // (as if TrickCompleted fired, timer is resolved, but queue has a batch from next hand)
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: playingState,
+        pendingHandScore: {
+          hand: 1,
+          bidder: "N",
+          bidAmount: 100,
+          nestCards: [],
+          discarded: [],
+          nsPointCards: 120,
+          ewPointCards: 0,
+          nsMostCardsBonus: 0,
+          ewMostCardsBonus: 0,
+          nsNestBonus: 0,
+          ewNestBonus: 0,
+          nsWonLastTrick: true,
+          ewWonLastTrick: false,
+          nsTotal: 120,
+          ewTotal: 0,
+          nsDelta: 100,
+          ewDelta: 0,
+          shotMoon: false,
+          moonShooterWentSet: false,
+        },
+        // Queue is open with one buffered batch
+        _deferredEventQueue: [[cardPlayed]],
+      });
+
+      // Queue is non-null before acknowledgement
+      expect(useOnlineGameStore.getState()._deferredEventQueue).not.toBeNull();
+
+      // Acknowledge — should drain the queue
+      useOnlineGameStore.getState().acknowledgeHandResult();
+
+      // Queue must be closed (null) after acknowledgement
+      expect(useOnlineGameStore.getState()._deferredEventQueue).toBeNull();
+    });
+  });
+
   // ── Test: disconnect() resets to idle state ───────────────────────────────
   describe("disconnect", () => {
     it("resets to idle state after disconnect()", () => {

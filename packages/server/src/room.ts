@@ -402,9 +402,18 @@ export default class RookRoom implements Party.Server {
         const playerInfo = this.gameState.players.find((p) => p.seat === activePlayer);
         if (!playerInfo || playerInfo.kind !== "bot") break;
 
+        // Delay FIRST — pause before the bot acts (read phase before any mutation)
+        const delayMs =
+          this.gameState.phase === "playing" || this.gameState.phase === "bidding"
+            ? (this.gameState.rules.botDelayMs ?? 1000)
+            : 0;
+        if (delayMs > 0) {
+          await new Promise<void>((r) => setTimeout(r, delayMs));
+        }
+
         const profile = playerInfo.botProfile ?? BOT_PRESETS["normal"];
         const command = botChooseCommand(this.gameState, activePlayer, profile);
-        const result = validateCommand(this.gameState, command);
+        const result = validateCommand(this.gameState, command, this.gameState.rules);
 
         if (!result.ok) {
           console.error(
@@ -420,15 +429,6 @@ export default class RookRoom implements Party.Server {
         this.broadcastEvents(result.events);
 
         if (this.gameState.phase === "finished") break;
-
-        // Delay only during playing and bidding phases
-        const delayMs =
-          this.gameState.phase === "playing" || this.gameState.phase === "bidding"
-            ? (this.gameState.rules.botDelayMs ?? 1000)
-            : 0;
-        if (delayMs > 0) {
-          await new Promise<void>((r) => setTimeout(r, delayMs));
-        }
       }
     } finally {
       this.botTurnInProgress = false;

@@ -62,6 +62,7 @@ export type OnlineStoreState = {
   biddingThinkingSeat: Seat | null;
   _socket: WebSocket | null;
   _pendingBatch: GameEvent[];
+  _deferredEventQueue: GameEvent[][] | null;
 };
 
 export type OnlineStoreActions = {

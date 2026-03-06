@@ -49,6 +49,7 @@ export const INITIAL_ONLINE_STATE: OnlineStoreState = {
   biddingThinkingSeat: null,
   _socket: null,
   _pendingBatch: [],
+  _deferredEventQueue: null,
 };
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -211,6 +212,13 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     } else {
       get()._updateOverlayAfterBatch();
     }
+    // Drain any events that arrived while waiting for hand result acknowledgement.
+    // Always close the queue first (even if empty) to prevent it staying open.
+    const queued = get()._deferredEventQueue ?? [];
+    set({ _deferredEventQueue: null });
+    for (const batch of queued) {
+      get()._applyIncomingEvents(batch);
+    }
   },
 
   clearAnnouncement: () => set({ announcement: null }),
@@ -278,13 +286,20 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   },
 
   _applyIncomingEvents: (events) => {
-    // Split on TrickCompleted: apply pre-events immediately, defer post-events
+    // If a deferred TrickCompleted is in flight, buffer all incoming events
+    if (get()._deferredEventQueue !== null) {
+      set((s) => ({
+        _deferredEventQueue: [...(s._deferredEventQueue ?? []), events],
+      }));
+      return;
+    }
+
     const trickIdx = events.findIndex((e) => e.type === "TrickCompleted");
 
     if (trickIdx !== -1) {
       const preEvents = events.slice(0, trickIdx);
 
-      // Apply pre-events synchronously (all CardPlayed before the trick completes)
+      // Apply pre-events synchronously (CardPlayed cards that led to the trick)
       if (preEvents.length > 0) {
         set((s) => {
           let gs = s.gameState ?? INITIAL_STATE;
@@ -292,7 +307,6 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
           let announcement = s.announcement;
           let gameOverReason = s.gameOverReason;
           let lobbyPhase = s.lobbyPhase;
-
           for (const ev of preEvents) {
             gs = applyEvent(gs, ev);
             if (ev.type === "HandScored") pendingHandScore = ev.score;
@@ -301,38 +315,65 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
             const next = buildAnnouncementFromEvent(ev, gs.rules);
             if (next !== null) announcement = next;
           }
-
           return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
         });
       }
 
-      // Delay before applying the TrickCompleted event
+      // Open the deferred queue — subsequent batches will buffer here
+      set({ _deferredEventQueue: [] });
+
       const trickEvent = events[trickIdx];
       const afterTrickEvents = events.slice(trickIdx + 1);
       const delay = get().gameState?.rules.botDelayMs ?? 1000;
+
+      const finalize = () => {
+        // Drain the queue (events that arrived during the delay)
+        const queued = get()._deferredEventQueue ?? [];
+        set({ _deferredEventQueue: null }); // close the buffer FIRST
+        for (const batch of queued) {
+          get()._applyIncomingEvents(batch); // may re-open buffer if batch has TrickCompleted
+        }
+        get()._updateOverlayAfterBatch();
+      };
+
       setTimeout(() => {
+        // Apply TrickCompleted
         set((s) => {
           let gs = s.gameState ?? INITIAL_STATE;
           let pendingHandScore = s.pendingHandScore;
           let announcement = s.announcement;
           let gameOverReason = s.gameOverReason;
           let lobbyPhase = s.lobbyPhase;
-
           gs = applyEvent(gs, trickEvent);
           const next = buildAnnouncementFromEvent(trickEvent, gs.rules);
           if (next !== null) announcement = next;
-
           return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
         });
 
-        // Apply any events that follow TrickCompleted in the same batch (e.g. next trick's first card)
-        // in a separate micro-task so the cleared trick state is observable first.
         if (afterTrickEvents.length > 0) {
+          // Apply after-trick events (e.g. HandScored) in a microtask, then finalize
           setTimeout(() => {
-            get()._applyIncomingEvents(afterTrickEvents);
+            // Apply afterTrickEvents directly (don't use _applyIncomingEvents — would re-check queue)
+            set((s) => {
+              let gs = s.gameState ?? INITIAL_STATE;
+              let pendingHandScore = s.pendingHandScore;
+              let announcement = s.announcement;
+              let gameOverReason = s.gameOverReason;
+              let lobbyPhase = s.lobbyPhase;
+              for (const ev of afterTrickEvents) {
+                gs = applyEvent(gs, ev);
+                if (ev.type === "HandScored") pendingHandScore = ev.score;
+                if (ev.type === "GameFinished") gameOverReason = ev.reason;
+                if (ev.type === "GameStarted") lobbyPhase = "playing";
+                const next = buildAnnouncementFromEvent(ev, gs.rules);
+                if (next !== null) announcement = next;
+              }
+              return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
+            });
+            finalize();
           }, 0);
         } else {
-          get()._updateOverlayAfterBatch();
+          finalize();
         }
       }, delay);
 
