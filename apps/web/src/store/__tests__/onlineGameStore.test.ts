@@ -1922,4 +1922,62 @@ describe("onlineGameStore", () => {
       expect(state.overlay).toBe("bidding");
     });
   });
+
+  // ── Stale socket onclose guard ────────────────────────────────────────────
+  describe("stale socket onclose guard", () => {
+    const localStorageStore: Record<string, string> = {};
+    const sessionStorageStore: Record<string, string> = {};
+
+    beforeEach(() => {
+      vi.stubGlobal("localStorage", {
+        getItem: (k: string) => localStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { localStorageStore[k] = v; },
+        removeItem: (k: string) => { delete localStorageStore[k]; },
+      });
+      vi.stubGlobal("sessionStorage", {
+        getItem: (k: string) => sessionStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { sessionStorageStore[k] = v; },
+        removeItem: (k: string) => { delete sessionStorageStore[k]; },
+      });
+      sessionStorageStore["rookPlayerId"] = "p1";
+      localStorageStore["rookDisplayName"] = "Alice";
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const k of Object.keys(localStorageStore)) delete localStorageStore[k];
+      for (const k of Object.keys(sessionStorageStore)) delete sessionStorageStore[k];
+    });
+
+    it("does not set connectionError when a replaced (stale) socket fires onclose", () => {
+      // Simulate two rapid connect() calls — the second replaces the first.
+      // The first socket's onclose should be ignored since it's no longer current.
+      const sockets: Array<{ onclose: (() => void) | null; close: () => void }> = [];
+      vi.stubGlobal("WebSocket", class {
+        onopen: (() => void) | null = null;
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onclose: (() => void) | null = null;
+        close() {}
+        constructor() { sockets.push(this); }
+      });
+
+      // First connect
+      useOnlineGameStore.getState().connect("ROOM1");
+      expect(sockets).toHaveLength(1);
+      const firstSocket = sockets[0];
+
+      // Second connect (replaces first)
+      useOnlineGameStore.getState().connect("ROOM1");
+      expect(sockets).toHaveLength(2);
+
+      // First socket's onclose fires (stale)
+      firstSocket.onclose?.();
+
+      // Should NOT set a connectionError — the stale close is ignored
+      expect(useOnlineGameStore.getState().connectionError).toBeNull();
+      expect(useOnlineGameStore.getState().lobbyPhase).toBe("connecting");
+    });
+  });
 });

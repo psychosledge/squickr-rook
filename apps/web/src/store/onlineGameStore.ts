@@ -127,10 +127,15 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     };
 
     ws.onerror = () => {
+      // Only act if this is still the current socket
+      if (get()._socket !== ws) return;
       set({ connectionError: "WebSocket error" });
     };
 
     ws.onclose = () => {
+      // Only act if this is still the current socket.
+      // If connect() was called again it closed this socket itself — ignore the stale close.
+      if (get()._socket !== ws) return;
       const { lobbyPhase } = get();
       if (lobbyPhase === "playing") {
         set({ connectionError: "Disconnected from server.", _socket: null });
