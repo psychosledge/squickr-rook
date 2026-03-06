@@ -81,7 +81,7 @@ export function OnlineGamePageView({
 
       {historyModalOpen && (
         <HandHistoryModal
-          rows={buildHandHistoryRows(gameState.handHistory)}
+          rows={buildHandHistoryRows(gameState.handHistory, undefined, seatNames)}
           onClose={closeHistoryModal}
         />
       )}
@@ -122,6 +122,7 @@ export function OnlineGamePageView({
           runningScores={gameState.scores}
           onContinue={onAcknowledgeHandResult}
           handHistory={gameState.handHistory}
+          seatNames={seatNames}
         />
       )}
 
@@ -132,6 +133,7 @@ export function OnlineGamePageView({
           reason={gameOverReason ?? "threshold-reached"}
           onPlayAgain={onPlayAgain}
           handHistory={gameState.handHistory}
+          seatNames={seatNames}
         />
       )}
     </div>

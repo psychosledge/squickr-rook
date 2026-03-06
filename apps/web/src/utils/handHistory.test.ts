@@ -231,4 +231,47 @@ describe("buildHandHistoryRows", () => {
     expect(rows[0].handNumber).toBe(1);
     expect(rows[1].handNumber).toBe(2);
   });
+
+  // ── seatNames parameter ────────────────────────────────────────────────────
+
+  it("bidderLabel uses seatNames display name when provided for the bidder seat", () => {
+    const history: HandScore[] = [
+      makeHandScore({ hand: 1, bidder: "N", bidAmount: 100, nsTotal: 110, ewTotal: 80, nsDelta: 100, ewDelta: 80 }),
+    ];
+
+    const rows = buildHandHistoryRows(history, undefined, { N: "Alice" });
+
+    expect(rows[0].bidderLabel).toBe("Alice");
+  });
+
+  it("bidderLabel falls back to getSeatLabel when seatNames does not include bidder seat", () => {
+    const history: HandScore[] = [
+      makeHandScore({ hand: 1, bidder: "N", bidAmount: 100, nsTotal: 110, ewTotal: 80, nsDelta: 100, ewDelta: 80 }),
+    ];
+
+    // seatNames has E but not N
+    const rows = buildHandHistoryRows(history, undefined, { E: "Bob" });
+
+    expect(rows[0].bidderLabel).toBe("You"); // getSeatLabel("N") === "You"
+  });
+
+  it("bidderLabel falls back to getSeatLabel when seatNames is undefined", () => {
+    const history: HandScore[] = [
+      makeHandScore({ hand: 1, bidder: "E", bidAmount: 100, ewTotal: 110, nsTotal: 80, ewDelta: 100, nsDelta: 80 }),
+    ];
+
+    const rows = buildHandHistoryRows(history, undefined, undefined);
+
+    expect(rows[0].bidderLabel).toBe("P2"); // getSeatLabel("E") === "P2"
+  });
+
+  it("bidderLabel uses seatNames for seat E when provided", () => {
+    const history: HandScore[] = [
+      makeHandScore({ hand: 1, bidder: "E", bidAmount: 100, ewTotal: 110, nsTotal: 80, ewDelta: 100, nsDelta: 80 }),
+    ];
+
+    const rows = buildHandHistoryRows(history, undefined, { E: "Charlie" });
+
+    expect(rows[0].bidderLabel).toBe("Charlie");
+  });
 });

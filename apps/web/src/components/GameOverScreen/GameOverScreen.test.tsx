@@ -28,6 +28,18 @@ vi.mock("./GameOverScreen.module.css", () => ({
 // Mock seatLabel utility
 vi.mock("@/utils/seatLabel", () => ({
   getTeamLabel: (team: string) => `Team-${team}`,
+  getSeatLabel: (seat: string) => {
+    const labels: Record<string, string> = { N: "You", E: "P2", S: "P3", W: "P4" };
+    return labels[seat] ?? seat;
+  },
+  teamDisplay: (team: string, seatNames?: Partial<Record<string, string>>) => {
+    if (!seatNames) return `Team-${team}`;
+    const [s1, s2] = team === "NS" ? ["N", "S"] : ["E", "W"];
+    const labels: Record<string, string> = { N: "You", E: "P2", S: "P3", W: "P4" };
+    const n1 = seatNames[s1] ?? labels[s1] ?? s1;
+    const n2 = seatNames[s2] ?? labels[s2] ?? s2;
+    return `${n1} & ${n2}`;
+  },
 }));
 
 // Mock HandHistoryTable
@@ -39,10 +51,14 @@ vi.mock("@/components/HandHistoryTable/HandHistoryTable", () => ({
     }),
 }));
 
-// Mock buildHandHistoryRows
+// Mock buildHandHistoryRows — capture last call args for assertions
+let lastBuildHandHistoryRowsArgs: unknown[] = [];
 vi.mock("@/utils/handHistory", () => ({
-  buildHandHistoryRows: (history: unknown[]) =>
-    history.map((_, i) => ({ handNumber: i + 1 })),
+  buildHandHistoryRows: (...args: unknown[]) => {
+    lastBuildHandHistoryRowsArgs = args;
+    const history = args[0] as unknown[];
+    return history.map((_, i) => ({ handNumber: i + 1 }));
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -245,5 +261,58 @@ describe("GameOverScreen", () => {
     );
     const allText = flattenText(tree);
     expect(allText).toContain("Play Again");
+  });
+
+  // ── Test 8: seatNames — reason line and score box labels use display names ─
+  it("8. reason line uses seatNames when provided — winning team shows display names", () => {
+    // NS wins, reason threshold-reached → "${teamDisplay('NS', seatNames)} reached 500 points"
+    const tree = GameOverScreenView(
+      makeProps({
+        winner: "NS",
+        reason: "threshold-reached",
+        seatNames: { N: "Alice", S: "Carol" },
+      }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("Alice");
+    expect(allText).toContain("Carol");
+    expect(allText).not.toContain("Team-NS");
+  });
+
+  it("8b. reason line falls back to getTeamLabel when seatNames is undefined", () => {
+    const tree = GameOverScreenView(
+      makeProps({ winner: "NS", reason: "threshold-reached" }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("Team-NS");
+  });
+
+  it("8c. score box team labels use seatNames when provided", () => {
+    const seatNames = { N: "Alice", S: "Carol", E: "Bob", W: "Dave" };
+    const tree = GameOverScreenView(makeProps({ seatNames }));
+    const allText = flattenText(tree);
+    // NS score box: "Alice & Carol", EW score box: "Bob & Dave"
+    expect(allText).toContain("Alice");
+    expect(allText).toContain("Carol");
+    expect(allText).toContain("Bob");
+    expect(allText).toContain("Dave");
+    expect(allText).not.toContain("Team-NS");
+    expect(allText).not.toContain("Team-EW");
+  });
+
+  it("8d. score box falls back to Team labels when seatNames undefined", () => {
+    const tree = GameOverScreenView(makeProps());
+    const allText = flattenText(tree);
+    expect(allText).toContain("Team-NS");
+    expect(allText).toContain("Team-EW");
+  });
+
+  // ── Test 9: seatNames passed to buildHandHistoryRows ────────────────────
+  it("9. seatNames forwarded to buildHandHistoryRows when hand log is shown", () => {
+    const seatNames = { N: "Alice" };
+    GameOverScreenView(
+      makeProps({ handHistory: [makeHandScore()], showHandLog: true, seatNames }),
+    );
+    expect(lastBuildHandHistoryRowsArgs[2]).toEqual(seatNames);
   });
 });

@@ -17,3 +17,14 @@ export function getTeamLabel(team: Team): string {
   };
   return labels[team];
 }
+
+export function teamDisplay(
+  team: Team,
+  seatNames?: Partial<Record<Seat, string>>,
+): string {
+  if (!seatNames) return getTeamLabel(team);
+  const [s1, s2]: Seat[] = team === "NS" ? ["N", "S"] : ["E", "W"];
+  const n1 = seatNames[s1] ?? getSeatLabel(s1);
+  const n2 = seatNames[s2] ?? getSeatLabel(s2);
+  return `${n1} & ${n2}`;
+}

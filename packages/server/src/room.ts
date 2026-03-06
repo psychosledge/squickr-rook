@@ -387,40 +387,51 @@ export default class RookRoom implements Party.Server {
 
   // ── Bot turns ───────────────────────────────────────────────────────────────
 
-  private processBotTurns(): void {
-    if (this.gameState === null || this.phase !== "playing") return;
-    if (this.gameState.phase === "finished") return;
+  private botTurnInProgress = false;
 
-    const MAX_ITERATIONS = 50;
-    let iterations = 0;
+  private async processBotTurns(): Promise<void> {
+    if (this.botTurnInProgress) return;
+    this.botTurnInProgress = true;
+    try {
+      while (this.gameState !== null && this.phase === "playing") {
+        if (this.gameState.phase === "finished") break;
 
-    while (iterations < MAX_ITERATIONS) {
-      iterations++;
+        const activePlayer = this.gameState.activePlayer;
+        if (activePlayer === null) break;
 
-      const activePlayer = this.gameState.activePlayer;
-      if (activePlayer === null) return;
+        const playerInfo = this.gameState.players.find((p) => p.seat === activePlayer);
+        if (!playerInfo || playerInfo.kind !== "bot") break;
 
-      const playerInfo = this.gameState.players.find((p) => p.seat === activePlayer);
-      if (!playerInfo || playerInfo.kind !== "bot") return;
+        const profile = playerInfo.botProfile ?? BOT_PRESETS["normal"];
+        const command = botChooseCommand(this.gameState, activePlayer, profile);
+        const result = validateCommand(this.gameState, command);
 
-      const profile = playerInfo.botProfile ?? BOT_PRESETS["normal"];
-      const command = botChooseCommand(this.gameState, activePlayer, profile);
-      const result = validateCommand(this.gameState, command);
+        if (!result.ok) {
+          console.error(
+            `[RookRoom] Bot command invalid for seat ${activePlayer}: ${result.error}`,
+          );
+          break;
+        }
 
-      if (!result.ok) {
-        console.error(
-          `[RookRoom] Bot command invalid for seat ${activePlayer}: ${result.error}`,
-        );
-        return;
+        for (const event of result.events) {
+          this.gameState = applyEvent(this.gameState!, event);
+        }
+
+        this.broadcastEvents(result.events);
+
+        if (this.gameState.phase === "finished") break;
+
+        // Delay only during playing and bidding phases
+        const delayMs =
+          this.gameState.phase === "playing" || this.gameState.phase === "bidding"
+            ? (this.gameState.rules.botDelayMs ?? 1000)
+            : 0;
+        if (delayMs > 0) {
+          await new Promise<void>((r) => setTimeout(r, delayMs));
+        }
       }
-
-      for (const event of result.events) {
-        this.gameState = applyEvent(this.gameState!, event);
-      }
-
-      this.broadcastEvents(result.events);
-
-      if (this.gameState.phase === "finished") return;
+    } finally {
+      this.botTurnInProgress = false;
     }
   }
 

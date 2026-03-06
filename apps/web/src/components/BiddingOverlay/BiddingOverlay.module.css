@@ -168,19 +168,22 @@
   .overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: none;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
+    pointer-events: none;
   }
 
   .panel {
+    pointer-events: auto;
     border-radius: 16px;
     border-bottom: 1px solid var(--color-border);
     padding: 24px;
     width: 340px;
     max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   }
 
   .title {

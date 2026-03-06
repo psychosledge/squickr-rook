@@ -278,6 +278,68 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   },
 
   _applyIncomingEvents: (events) => {
+    // Split on TrickCompleted: apply pre-events immediately, defer post-events
+    const trickIdx = events.findIndex((e) => e.type === "TrickCompleted");
+
+    if (trickIdx !== -1) {
+      const preEvents = events.slice(0, trickIdx);
+
+      // Apply pre-events synchronously (all CardPlayed before the trick completes)
+      if (preEvents.length > 0) {
+        set((s) => {
+          let gs = s.gameState ?? INITIAL_STATE;
+          let pendingHandScore = s.pendingHandScore;
+          let announcement = s.announcement;
+          let gameOverReason = s.gameOverReason;
+          let lobbyPhase = s.lobbyPhase;
+
+          for (const ev of preEvents) {
+            gs = applyEvent(gs, ev);
+            if (ev.type === "HandScored") pendingHandScore = ev.score;
+            if (ev.type === "GameFinished") gameOverReason = ev.reason;
+            if (ev.type === "GameStarted") lobbyPhase = "playing";
+            const next = buildAnnouncementFromEvent(ev, gs.rules);
+            if (next !== null) announcement = next;
+          }
+
+          return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
+        });
+      }
+
+      // Delay before applying the TrickCompleted event
+      const trickEvent = events[trickIdx];
+      const afterTrickEvents = events.slice(trickIdx + 1);
+      const delay = get().gameState?.rules.botDelayMs ?? 1000;
+      setTimeout(() => {
+        set((s) => {
+          let gs = s.gameState ?? INITIAL_STATE;
+          let pendingHandScore = s.pendingHandScore;
+          let announcement = s.announcement;
+          let gameOverReason = s.gameOverReason;
+          let lobbyPhase = s.lobbyPhase;
+
+          gs = applyEvent(gs, trickEvent);
+          const next = buildAnnouncementFromEvent(trickEvent, gs.rules);
+          if (next !== null) announcement = next;
+
+          return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
+        });
+
+        // Apply any events that follow TrickCompleted in the same batch (e.g. next trick's first card)
+        // in a separate micro-task so the cleared trick state is observable first.
+        if (afterTrickEvents.length > 0) {
+          setTimeout(() => {
+            get()._applyIncomingEvents(afterTrickEvents);
+          }, 0);
+        } else {
+          get()._updateOverlayAfterBatch();
+        }
+      }, delay);
+
+      return;
+    }
+
+    // No TrickCompleted — original behaviour
     set((s) => {
       let gs = s.gameState ?? INITIAL_STATE;
       let pendingHandScore = s.pendingHandScore;

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { HandScore, Team } from "@rook/engine";
+import type { HandScore, Seat, Team } from "@rook/engine";
 import { SEAT_TEAM } from "@rook/engine";
-import { getTeamLabel } from "@/utils/seatLabel";
+import { teamDisplay } from "@/utils/seatLabel";
 import { buildHandHistoryRows } from "@/utils/handHistory";
 import HandHistoryTable from "@/components/HandHistoryTable/HandHistoryTable";
 import styles from "./HandResultOverlay.module.css";
@@ -11,6 +11,7 @@ type Props = {
   runningScores: Record<Team, number>;
   onContinue: () => void;
   handHistory?: HandScore[];
+  seatNames?: Partial<Record<Seat, string>>;
 };
 
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
@@ -25,6 +26,7 @@ export function HandResultOverlayView({
   runningScores,
   onContinue,
   handHistory,
+  seatNames,
   activeTab,
   onTabChange,
 }: HandResultOverlayViewProps) {
@@ -61,7 +63,7 @@ export function HandResultOverlayView({
           <>
             <div className={styles.bidResult}>
               <span className={bidWon ? styles.won : styles.lost}>
-                {getTeamLabel(bidderTeam)} bid {bidAmount} — {bidWon ? "MADE IT" : "SET!"}
+                {teamDisplay(bidderTeam, seatNames)} bid {bidAmount} — {bidWon ? "MADE IT" : "SET!"}
               </span>
               {score.shotMoon && (
                 <div className={styles.moon}>🌙 Shoot the Moon!</div>
@@ -79,7 +81,7 @@ export function HandResultOverlayView({
               </thead>
               <tbody>
                 <tr>
-                  <td>{getTeamLabel("NS")}</td>
+                  <td>{teamDisplay("NS", seatNames)}</td>
                   <td>{nsTotal}</td>
                   <td className={nsDelta >= 0 ? styles.pos : styles.neg}>
                     {nsDelta >= 0 ? "+" : ""}{nsDelta}
@@ -87,7 +89,7 @@ export function HandResultOverlayView({
                   <td><strong>{runningScores.NS}</strong></td>
                 </tr>
                 <tr>
-                  <td>{getTeamLabel("EW")}</td>
+                  <td>{teamDisplay("EW", seatNames)}</td>
                   <td>{ewTotal}</td>
                   <td className={ewDelta >= 0 ? styles.pos : styles.neg}>
                     {ewDelta >= 0 ? "+" : ""}{ewDelta}
@@ -101,7 +103,7 @@ export function HandResultOverlayView({
 
         {hasTabs && activeTab === "history" && handHistory && (
           <HandHistoryTable
-            rows={buildHandHistoryRows(handHistory)}
+            rows={buildHandHistoryRows(handHistory, undefined, seatNames)}
             highlightLast={true}
           />
         )}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSeatLabel, getTeamLabel } from "./seatLabel";
+import { getSeatLabel, getTeamLabel, teamDisplay } from "./seatLabel";
 
 describe("getSeatLabel", () => {
   it('getSeatLabel("N") === "You"', () => {
@@ -26,5 +26,24 @@ describe("getTeamLabel", () => {
 
   it('getTeamLabel("EW") === "P2 & P4"', () => {
     expect(getTeamLabel("EW")).toBe("P2 & P4");
+  });
+});
+
+describe("teamDisplay", () => {
+  it("falls back to getTeamLabel when no seatNames provided", () => {
+    expect(teamDisplay("NS")).toBe("P1 & P3");
+    expect(teamDisplay("EW")).toBe("P2 & P4");
+  });
+
+  it("builds team string from seatNames when provided", () => {
+    const seatNames = { N: "Alice", S: "Carol", E: "Bob", W: "Dave" };
+    expect(teamDisplay("NS", seatNames)).toBe("Alice & Carol");
+    expect(teamDisplay("EW", seatNames)).toBe("Bob & Dave");
+  });
+
+  it("falls back per-seat to getSeatLabel when a seat is missing from seatNames", () => {
+    const seatNames = { N: "Alice" }; // S, E, W missing
+    expect(teamDisplay("NS", seatNames)).toBe("Alice & P3");
+    expect(teamDisplay("EW", seatNames)).toBe("P2 & P4");
   });
 });

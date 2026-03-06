@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { HandScore, Team } from "@rook/engine";
-import { getTeamLabel } from "@/utils/seatLabel";
+import type { HandScore, Seat, Team } from "@rook/engine";
+import { teamDisplay } from "@/utils/seatLabel";
 import { buildHandHistoryRows } from "@/utils/handHistory";
 import HandHistoryTable from "@/components/HandHistoryTable/HandHistoryTable";
 import styles from "./GameOverScreen.module.css";
@@ -11,6 +11,7 @@ type Props = {
   reason: "threshold-reached" | "bust" | "moon-made" | "moon-set";
   onPlayAgain: () => void;
   handHistory?: HandScore[];
+  seatNames?: Partial<Record<Seat, string>>;
 };
 
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
@@ -26,6 +27,7 @@ export function GameOverScreenView({
   reason,
   onPlayAgain,
   handHistory,
+  seatNames,
   showHandLog,
   onToggleHandLog,
 }: GameOverScreenViewProps) {
@@ -41,21 +43,21 @@ export function GameOverScreenView({
         </h1>
         <p className={styles.reason}>
           {reason === "bust"
-            ? `${getTeamLabel(winner === "NS" ? "EW" : "NS")} team went bust`
+            ? `${teamDisplay(winner === "NS" ? "EW" : "NS", seatNames)} team went bust`
             : reason === "moon-made"
-            ? `${getTeamLabel(winner)} shot the Moon! 🌙`
+            ? `${teamDisplay(winner, seatNames)} shot the Moon! 🌙`
             : reason === "moon-set"
-            ? `${getTeamLabel(winner === "NS" ? "EW" : "NS")} failed to shoot the Moon`
-            : `${getTeamLabel(winner)} reached 500 points`}
+            ? `${teamDisplay(winner === "NS" ? "EW" : "NS", seatNames)} failed to shoot the Moon`
+            : `${teamDisplay(winner, seatNames)} reached 500 points`}
         </p>
 
         <div className={styles.scores}>
           <div className={`${styles.scoreBox} ${winner === "NS" ? styles.winner : ""}`}>
-            <span className={styles.teamLabel}>{getTeamLabel("NS")}</span>
+            <span className={styles.teamLabel}>{teamDisplay("NS", seatNames)}</span>
             <span className={styles.scoreVal}>{finalScores.NS}</span>
           </div>
           <div className={`${styles.scoreBox} ${winner === "EW" ? styles.winner : ""}`}>
-            <span className={styles.teamLabel}>{getTeamLabel("EW")}</span>
+            <span className={styles.teamLabel}>{teamDisplay("EW", seatNames)}</span>
             <span className={styles.scoreVal}>{finalScores.EW}</span>
           </div>
         </div>
@@ -68,7 +70,7 @@ export function GameOverScreenView({
 
         {hasHistory && showHandLog && handHistory && (
           <div className={styles.handLogSection}>
-            <HandHistoryTable rows={buildHandHistoryRows(handHistory)} />
+            <HandHistoryTable rows={buildHandHistoryRows(handHistory, undefined, seatNames)} />
           </div>
         )}
 

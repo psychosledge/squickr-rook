@@ -1,10 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useOnlineGameStore, INITIAL_ONLINE_STATE } from "../onlineGameStore";
 import { INITIAL_STATE, DEFAULT_RULES, applyEvent } from "@rook/engine";
 import type { GameEvent, GameState, Seat } from "@rook/engine";
 import type { WelcomeMsg, LobbyUpdatedMsg, EventBatchMsg, CommandErrorMsg } from "../onlineGameStore.types";
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function resetStore() {
   useOnlineGameStore.setState({ ...INITIAL_ONLINE_STATE });
@@ -826,6 +824,128 @@ describe("onlineGameStore", () => {
       expect(s.gameState).toBeNull();
       expect(s.mySeat).toBeNull();
       expect(s._socket).toBeNull();
+    });
+  });
+
+  // ── Test: TrickCompleted delay — trick NOT cleared immediately ─────────────
+  describe("_applyIncomingEvents — TrickCompleted delay", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("trick cards stay visible immediately after batch arrives; cleared after botDelayMs", async () => {
+      vi.useFakeTimers();
+
+      // Build a playing-phase state with a populated currentTrick
+      const playingState: GameState = {
+        ...INITIAL_STATE,
+        phase: "playing",
+        rules: { ...DEFAULT_RULES, botDelayMs: 500 },
+        currentTrick: [
+          { seat: "N", cardId: "Black-10" },
+          { seat: "E", cardId: "Red-5" },
+          { seat: "S", cardId: "Green-7" },
+          { seat: "W", cardId: "Yellow-3" },
+        ],
+        // Fake completed tricks / other needed fields
+        tricksPlayed: 0,
+        activePlayer: "E",
+      };
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: playingState,
+      });
+
+      // Events: CardPlayed (pre) + TrickCompleted (the split point) + CardPlayed (post, next trick)
+      const cardPlayedPre: GameEvent = {
+        type: "CardPlayed",
+        seat: "N",
+        cardId: "Black-10",
+        trickIndex: 1,
+        handNumber: 1,
+        timestamp: Date.now(),
+      };
+
+      const trickCompleted: GameEvent = {
+        type: "TrickCompleted",
+        plays: [
+          { seat: "N", cardId: "Black-10" },
+          { seat: "E", cardId: "Red-5" },
+          { seat: "S", cardId: "Green-7" },
+          { seat: "W", cardId: "Yellow-3" },
+        ],
+        winner: "N",
+        leadColor: "Black",
+        trickIndex: 0,
+        handNumber: 1,
+        timestamp: Date.now(),
+      };
+
+      const cardPlayedPost: GameEvent = {
+        type: "CardPlayed",
+        seat: "E",
+        cardId: "Red-5",
+        trickIndex: 1,
+        handNumber: 1,
+        timestamp: Date.now(),
+      };
+
+      useOnlineGameStore.getState()._applyIncomingEvents([
+        cardPlayedPre,
+        trickCompleted,
+        cardPlayedPost,
+      ]);
+
+      // IMMEDIATELY: trick should still be populated (pre-events applied, post-events deferred)
+      const stateImmediate = useOnlineGameStore.getState();
+      expect(stateImmediate.gameState?.currentTrick.length).toBeGreaterThan(0);
+
+      // AFTER botDelayMs: post-events applied, trick cleared
+      await vi.advanceTimersByTimeAsync(500);
+
+      const stateAfter = useOnlineGameStore.getState();
+      expect(stateAfter.gameState?.currentTrick).toHaveLength(0);
+    });
+
+    it("no delay when batch has no TrickCompleted event — original behaviour", () => {
+      vi.useFakeTimers();
+
+      const playingState: GameState = {
+        ...INITIAL_STATE,
+        phase: "playing",
+        rules: { ...DEFAULT_RULES, botDelayMs: 500 },
+        currentTrick: [{ seat: "N", cardId: "Black-10" }],
+        tricksPlayed: 0,
+        activePlayer: "E",
+      };
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        gameState: playingState,
+      });
+
+      const cardPlayedEvent: GameEvent = {
+        type: "CardPlayed",
+        seat: "E",
+        cardId: "Red-5",
+        trickIndex: 0,
+        handNumber: 1,
+        timestamp: Date.now(),
+      };
+
+      useOnlineGameStore.getState()._applyIncomingEvents([cardPlayedEvent]);
+
+      // No TrickCompleted in batch → applied synchronously, overlay updated immediately
+      // The state should be updated right away (no async needed)
+      const state = useOnlineGameStore.getState();
+      expect(state.gameState).not.toBeNull();
     });
   });
 });

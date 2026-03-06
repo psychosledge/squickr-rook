@@ -27,6 +27,18 @@ vi.mock("./HandResultOverlay.module.css", () => ({
 // Mock seatLabel utility
 vi.mock("@/utils/seatLabel", () => ({
   getTeamLabel: (team: string) => `Team-${team}`,
+  getSeatLabel: (seat: string) => {
+    const labels: Record<string, string> = { N: "You", E: "P2", S: "P3", W: "P4" };
+    return labels[seat] ?? seat;
+  },
+  teamDisplay: (team: string, seatNames?: Partial<Record<string, string>>) => {
+    if (!seatNames) return `Team-${team}`;
+    const [s1, s2] = team === "NS" ? ["N", "S"] : ["E", "W"];
+    const labels: Record<string, string> = { N: "You", E: "P2", S: "P3", W: "P4" };
+    const n1 = seatNames[s1] ?? labels[s1] ?? s1;
+    const n2 = seatNames[s2] ?? labels[s2] ?? s2;
+    return `${n1} & ${n2}`;
+  },
 }));
 
 // Mock HandHistoryTable
@@ -39,10 +51,14 @@ vi.mock("@/components/HandHistoryTable/HandHistoryTable", () => ({
     }),
 }));
 
-// Mock buildHandHistoryRows
+// Mock buildHandHistoryRows — capture last call args for assertions
+let lastBuildHandHistoryRowsArgs: unknown[] = [];
 vi.mock("@/utils/handHistory", () => ({
-  buildHandHistoryRows: (history: unknown[]) =>
-    history.map((_, i) => ({ handNumber: i + 1 })),
+  buildHandHistoryRows: (...args: unknown[]) => {
+    lastBuildHandHistoryRowsArgs = args;
+    const history = args[0] as unknown[];
+    return history.map((_, i) => ({ handNumber: i + 1 }));
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -293,5 +309,67 @@ describe("HandResultOverlay", () => {
 
     const activeTabText = flattenText(activeTabEls[0]);
     expect(activeTabText).toContain("History");
+  });
+
+  // ── Test 11: seatNames — bid result headline uses display names ──────────
+  it("11. bid result headline uses seatNames when provided (bidder team)", () => {
+    // Bidder N is on NS team; with seatNames N="Alice", S="Carol"
+    // teamDisplay("NS", seatNames) should produce "Alice & Carol"
+    const tree = HandResultOverlayView(
+      makeViewProps({
+        score: makeHandScore({ bidder: "N" }),
+        seatNames: { N: "Alice", S: "Carol" },
+      }),
+    );
+    const allText = flattenText(tree);
+    // Should NOT contain generic "Team-NS"
+    expect(allText).not.toContain("Team-NS");
+    // Should contain the display names
+    expect(allText).toContain("Alice");
+    expect(allText).toContain("Carol");
+  });
+
+  it("11b. bid result headline falls back to Team-NS when seatNames is undefined", () => {
+    const tree = HandResultOverlayView(makeViewProps({ score: makeHandScore({ bidder: "N" }) }));
+    const allText = flattenText(tree);
+    expect(allText).toContain("Team-NS");
+  });
+
+  // ── Test 12: seatNames — score table rows use display names ─────────────
+  it("12. score table rows use seatNames when provided", () => {
+    const seatNames = { N: "Alice", S: "Carol", E: "Bob", W: "Dave" };
+    const tree = HandResultOverlayView(
+      makeViewProps({ seatNames }),
+    );
+    const allText = flattenText(tree);
+    // NS row should say "Alice & Carol" not "Team-NS"
+    expect(allText).toContain("Alice");
+    expect(allText).toContain("Carol");
+    // EW row should say "Bob & Dave" not "Team-EW"
+    expect(allText).toContain("Bob");
+    expect(allText).toContain("Dave");
+    expect(allText).not.toContain("Team-NS");
+    expect(allText).not.toContain("Team-EW");
+  });
+
+  it("12b. score table rows fall back to Team-NS/Team-EW when seatNames is undefined", () => {
+    const tree = HandResultOverlayView(makeViewProps());
+    const allText = flattenText(tree);
+    expect(allText).toContain("Team-NS");
+    expect(allText).toContain("Team-EW");
+  });
+
+  // ── Test 13: seatNames — passed to buildHandHistoryRows ─────────────────
+  it("13. seatNames is forwarded to buildHandHistoryRows on history tab", () => {
+    const seatNames = { N: "Alice" };
+    HandResultOverlayView(
+      makeViewProps({
+        handHistory: [makeHandScore()],
+        activeTab: "history",
+        seatNames,
+      }),
+    );
+    // The 3rd arg to buildHandHistoryRows should be the seatNames
+    expect(lastBuildHandHistoryRowsArgs[2]).toEqual(seatNames);
   });
 });

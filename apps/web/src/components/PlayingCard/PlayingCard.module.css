@@ -11,7 +11,7 @@
   user-select: none;
   flex-shrink: 0;
   position: relative;
-  transition: transform 0.1s, filter 0.15s;
+  transition: transform 0.1s, filter 0.15s, opacity 0.15s;
   margin-left: -15px;
 }
 
@@ -22,7 +22,8 @@
 }
 
 .unplayable {
-  filter: grayscale(1) brightness(0.75);
+  opacity: 0.38;
+  filter: grayscale(0.6);
   cursor: default;
 }
 

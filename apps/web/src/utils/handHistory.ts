@@ -20,6 +20,7 @@ export type HandHistoryRow = {
 export function buildHandHistoryRows(
   history: HandScore[],
   startScores: Record<Team, number> = { NS: 0, EW: 0 },
+  seatNames?: Partial<Record<Seat, string>>,
 ): HandHistoryRow[] {
   if (history.length === 0) return [];
 
@@ -29,7 +30,7 @@ export function buildHandHistoryRows(
   return history.map((score, index) => {
     const bidderTeam: Team = SEAT_TEAM[score.bidder];
     const bidderSeat: Seat = score.bidder;
-    const bidderLabel = getSeatLabel(bidderSeat);
+    const bidderLabel = seatNames?.[bidderSeat] ?? getSeatLabel(bidderSeat);
 
     const { shotMoon, moonShooterWentSet, bidAmount, nsTotal, ewTotal, nsDelta, ewDelta } = score;
 
