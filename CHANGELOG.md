@@ -4,6 +4,27 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.0.0] — 2026-03-05
+
+### New Features
+- **Online multiplayer** — play with up to 4 real players over the internet via a shared room code
+  - Create or join a room from the lobby; share the 6-character room code with friends
+  - Each player sees their own hand face-up; opponents' hands are hidden
+  - Player display names shown throughout: bidding overlay, score bar, trick area, result overlays, and game over screen
+  - Seats rotate so your hand is always at the bottom regardless of which seat you occupy
+  - Full reconnect support — rejoining with the same browser tab restores your seat and game state
+- **Moon bidding lock** — once any player shoots the moon, the bidding overlay hides the numeric stepper so only additional ShootMoon declarations are possible
+- **Moon scoring display** — Points and Delta columns are hidden in the hand result overlay when a moon shot occurred, avoiding misleading deltas
+
+### Bug Fixes
+- **Card visibility** — your cards are always fully visible; only opponents' face-down hands are hidden
+- **Card dimming** — unplayable cards dim correctly; no cards are incorrectly dimmed when it is not your turn
+- **You Win / You Lose** — online players seated East or West now see the correct win/lose outcome
+- **Bot delay** — bot think-time delay now fires before the bot acts (not after), making pacing feel natural in online rooms
+- **Trick linger race condition** — event batches arriving during the 1-second trick-completion linger are now queued and applied in order, preventing game state corruption
+
+---
+
 ## [v0.4.3] — 2026-03-04
 
 ### Improvements
