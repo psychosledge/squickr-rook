@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import type { GameState } from "@rook/engine";
 import { DEFAULT_RULES } from "@rook/engine";
-import { OnlineGamePageView } from "./OnlineGamePage";
+import { OnlineGamePageView, buildPlayAgainHandler, buildLeaveGameHandler } from "./OnlineGamePage";
 import type { OnlineGamePageViewProps } from "./OnlineGamePage";
 
 // Mock CSS modules
@@ -494,6 +494,44 @@ describe("DisconnectAlert rendering in OnlineGamePageView", () => {
     expect(alerts).toHaveLength(1);
     const p = alerts[0].props as Record<string, unknown>;
     expect(p.isHost).toBe(false);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// OnlineGamePage container — navigation target tests (32–33)
+// ---------------------------------------------------------------------------
+// These tests verify that both "Play Again" and "Leave Game" navigate to
+// "/online" (the home screen), not "/online/:code" (the room lobby).
+// We test via the exported `buildPlayAgainHandler` and `buildLeaveGameHandler`
+// pure factory functions that encapsulate navigation logic.
+
+describe("OnlineGamePage — navigation handlers", () => {
+
+  it("32. handlePlayAgain navigates to '/online' (not '/online/:code')", () => {
+    const disconnect = vi.fn();
+    const navigate = vi.fn();
+    const code = "ABC123";
+
+    const handlePlayAgain = buildPlayAgainHandler({ disconnect, navigate });
+    handlePlayAgain();
+
+    expect(navigate).toHaveBeenCalledWith("/online");
+    expect(navigate).not.toHaveBeenCalledWith(`/online/${code}`);
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("33. Leave Game button navigates to '/online' (not '/online/:code')", () => {
+    const disconnect = vi.fn();
+    const navigate = vi.fn();
+    const code = "ABC123";
+
+    const handleLeaveGame = buildLeaveGameHandler({ disconnect, navigate });
+    handleLeaveGame();
+
+    expect(navigate).toHaveBeenCalledWith("/online");
+    expect(navigate).not.toHaveBeenCalledWith(`/online/${code}`);
+    expect(disconnect).toHaveBeenCalledOnce();
   });
 
 });

@@ -162,6 +162,30 @@ export function OnlineGamePageView({
   );
 }
 
+// ── Navigation Handler Factories (exported for testing) ─────────────────────
+
+type NavigateFn = (path: string) => void;
+
+export function buildPlayAgainHandler(opts: {
+  disconnect: () => void;
+  navigate: NavigateFn;
+}): () => void {
+  return function handlePlayAgain() {
+    opts.disconnect();
+    void opts.navigate("/online");
+  };
+}
+
+export function buildLeaveGameHandler(opts: {
+  disconnect: () => void;
+  navigate: NavigateFn;
+}): () => void {
+  return function handleLeaveGame() {
+    opts.disconnect();
+    void opts.navigate("/online");
+  };
+}
+
 // ── Default Export: OnlineGamePage ───────────────────────────────────────────
 
 export default function OnlineGamePage() {
@@ -238,7 +262,7 @@ export default function OnlineGamePage() {
       <div className={styles.disconnectedPanel}>
         <p>You were disconnected from the game.</p>
         <button onClick={() => code && connect(code)}>Reconnect</button>
-        <button onClick={() => { disconnect(); void navigate(code ? `/online/${code}` : "/online"); }}>
+        <button onClick={buildLeaveGameHandler({ disconnect, navigate })}>
           Leave Game
         </button>
       </div>
@@ -252,13 +276,6 @@ export default function OnlineGamePage() {
   );
 
   const humanTeam: Team = mySeat !== null && ["E", "W"].includes(mySeat) ? "EW" : "NS";
-
-  function handlePlayAgain() {
-    // disconnect() resets store state. OnlineLobbyPage will reconnect
-    // via its useEffect when it mounts at /online/:code.
-    disconnect();
-    void navigate(code ? `/online/${code}` : "/online");
-  }
 
   return (
     <OnlineGamePageView
@@ -288,7 +305,7 @@ export default function OnlineGamePage() {
       clearAnnouncement={clearAnnouncement}
       openHistoryModal={openHistoryModal}
       closeHistoryModal={closeHistoryModal}
-      onPlayAgain={handlePlayAgain}
+      onPlayAgain={buildPlayAgainHandler({ disconnect, navigate })}
     />
   );
 }
