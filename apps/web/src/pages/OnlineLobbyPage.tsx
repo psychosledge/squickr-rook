@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { customAlphabet } from "nanoid";
 import { useOnlineGameStore } from "@/store/onlineGameStore";
@@ -147,6 +147,81 @@ export function ConnectingView({ roomCode, connectionError, onBack }: Connecting
   );
 }
 
+// ── Sub-component: Lobby Name Edit Form ─────────────────────────────────────
+
+export type LobbyNameEditFormProps = {
+  value: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+};
+
+export function LobbyNameEditForm({ value, onChange, onSave, onCancel }: LobbyNameEditFormProps) {
+  return (
+    <div className={styles.nameEditForm}>
+      <input
+        className={styles.nameEditInput}
+        type="text"
+        value={value}
+        maxLength={20}
+        onChange={(e) => onChange(e.target.value)}
+        autoFocus
+      />
+      <button
+        className={styles.seatBtn}
+        onClick={onSave}
+        disabled={value.trim().length === 0}
+      >
+        Save
+      </button>
+      <button className={styles.seatBtn} onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+// ── Sub-component: Display Name Row (stateful) ───────────────────────────────
+// This sub-component manages the edit form state.
+// The ✏️ button is rendered inline in LobbyView (so tests can see it),
+// and it calls triggerEdit.current() which this component sets up.
+
+type LobbyDisplayNameRowProps = {
+  myDisplayName: string;
+  onUpdateName: (name: string) => void;
+  triggerEdit: React.MutableRefObject<() => void>;
+};
+
+function LobbyDisplayNameRow({ myDisplayName, onUpdateName, triggerEdit }: LobbyDisplayNameRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(myDisplayName);
+
+  // Register the startEditing callback so parent can call it
+  triggerEdit.current = () => {
+    setEditValue(myDisplayName);
+    setIsEditing(true);
+  };
+
+  function handleSave() {
+    const trimmed = editValue.trim();
+    if (trimmed) {
+      onUpdateName(trimmed);
+    }
+    setIsEditing(false);
+  }
+
+  if (!isEditing) return null;
+
+  return (
+    <LobbyNameEditForm
+      value={editValue}
+      onChange={setEditValue}
+      onSave={handleSave}
+      onCancel={() => setIsEditing(false)}
+    />
+  );
+}
+
 // ── View: Lobby ──────────────────────────────────────────────────────────────
 
 export type LobbyViewProps = {
@@ -160,6 +235,9 @@ export type LobbyViewProps = {
   onLeaveSeat: () => void;
   onStartGame: () => void;
   onBack: () => void;
+  myDisplayName: string;
+  onUpdateName: (name: string) => void;
+  gameStarted: boolean;
 };
 
 export function LobbyView({
@@ -173,9 +251,15 @@ export function LobbyView({
   onLeaveSeat,
   onStartGame,
   onBack,
+  myDisplayName,
+  onUpdateName,
+  gameStarted,
 }: LobbyViewProps) {
   const nsPair: Seat[] = ["N", "S"];
   const ewPair: Seat[] = ["E", "W"];
+  // Plain ref object (no React hook) — LobbyDisplayNameRow sets .current
+  // so the inline ✏️ button can trigger edit state in the sub-component.
+  const triggerEdit: React.MutableRefObject<() => void> = { current: () => {} };
 
   function renderSeatCard(seat: Seat) {
     const info = seats.find((s) => s.seat === seat);
@@ -218,6 +302,22 @@ export function LobbyView({
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Squickr Rook</h1>
+
+      <div className={styles.playerNameRow}>
+        <span className={styles.playerNameDisplay}>
+          Playing as: {myDisplayName}
+          {!gameStarted && (
+            <button
+              className={styles.editNameBtn}
+              aria-label="Edit display name"
+              onClick={() => triggerEdit.current()}
+            >
+              ✏️
+            </button>
+          )}
+        </span>
+        <LobbyDisplayNameRow myDisplayName={myDisplayName} onUpdateName={onUpdateName} triggerEdit={triggerEdit} />
+      </div>
 
       <div className={styles.roomInfo}>
         <span className={styles.label}>Room Code</span>
@@ -267,11 +367,13 @@ export default function OnlineLobbyPage() {
   const hostId = useOnlineGameStore((s) => s.hostId);
   const mySeat = useOnlineGameStore((s) => s.mySeat);
   const myPlayerId = useOnlineGameStore((s) => s.myPlayerId);
+  const myDisplayName = useOnlineGameStore((s) => s.myDisplayName);
   const connect = useOnlineGameStore((s) => s.connect);
   const disconnect = useOnlineGameStore((s) => s.disconnect);
   const claimSeat = useOnlineGameStore((s) => s.claimSeat);
   const leaveSeat = useOnlineGameStore((s) => s.leaveSeat);
   const startGame = useOnlineGameStore((s) => s.startGame);
+  const updateDisplayName = useOnlineGameStore((s) => s.updateDisplayName);
 
   // Local state
   const [displayName, setDisplayName] = useState<string>(
@@ -371,6 +473,9 @@ export default function OnlineLobbyPage() {
       onLeaveSeat={leaveSeat}
       onStartGame={startGame}
       onBack={handleBack}
+      myDisplayName={myDisplayName}
+      onUpdateName={updateDisplayName}
+      gameStarted={lobbyPhase === "playing"}
     />
   );
 }

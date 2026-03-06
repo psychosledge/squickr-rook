@@ -41,7 +41,8 @@ export type ClientClaimSeat   = { type: "ClaimSeat"; seat: Seat };
 export type ClientLeaveSeat   = { type: "LeaveSeat" };
 export type ClientStartGame   = { type: "StartGame" };
 export type ClientSendCommand = { type: "SendCommand"; command: GameCommand };
-export type ClientMessage = ClientJoinRoom | ClientClaimSeat | ClientLeaveSeat | ClientStartGame | ClientSendCommand;
+export type ClientUpdateName  = { type: "UpdateName"; displayName: string };
+export type ClientMessage = ClientJoinRoom | ClientClaimSeat | ClientLeaveSeat | ClientStartGame | ClientSendCommand | ClientUpdateName;
 
 export type OnlineStoreState = {
   myPlayerId: string;
@@ -71,6 +72,7 @@ export type OnlineStoreActions = {
   claimSeat: (seat: Seat) => void;
   leaveSeat: () => void;
   startGame: () => void;
+  updateDisplayName: (name: string) => void;
   humanPlayCard: (cardId: CardId) => void;
   humanPlaceBid: (amount: number) => void;
   humanPassBid: () => void;

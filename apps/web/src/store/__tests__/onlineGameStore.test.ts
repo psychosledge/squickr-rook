@@ -1393,6 +1393,91 @@ describe("onlineGameStore", () => {
     });
   });
 
+  // ── updateDisplayName ─────────────────────────────────────────────────────
+  describe("updateDisplayName", () => {
+    // localStorage stub (node environment has no localStorage)
+    const localStorageStore: Record<string, string> = {};
+    const mockLocalStorage = {
+      getItem: (key: string) => localStorageStore[key] ?? null,
+      setItem: (key: string, value: string) => { localStorageStore[key] = value; },
+      removeItem: (key: string) => { delete localStorageStore[key]; },
+    };
+
+    beforeEach(() => {
+      // Stub localStorage on globalThis
+      vi.stubGlobal("localStorage", mockLocalStorage);
+      // Clear store
+      delete localStorageStore["rookDisplayName"];
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("trims the name, updates localStorage and store state", () => {
+      const { mockSocket } = injectMockSocket();
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        myDisplayName: "Alice",
+        _socket: mockSocket,
+      });
+
+      useOnlineGameStore.getState().updateDisplayName("  Bob  ");
+
+      const state = useOnlineGameStore.getState();
+      expect(state.myDisplayName).toBe("Bob");
+      expect(localStorage.getItem("rookDisplayName")).toBe("Bob");
+    });
+
+    it("sends UpdateName message via _sendRaw", () => {
+      const { mockSocket, sent } = injectMockSocket();
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        myDisplayName: "Alice",
+        _socket: mockSocket,
+      });
+
+      useOnlineGameStore.getState().updateDisplayName("Charlie");
+
+      const messages = sent.map((s) => JSON.parse(s));
+      expect(messages).toContainEqual({ type: "UpdateName", displayName: "Charlie" });
+    });
+
+    it("does nothing when trimmed name is empty", () => {
+      const { mockSocket, sent } = injectMockSocket();
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        myDisplayName: "Alice",
+        _socket: mockSocket,
+      });
+
+      useOnlineGameStore.getState().updateDisplayName("   ");
+
+      const state = useOnlineGameStore.getState();
+      expect(state.myDisplayName).toBe("Alice");
+      expect(sent).toHaveLength(0);
+      expect(localStorage.getItem("rookDisplayName")).toBeNull();
+    });
+
+    it("does nothing when not connected (_socket is null)", () => {
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        myDisplayName: "Alice",
+        _socket: null,
+      });
+
+      // Should not throw, should not update anything
+      expect(() => {
+        useOnlineGameStore.getState().updateDisplayName("Dave");
+      }).not.toThrow();
+
+      const state = useOnlineGameStore.getState();
+      expect(state.myDisplayName).toBe("Alice");
+      expect(localStorage.getItem("rookDisplayName")).toBeNull();
+    });
+  });
+
   // ── buildAnnouncementFromEvent — seatNames display names ─────────────────
   describe("buildAnnouncementFromEvent — display names in announcements", () => {
     it("BiddingComplete announcement uses display name from seats when available", () => {

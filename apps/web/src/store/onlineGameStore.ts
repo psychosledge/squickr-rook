@@ -151,6 +151,16 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     get()._sendRaw({ type: "StartGame" });
   },
 
+  updateDisplayName: (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const { _socket } = get();
+    if (!_socket) return;
+    localStorage.setItem("rookDisplayName", trimmed);
+    set({ myDisplayName: trimmed });
+    get()._sendRaw({ type: "UpdateName", displayName: trimmed });
+  },
+
   // ── Human game actions ────────────────────────────────────────────────────
 
   humanPlayCard: (cardId) => {
