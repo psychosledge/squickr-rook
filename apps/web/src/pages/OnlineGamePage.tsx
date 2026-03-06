@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { useOnlineGameStore } from "@/store/onlineGameStore";
 import type { SeatInfo } from "@/store/onlineGameStore.types";
 import type { OverlayKind } from "@/store/gameStore.types";
-import type { GameState, HandScore, Seat, CardId, Color } from "@rook/engine";
+import type { GameState, HandScore, Seat, CardId, Color, Team } from "@rook/engine";
 import ScoreBar from "@/components/ScoreBar/ScoreBar";
 import GameTable from "@/components/GameTable/GameTable";
 import NestOverlay from "@/components/NestOverlay/NestOverlay";
@@ -30,6 +30,7 @@ export type OnlineGamePageViewProps = {
   historyModalOpen: boolean;
   biddingThinkingSeat: Seat | null;
   seatNames?: Partial<Record<Seat, string>>;
+  humanTeam: Team;
   onPlayCard: (cardId: CardId) => void;
   onToggleDiscard: (cardId: CardId) => void;
   onConfirmDiscards: () => void;
@@ -57,6 +58,7 @@ export function OnlineGamePageView({
   historyModalOpen,
   biddingThinkingSeat,
   seatNames,
+  humanTeam,
   onPlayCard,
   onToggleDiscard,
   onConfirmDiscards,
@@ -134,6 +136,7 @@ export function OnlineGamePageView({
           onPlayAgain={onPlayAgain}
           handHistory={gameState.handHistory}
           seatNames={seatNames}
+          humanTeam={humanTeam}
         />
       )}
     </div>
@@ -184,6 +187,8 @@ export default function OnlineGamePage() {
       .map((s) => [s.seat, s.displayName]),
   );
 
+  const humanTeam: Team = mySeat !== null && ["E", "W"].includes(mySeat) ? "EW" : "NS";
+
   function handlePlayAgain() {
     // disconnect() resets store state. OnlineLobbyPage will reconnect
     // via its useEffect when it mounts at /online/:code.
@@ -203,6 +208,7 @@ export default function OnlineGamePage() {
       historyModalOpen={historyModalOpen}
       biddingThinkingSeat={biddingThinkingSeat}
       seatNames={seatNames}
+      humanTeam={humanTeam}
       onPlayCard={humanPlayCard}
       onToggleDiscard={toggleDiscard}
       onConfirmDiscards={confirmDiscards}

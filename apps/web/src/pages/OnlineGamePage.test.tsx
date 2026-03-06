@@ -173,6 +173,7 @@ function makeProps(overrides: Partial<OnlineGamePageViewProps> = {}): OnlineGame
     gameOverReason: null,
     historyModalOpen: false,
     biddingThinkingSeat: null,
+    humanTeam: "NS",
     onPlayCard: vi.fn(),
     onToggleDiscard: vi.fn(),
     onConfirmDiscards: vi.fn(),
@@ -389,6 +390,30 @@ describe("OnlineGamePageView", () => {
     expect(tables).toHaveLength(1);
     const p = tables[0].props as Record<string, unknown>;
     expect(p.humanSeat).toBe("N");
+  });
+
+  it("24. GameOverScreen receives humanTeam prop when overlay='game-over'", () => {
+    const gameState = makeGameState({ winner: "EW", phase: "finished" });
+    const tree = OnlineGamePageView(
+      makeProps({ overlay: "game-over", gameState, humanTeam: "EW" }),
+    );
+    const all = flattenElements(tree);
+    const screens = findByType(all, GameOverScreen);
+    expect(screens).toHaveLength(1);
+    const p = screens[0].props as Record<string, unknown>;
+    expect(p.humanTeam).toBe("EW");
+  });
+
+  it("25. GameOverScreen receives humanTeam='NS' when humanTeam is NS", () => {
+    const gameState = makeGameState({ winner: "NS", phase: "finished" });
+    const tree = OnlineGamePageView(
+      makeProps({ overlay: "game-over", gameState, humanTeam: "NS" }),
+    );
+    const all = flattenElements(tree);
+    const screens = findByType(all, GameOverScreen);
+    expect(screens).toHaveLength(1);
+    const p = screens[0].props as Record<string, unknown>;
+    expect(p.humanTeam).toBe("NS");
   });
 
 });

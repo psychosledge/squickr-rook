@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 import { INITIAL_STATE, applyEvent } from "@rook/engine";
-import type { GameEvent, GameRules } from "@rook/engine";
+import type { GameEvent, GameRules, Seat } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import type {
   OnlineStore,
@@ -16,14 +16,19 @@ import type {
  * Returns an announcement string for events that warrant one, or null otherwise.
  * Pure function — safe to test independently.
  */
-function buildAnnouncementFromEvent(ev: GameEvent, _rules: GameRules): string | null {
+function buildAnnouncementFromEvent(
+  ev: GameEvent,
+  _rules: GameRules,
+  seatNames?: Partial<Record<Seat, string>>,
+): string | null {
+  const nameOf = (seat: Seat) => seatNames?.[seat] ?? getSeatLabel(seat);
   if (ev.type === "BiddingComplete") {
-    const label = getSeatLabel(ev.winner);
+    const label = nameOf(ev.winner);
     const moon = ev.shotMoon ? " — SHOOT THE MOON!" : "";
     return `${label} won the bid at ${ev.amount}${moon}`;
   }
   if (ev.type === "TrumpSelected") {
-    return `${getSeatLabel(ev.seat)} chose ${ev.color} as trump`;
+    return `${nameOf(ev.seat)} chose ${ev.color} as trump`;
   }
   return null;
 }
@@ -307,12 +312,15 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
           let announcement = s.announcement;
           let gameOverReason = s.gameOverReason;
           let lobbyPhase = s.lobbyPhase;
+          const sn = Object.fromEntries(
+            s.seats.filter((si) => si.displayName !== null).map((si) => [si.seat, si.displayName!]),
+          );
           for (const ev of preEvents) {
             gs = applyEvent(gs, ev);
             if (ev.type === "HandScored") pendingHandScore = ev.score;
             if (ev.type === "GameFinished") gameOverReason = ev.reason;
             if (ev.type === "GameStarted") lobbyPhase = "playing";
-            const next = buildAnnouncementFromEvent(ev, gs.rules);
+            const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
             if (next !== null) announcement = next;
           }
           return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
@@ -344,8 +352,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
           let announcement = s.announcement;
           let gameOverReason = s.gameOverReason;
           let lobbyPhase = s.lobbyPhase;
+          const sn = Object.fromEntries(
+            s.seats.filter((si) => si.displayName !== null).map((si) => [si.seat, si.displayName!]),
+          );
           gs = applyEvent(gs, trickEvent);
-          const next = buildAnnouncementFromEvent(trickEvent, gs.rules);
+          const next = buildAnnouncementFromEvent(trickEvent, gs.rules, sn);
           if (next !== null) announcement = next;
           return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
         });
@@ -360,12 +371,15 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
               let announcement = s.announcement;
               let gameOverReason = s.gameOverReason;
               let lobbyPhase = s.lobbyPhase;
+              const sn = Object.fromEntries(
+                s.seats.filter((si) => si.displayName !== null).map((si) => [si.seat, si.displayName!]),
+              );
               for (const ev of afterTrickEvents) {
                 gs = applyEvent(gs, ev);
                 if (ev.type === "HandScored") pendingHandScore = ev.score;
                 if (ev.type === "GameFinished") gameOverReason = ev.reason;
                 if (ev.type === "GameStarted") lobbyPhase = "playing";
-                const next = buildAnnouncementFromEvent(ev, gs.rules);
+                const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
                 if (next !== null) announcement = next;
               }
               return { gameState: gs, lobbyPhase, pendingHandScore, announcement, gameOverReason };
@@ -387,13 +401,16 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
       let announcement = s.announcement;
       let gameOverReason = s.gameOverReason;
       let lobbyPhase = s.lobbyPhase;
+      const sn = Object.fromEntries(
+        s.seats.filter((si) => si.displayName !== null).map((si) => [si.seat, si.displayName!]),
+      );
 
       for (const ev of events) {
         gs = applyEvent(gs, ev);
         if (ev.type === "HandScored") pendingHandScore = ev.score;
         if (ev.type === "GameFinished") gameOverReason = ev.reason;
         if (ev.type === "GameStarted") lobbyPhase = "playing";
-        const next = buildAnnouncementFromEvent(ev, gs.rules);
+        const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
         if (next !== null) announcement = next;
       }
 

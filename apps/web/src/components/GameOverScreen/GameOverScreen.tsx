@@ -12,6 +12,8 @@ type Props = {
   onPlayAgain: () => void;
   handHistory?: HandScore[];
   seatNames?: Partial<Record<Seat, string>>;
+  /** The team the local human player is on. Defaults to "NS" (single-player). */
+  humanTeam?: Team;
 };
 
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
@@ -28,10 +30,11 @@ export function GameOverScreenView({
   onPlayAgain,
   handHistory,
   seatNames,
+  humanTeam = "NS",
   showHandLog,
   onToggleHandLog,
 }: GameOverScreenViewProps) {
-  const humanWon = winner === "NS";
+  const humanWon = winner === humanTeam;
   const hasHistory = handHistory != null && handHistory.length > 0;
 
   return (

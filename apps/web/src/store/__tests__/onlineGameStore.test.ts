@@ -1149,4 +1149,65 @@ describe("onlineGameStore", () => {
       expect(state.gameState).not.toBeNull();
     });
   });
+
+  // ── buildAnnouncementFromEvent — seatNames display names ─────────────────
+  describe("buildAnnouncementFromEvent — display names in announcements", () => {
+    it("BiddingComplete announcement uses display name from seats when available", () => {
+      // Arrange: set up store with seats having display names, gameState in bidding phase
+      const biddingState = makeBiddingState("N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        seats: makeSeats("p1", "N"), // Alice is at N
+        gameState: biddingState,
+      });
+
+      // Act: apply BiddingComplete event for seat N (Alice)
+      const biddingCompleteEvent: GameEvent = {
+        type: "BiddingComplete",
+        winner: "N",
+        amount: 120,
+        forced: false,
+        shotMoon: false,
+        handNumber: biddingState.handNumber,
+        timestamp: Date.now(),
+      };
+      useOnlineGameStore.getState()._applyIncomingEvents([biddingCompleteEvent]);
+
+      // Assert: announcement uses display name "Alice", not the seat label "You"
+      const announcement = useOnlineGameStore.getState().announcement;
+      expect(announcement).not.toBeNull();
+      expect(announcement).toContain("Alice");
+    });
+
+    it("TrumpSelected announcement uses display name from seats when available", () => {
+      // Arrange: set up store at nest phase
+      const nestState = makeNestState("N");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        myPlayerId: "p1",
+        mySeat: "N",
+        seats: makeSeats("p1", "N"), // Alice is at N
+        gameState: nestState,
+      });
+
+      // Act: apply TrumpSelected event for seat N (Alice)
+      const trumpSelectedEvent: GameEvent = {
+        type: "TrumpSelected",
+        seat: "N",
+        color: "Green",
+        handNumber: nestState.handNumber,
+        timestamp: Date.now(),
+      };
+      useOnlineGameStore.getState()._applyIncomingEvents([trumpSelectedEvent]);
+
+      // Assert: announcement uses display name "Alice"
+      const announcement = useOnlineGameStore.getState().announcement;
+      expect(announcement).not.toBeNull();
+      expect(announcement).toContain("Alice");
+    });
+  });
 });

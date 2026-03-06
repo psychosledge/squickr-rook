@@ -315,4 +315,23 @@ describe("GameOverScreen", () => {
     );
     expect(lastBuildHandHistoryRowsArgs[2]).toEqual(seatNames);
   });
+
+  // ── Test 10 & 11: humanTeam prop controls win/lose message ───────────────
+  it("10. humanTeam='EW', winner='EW' → shows 'You Win!'", () => {
+    const tree = GameOverScreenView(
+      makeProps({ winner: "EW", humanTeam: "EW" }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("You Win!");
+    expect(allText).not.toContain("You Lose");
+  });
+
+  it("11. humanTeam='NS', winner='EW' → shows 'You Lose'", () => {
+    const tree = GameOverScreenView(
+      makeProps({ winner: "EW", humanTeam: "NS" }),
+    );
+    const allText = flattenText(tree);
+    expect(allText).toContain("You Lose");
+    expect(allText).not.toContain("You Win!");
+  });
 });
