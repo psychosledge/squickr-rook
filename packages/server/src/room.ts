@@ -363,6 +363,31 @@ export default class RookRoom implements Party.Server {
     };
     this.sendTo(conn, welcome);
 
+    // Normal-path mid-game reconnect: if the game is playing, this player has a seat,
+    // gamePaused is true, and there are no remaining disconnected seats, then clear
+    // gamePaused and broadcast PlayerReconnected (handles the case where JoinRoom
+    // arrives before onClose, so the player never entered disconnectedSeats).
+    if (
+      this.phase === "playing" &&
+      seat !== null &&
+      this.gameState !== null &&
+      this.gamePaused &&
+      this.disconnectedSeats.size === 0
+    ) {
+      this.gamePaused = false;
+      const seatEntry = this.seatedPlayers.get(seat);
+      const displayName = seatEntry?.displayName ?? msg.displayName;
+      for (const c of this.room.getConnections<ConnectionState>()) {
+        this.sendTo(c, {
+          type: "PlayerReconnected",
+          seat,
+          displayName,
+        } satisfies PlayerReconnected);
+      }
+      await this.processBotTurns();
+      return;
+    }
+
     // Broadcast lobby updated to everyone else (if in lobby)
     if (this.phase === "lobby") {
       for (const c of this.room.getConnections()) {
@@ -657,7 +682,7 @@ export default class RookRoom implements Party.Server {
           // Check if this is a disconnected human seat
           const disconnectedEntry = this.disconnectedSeats.get(seat);
           if (disconnectedEntry !== undefined) {
-            return { seat, playerId: null, displayName: null, connected: false, isBot: false };
+            return { seat, playerId: disconnectedEntry.playerId, displayName: disconnectedEntry.displayName, connected: false, isBot: false };
           }
           const playerInfo = this.gameState.players.find((p) => p.seat === seat);
           if (playerInfo !== undefined) {

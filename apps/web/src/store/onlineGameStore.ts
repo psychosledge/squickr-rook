@@ -10,6 +10,11 @@ import type {
   ClientMessage,
 } from "./onlineGameStore.types";
 
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+/** sessionStorage key used to persist the active room code across page refreshes mid-game. */
+export const MID_GAME_ROOM_KEY = "rookMidGameRoom";
+
 // ─── Pure helper ────────────────────────────────────────────────────────────
 
 /**
@@ -91,9 +96,17 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     // current game state, seat, and lobby info so that the OnlineGamePage
     // navigation useEffect doesn't redirect back to the lobby on reconnect.
     const { gameState, mySeat, seats } = get();
-    const preservedGame = gameState !== null
-      ? { gameState, mySeat, seats, isReconnecting: true } // seats is stale until Welcome arrives
-      : {};
+    const isInMemoryReconnect = gameState !== null;
+    const isCrossRefreshReconnect =
+      !isInMemoryReconnect &&
+      globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === roomCode;
+
+    const preservedGame: Partial<OnlineStoreState> =
+      isInMemoryReconnect
+        ? { gameState, mySeat, seats, isReconnecting: true } // seats is stale until Welcome arrives
+        : isCrossRefreshReconnect
+          ? { isReconnecting: true }
+          : {};
 
     // Reset state (preserve game fields if reconnecting)
     set({
@@ -150,6 +163,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   },
 
   disconnect: () => {
+          globalThis.sessionStorage?.removeItem(MID_GAME_ROOM_KEY);
     get()._socket?.close();
     set({ ...INITIAL_ONLINE_STATE });
   },
@@ -291,6 +305,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
 
         // If server sent a full game state, apply it
         if (msg.state) {
+          globalThis.sessionStorage?.setItem(MID_GAME_ROOM_KEY, msg.roomCode);
           set({ gameState: msg.state, lobbyPhase: "playing" });
           get()._updateOverlayAfterBatch();
         } else if (msg.phase === "playing" && get().gameState === null) {
@@ -298,6 +313,10 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
           // have no local state — fall back to lobby so the UI doesn't spin
           // forever trying to render a null game (redirect loop prevention).
           set({ lobbyPhase: "lobby" });
+        }
+
+        if (!msg.state) {
+    globalThis.sessionStorage?.removeItem(MID_GAME_ROOM_KEY);
         }
 
         // Drain pending batch (events that arrived before Welcome)
@@ -374,7 +393,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
             gs = applyEvent(gs, ev);
             if (ev.type === "HandScored") pendingHandScore = ev.score;
             if (ev.type === "GameFinished") gameOverReason = ev.reason;
-            if (ev.type === "GameStarted") lobbyPhase = "playing";
+            if (ev.type === "GameStarted") {
+              lobbyPhase = "playing";
+              const rc = get().roomCode;
+              if (rc) globalThis.sessionStorage?.setItem(MID_GAME_ROOM_KEY, rc);
+            }
             const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
             if (next !== null) announcement = next;
           }
@@ -433,7 +456,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
                 gs = applyEvent(gs, ev);
                 if (ev.type === "HandScored") pendingHandScore = ev.score;
                 if (ev.type === "GameFinished") gameOverReason = ev.reason;
-                if (ev.type === "GameStarted") lobbyPhase = "playing";
+                 if (ev.type === "GameStarted") {
+                   lobbyPhase = "playing";
+                   const rc = get().roomCode;
+                   if (rc) globalThis.sessionStorage?.setItem(MID_GAME_ROOM_KEY, rc);
+                 }
                 const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
                 if (next !== null) announcement = next;
               }
@@ -465,7 +492,11 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
         gs = applyEvent(gs, ev);
         if (ev.type === "HandScored") pendingHandScore = ev.score;
         if (ev.type === "GameFinished") gameOverReason = ev.reason;
-        if (ev.type === "GameStarted") lobbyPhase = "playing";
+        if (ev.type === "GameStarted") {
+          lobbyPhase = "playing";
+          const rc = get().roomCode;
+          if (rc) globalThis.sessionStorage?.setItem(MID_GAME_ROOM_KEY, rc);
+        }
         const next = buildAnnouncementFromEvent(ev, gs.rules, sn);
         if (next !== null) announcement = next;
       }

@@ -2203,4 +2203,204 @@ describe("onlineGameStore", () => {
       expect(useOnlineGameStore.getState().isReconnecting).toBe(false);
     });
   });
+
+  // ── Mid-game refresh: sessionStorage flag ────────────────────────────────
+  describe("mid-game refresh — sessionStorage flag", () => {
+    // Use a shared storage mock for the whole describe block
+    const sessionStorageStore: Record<string, string> = {};
+    const mockSessionStorage = {
+      getItem: (key: string) => sessionStorageStore[key] ?? null,
+      setItem: (key: string, value: string) => { sessionStorageStore[key] = value; },
+      removeItem: (key: string) => { delete sessionStorageStore[key]; },
+    };
+
+    beforeEach(() => {
+      vi.stubGlobal("sessionStorage", mockSessionStorage);
+      // Clear the storage before every test to avoid pollution
+      for (const k of Object.keys(sessionStorageStore)) delete sessionStorageStore[k];
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    // T1 — sessionStorage written on GameStarted
+    it("T1: writes rookMidGameRoom to sessionStorage when GameStarted event is applied", () => {
+      // Arrange: store in lobby phase with a roomCode, about to receive GameStarted
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "lobby",
+        myPlayerId: "p1",
+        mySeat: "N",
+        roomCode: "XKCD12",
+        seats: makeSeats("p1", "N"),
+      });
+
+      const gameStartedEvent: GameEvent = {
+        type: "GameStarted",
+        seed: 42,
+        dealer: "W",
+        players: [
+          { seat: "N", name: "Alice", kind: "human" },
+          { seat: "E", name: "Bot E", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+          { seat: "S", name: "Bot S", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+          { seat: "W", name: "Bot W", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+        ],
+        rules: DEFAULT_RULES,
+        timestamp: Date.now(),
+      };
+
+      // Act
+      useOnlineGameStore.getState()._applyIncomingEvents([gameStartedEvent]);
+
+      // Assert
+      expect(sessionStorage.getItem("rookMidGameRoom")).toBe("XKCD12");
+    });
+
+    // T2 — sessionStorage written on Welcome with state
+    it("T2: writes rookMidGameRoom to sessionStorage on Welcome with state", () => {
+      // Arrange: store connecting
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+      });
+
+      const gameState = makeBiddingState("N");
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "XKCD12",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        state: gameState,
+      };
+
+      // Act
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert
+      expect(sessionStorage.getItem("rookMidGameRoom")).toBe("XKCD12");
+    });
+
+    // T3 — sessionStorage cleared on Welcome without state
+    it("T3: clears rookMidGameRoom from sessionStorage on Welcome with no state", () => {
+      // Arrange: pre-set sessionStorage
+      sessionStorage.setItem("rookMidGameRoom", "XKCD12");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+      });
+
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "XKCD12",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "lobby",
+        // no state
+      };
+
+      // Act
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert
+      expect(sessionStorage.getItem("rookMidGameRoom")).toBeNull();
+    });
+
+    // T4 — sessionStorage cleared on disconnect()
+    it("T4: clears rookMidGameRoom from sessionStorage on disconnect()", () => {
+      // Arrange
+      sessionStorage.setItem("rookMidGameRoom", "XKCD12");
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "playing",
+        roomCode: "XKCD12",
+        gameState: makeBiddingState("N"),
+      });
+
+      // Act
+      useOnlineGameStore.getState().disconnect();
+
+      // Assert
+      expect(sessionStorage.getItem("rookMidGameRoom")).toBeNull();
+    });
+
+    // T5 — connect() sets isReconnecting: true from sessionStorage
+    it("T5: connect() sets isReconnecting:true when sessionStorage code matches", () => {
+      // Arrange
+      const localStorageStore: Record<string, string> = {};
+      vi.stubGlobal("localStorage", {
+        getItem: (k: string) => localStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { localStorageStore[k] = v; },
+        removeItem: (k: string) => { delete localStorageStore[k]; },
+      });
+      sessionStorageStore["rookPlayerId"] = "p1";
+      sessionStorageStore["rookMidGameRoom"] = "XKCD12";
+      localStorageStore["rookDisplayName"] = "Alice";
+
+      vi.stubGlobal("WebSocket", class {
+        readyState = WebSocket.CONNECTING;
+        onopen: (() => void) | null = null;
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onclose: (() => void) | null = null;
+        close() {}
+        send() {}
+      });
+
+      resetStore();
+
+      // Store has no gameState (fresh tab after refresh)
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        gameState: null,
+      });
+
+      // Act
+      useOnlineGameStore.getState().connect("XKCD12");
+
+      // Assert
+      expect(useOnlineGameStore.getState().isReconnecting).toBe(true);
+    });
+
+    // T6 — connect() does NOT set isReconnecting when sessionStorage code mismatches
+    it("T6: connect() does NOT set isReconnecting when sessionStorage code mismatches", () => {
+      // Arrange
+      const localStorageStore: Record<string, string> = {};
+      vi.stubGlobal("localStorage", {
+        getItem: (k: string) => localStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { localStorageStore[k] = v; },
+        removeItem: (k: string) => { delete localStorageStore[k]; },
+      });
+      sessionStorageStore["rookPlayerId"] = "p1";
+      sessionStorageStore["rookMidGameRoom"] = "OTHER1"; // different room code
+      localStorageStore["rookDisplayName"] = "Alice";
+
+      vi.stubGlobal("WebSocket", class {
+        readyState = WebSocket.CONNECTING;
+        onopen: (() => void) | null = null;
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onclose: (() => void) | null = null;
+        close() {}
+        send() {}
+      });
+
+      resetStore();
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        gameState: null,
+      });
+
+      // Act
+      useOnlineGameStore.getState().connect("XKCD12");
+
+      // Assert: code mismatch → no isReconnecting
+      expect(useOnlineGameStore.getState().isReconnecting).toBe(false);
+    });
+  });
 });

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useOnlineGameStore } from "@/store/onlineGameStore";
+import { useOnlineGameStore, MID_GAME_ROOM_KEY } from "@/store/onlineGameStore";
 import type { SeatInfo } from "@/store/onlineGameStore.types";
 import type { OverlayKind } from "@/store/gameStore.types";
 import type { GameState, HandScore, Seat, CardId, Color, Team } from "@rook/engine";
@@ -199,17 +199,34 @@ export default function OnlineGamePage() {
   const connectionError = useOnlineGameStore((s) => s.connectionError);
   const _socket = useOnlineGameStore((s) => s._socket);
   const isReconnecting = useOnlineGameStore((s) => s.isReconnecting);
+  const lobbyPhase = useOnlineGameStore((s) => s.lobbyPhase);
   const isHost = myPlayerId !== null && myPlayerId !== "" && myPlayerId === hostId;
+
+  // Mount-only effect: reconnect automatically on mid-game refresh (direct navigation)
+  useEffect(() => {
+    const storedCode = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY);
+    // On a cold page refresh, lobbyPhase starts as "idle" (store is wiped).
+    // Guard against re-connecting if a connection is already in progress.
+    if (storedCode && storedCode === code && lobbyPhase === "idle") {
+      connect(code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Empty deps: mount-only. Adding lobbyPhase/connect would cause double-connect
+    // when Welcome arrives and sets lobbyPhase="connecting".
+  }, []);
 
   // Navigate back if no game state
   useEffect(() => {
-    if (!gameState && !isReconnecting) {
+    const storedCode = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY);
+    if (!gameState && !isReconnecting && storedCode !== code) {
       void navigate(code ? `/online/${code}` : "/online");
     }
   }, [gameState, isReconnecting, code, navigate]);
 
+  const hasMidGameFlag = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === code;
+
   if (!gameState) {
-    if (isReconnecting) {
+    if (isReconnecting || hasMidGameFlag) {
       return <div className={styles.reconnecting}><p>Reconnecting…</p></div>;
     }
     return null;

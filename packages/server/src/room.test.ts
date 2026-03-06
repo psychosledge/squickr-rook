@@ -502,4 +502,121 @@ describe("RookRoom — reconnect race condition fixes", () => {
       expect(roomInternal.gamePaused).toBe(true);
     });
   });
+
+  // ── T11: normal path mid-game reconnect — clears gamePaused ──────────────
+
+  describe("handleJoinRoom normal path: mid-game reconnect when JoinRoom beats onClose", () => {
+    it("T11: clears gamePaused and broadcasts PlayerReconnected when disconnectedSeats is empty after rejoining", async () => {
+      // Scenario: player N is in seatedPlayers with a new connId (JoinRoom beat onClose).
+      // gamePaused=true (some other player disconnected and reconnected, leaving gamePaused stuck),
+      // disconnectedSeats is empty.
+      // After the normal-path join, if phase=playing and seat found with gamePaused=true, clear it.
+
+      const conns = await setupFourPlayerLobby(rookRoom, room);
+      await sendStartGame(rookRoom, conns.N);
+
+      // Force gamePaused=true and disconnectedSeats empty (JoinRoom beat onClose scenario)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+      rookInternal.gamePaused = true;
+      // disconnectedSeats is already empty (JoinRoom arrived before onClose)
+
+      // Now a new connection for N joins (simulating the refresh tab re-connecting)
+      const newConnN = makeMockConn("new-conn-N-t11");
+      room.addConn(newConnN);
+
+      // Clear sent messages before the join
+      newConnN._sent.length = 0;
+      conns.E._sent.length = 0;
+      conns.S._sent.length = 0;
+      conns.W._sent.length = 0;
+
+      // N joins with a new connection (but same playerId)
+      await sendJoinRoom(rookRoom, newConnN, "player-N", "Alice");
+
+      // Assert: gamePaused should be false (cleared because no disconnected seats)
+      expect(rookInternal.gamePaused).toBe(false);
+
+      // Assert: PlayerReconnected was broadcast to all connections
+      const msgsE = getMessages(conns.E);
+      const msgsS = getMessages(conns.S);
+      const msgsW = getMessages(conns.W);
+      expect(msgsE.filter((m) => m.type === "PlayerReconnected")).toHaveLength(1);
+      expect(msgsS.filter((m) => m.type === "PlayerReconnected")).toHaveLength(1);
+      expect(msgsW.filter((m) => m.type === "PlayerReconnected")).toHaveLength(1);
+
+      // Assert: Welcome with state was sent to the new conn
+      const newConnMsgs = getMessages(newConnN);
+      const welcomeMsgs = newConnMsgs.filter((m) => m.type === "Welcome") as Array<{
+        type: string;
+        state?: unknown;
+      }>;
+      expect(welcomeMsgs.length).toBeGreaterThan(0);
+      expect(welcomeMsgs[welcomeMsgs.length - 1]!.state).toBeDefined();
+    });
+
+    it("T12: does NOT clear gamePaused when other disconnected seats remain", async () => {
+      // Scenario: N rejoins (normal path), but E is still in disconnectedSeats.
+      // gamePaused should stay true because E is still disconnected.
+
+      const conns = await setupFourPlayerLobby(rookRoom, room);
+      await sendStartGame(rookRoom, conns.N);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+      rookInternal.gamePaused = true;
+      // E is still disconnected
+      rookInternal.disconnectedSeats.set("E", { playerId: "player-E", displayName: "Bob" });
+      rookInternal.seatedPlayers.delete("E");
+
+      conns.S._sent.length = 0;
+      conns.W._sent.length = 0;
+
+      // N joins (hits normal path since N is still in seatedPlayers and NOT in disconnectedSeats)
+      const newConnN = makeMockConn("new-conn-N-t12");
+      room.addConn(newConnN);
+      await sendJoinRoom(rookRoom, newConnN, "player-N", "Alice");
+
+      // Assert: gamePaused still true (E is still disconnected)
+      expect(rookInternal.gamePaused).toBe(true);
+
+      // Assert: NO PlayerReconnected broadcast (because disconnectedSeats is not empty)
+      const msgsS = getMessages(conns.S);
+      const msgsW = getMessages(conns.W);
+      expect(msgsS.filter((m) => m.type === "PlayerReconnected")).toHaveLength(0);
+      expect(msgsW.filter((m) => m.type === "PlayerReconnected")).toHaveLength(0);
+    });
+  });
+
+  // ── T13: buildSeatInfoArray returns playerId/displayName for disconnected seat ──
+
+  describe("buildSeatInfoArray: preserves playerId and displayName for disconnected seats", () => {
+    it("T13: returns playerId and displayName (not null) for disconnected seat", async () => {
+      const conns = await setupFourPlayerLobby(rookRoom, room);
+      await sendStartGame(rookRoom, conns.N);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+
+      // Manually add N to disconnectedSeats (simulating a disconnect)
+      rookInternal.disconnectedSeats.set("N", { playerId: "player-N", displayName: "Alice" });
+      rookInternal.seatedPlayers.delete("N");
+
+      // Call buildSeatInfoArray
+      const seatInfoArray = rookInternal.buildSeatInfoArray() as Array<{
+        seat: Seat;
+        playerId: string | null;
+        displayName: string | null;
+        connected: boolean;
+        isBot: boolean;
+      }>;
+
+      const seatN = seatInfoArray.find((s) => s.seat === "N");
+      expect(seatN).toBeDefined();
+      expect(seatN!.playerId).toBe("player-N");
+      expect(seatN!.displayName).toBe("Alice");
+      expect(seatN!.connected).toBe(false);
+      expect(seatN!.isBot).toBe(false);
+    });
+  });
 });
