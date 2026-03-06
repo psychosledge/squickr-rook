@@ -232,7 +232,8 @@ export default class RookRoom implements Party.Server {
         }
         const displayName = state?.displayName ?? "Player";
         // Track disconnection — do not convert to bot yet
-        this.disconnectedSeats.set(seat, { playerId: state!.playerId, displayName });
+        if (!state?.playerId) return; // connection closed before JoinRoom — nothing to clean up
+        this.disconnectedSeats.set(seat, { playerId: state.playerId, displayName });
         // Remove from seatedPlayers so buildSeatInfoArray sees it as disconnected
         this.seatedPlayers.delete(seat);
         // Broadcast disconnection notification

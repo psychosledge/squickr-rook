@@ -186,6 +186,20 @@ export function buildLeaveGameHandler(opts: {
   };
 }
 
+// ── Reconnect guard helper (exported for testing) ────────────────────────────
+
+/**
+ * Pure helper that decides whether to show the "Reconnecting…" screen
+ * when gameState is null. Extracted for testability.
+ */
+export function shouldShowReconnecting(opts: {
+  isReconnecting: boolean;
+  hasMidGameFlag: boolean;
+  lobbyPhase: string;
+}): boolean {
+  return opts.isReconnecting || opts.hasMidGameFlag || opts.lobbyPhase === "connecting";
+}
+
 // ── Default Export: OnlineGamePage ───────────────────────────────────────────
 
 export default function OnlineGamePage() {
@@ -250,7 +264,7 @@ export default function OnlineGamePage() {
   const hasMidGameFlag = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === code;
 
   if (!gameState) {
-    if (isReconnecting || hasMidGameFlag) {
+    if (shouldShowReconnecting({ isReconnecting, hasMidGameFlag, lobbyPhase })) {
       return <div className={styles.reconnecting}><p>Reconnecting…</p></div>;
     }
     return null;

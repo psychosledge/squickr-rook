@@ -137,6 +137,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     };
 
     ws.onmessage = (e) => {
+      if (get()._socket !== ws) return; // stale socket guard
       get()._handleMessage(JSON.parse(e.data as string) as ServerMessage);
     };
 
@@ -163,7 +164,7 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
   },
 
   disconnect: () => {
-          globalThis.sessionStorage?.removeItem(MID_GAME_ROOM_KEY);
+    globalThis.sessionStorage?.removeItem(MID_GAME_ROOM_KEY);
     get()._socket?.close();
     set({ ...INITIAL_ONLINE_STATE });
   },
@@ -293,30 +294,31 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
         const { myPlayerId } = get();
         const mySeat = msg.seats.find((s) => s.playerId === myPlayerId)?.seat ?? null;
 
+        if (msg.state) {
+          globalThis.sessionStorage?.setItem(MID_GAME_ROOM_KEY, msg.roomCode);
+        } else {
+          globalThis.sessionStorage?.removeItem(MID_GAME_ROOM_KEY);
+        }
+
         set({
-          lobbyPhase: msg.phase,
+          // If server says "playing" but sent no state snapshot, fall back to "lobby"
+          // to prevent OnlineGamePage from looping on a null gameState.
+          lobbyPhase: msg.state
+            ? "playing"
+            : msg.phase === "playing"
+              ? "lobby"   // redirect-loop prevention
+              : msg.phase,
           seats: msg.seats,
           hostId: msg.hostId,
           mySeat,
           roomCode: msg.roomCode,
           connectionError: null,
           isReconnecting: false,
+          ...(msg.state ? { gameState: msg.state } : {}),
         });
 
-        // If server sent a full game state, apply it
         if (msg.state) {
-          globalThis.sessionStorage?.setItem(MID_GAME_ROOM_KEY, msg.roomCode);
-          set({ gameState: msg.state, lobbyPhase: "playing" });
           get()._updateOverlayAfterBatch();
-        } else if (msg.phase === "playing" && get().gameState === null) {
-          // Server says game is in progress but sent no state snapshot and we
-          // have no local state — fall back to lobby so the UI doesn't spin
-          // forever trying to render a null game (redirect loop prevention).
-          set({ lobbyPhase: "lobby" });
-        }
-
-        if (!msg.state) {
-    globalThis.sessionStorage?.removeItem(MID_GAME_ROOM_KEY);
         }
 
         // Drain pending batch (events that arrived before Welcome)

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import type { GameState } from "@rook/engine";
 import { DEFAULT_RULES } from "@rook/engine";
-import { OnlineGamePageView, buildPlayAgainHandler, buildLeaveGameHandler } from "./OnlineGamePage";
+import { OnlineGamePageView, buildPlayAgainHandler, buildLeaveGameHandler, shouldShowReconnecting } from "./OnlineGamePage";
 import type { OnlineGamePageViewProps } from "./OnlineGamePage";
 
 // Mock CSS modules
@@ -532,6 +532,65 @@ describe("OnlineGamePage — navigation handlers", () => {
     expect(navigate).toHaveBeenCalledWith("/online");
     expect(navigate).not.toHaveBeenCalledWith(`/online/${code}`);
     expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Fix 3: shouldShowReconnecting guard includes lobbyPhase === "connecting"
+// ---------------------------------------------------------------------------
+
+describe("shouldShowReconnecting — blank-screen guard", () => {
+
+  it("34. returns true when isReconnecting=true (existing behaviour)", () => {
+    expect(shouldShowReconnecting({
+      isReconnecting: true,
+      hasMidGameFlag: false,
+      lobbyPhase: "idle",
+    })).toBe(true);
+  });
+
+  it("35. returns true when hasMidGameFlag=true (existing behaviour)", () => {
+    expect(shouldShowReconnecting({
+      isReconnecting: false,
+      hasMidGameFlag: true,
+      lobbyPhase: "idle",
+    })).toBe(true);
+  });
+
+  it("36. returns true when lobbyPhase='connecting' even if isReconnecting=false and hasMidGameFlag=false (Fix 3)", () => {
+    // This is the new behaviour added by Fix 3.
+    // Before the fix, a fresh reconnect with lobbyPhase="connecting" but no
+    // sessionStorage flag would fall through to `return null`, causing the blank screen.
+    expect(shouldShowReconnecting({
+      isReconnecting: false,
+      hasMidGameFlag: false,
+      lobbyPhase: "connecting",
+    })).toBe(true);
+  });
+
+  it("37. returns false when all conditions are false (no reconnect needed)", () => {
+    expect(shouldShowReconnecting({
+      isReconnecting: false,
+      hasMidGameFlag: false,
+      lobbyPhase: "idle",
+    })).toBe(false);
+  });
+
+  it("38. returns false when lobbyPhase='lobby' (not connecting)", () => {
+    expect(shouldShowReconnecting({
+      isReconnecting: false,
+      hasMidGameFlag: false,
+      lobbyPhase: "lobby",
+    })).toBe(false);
+  });
+
+  it("39. returns false when lobbyPhase='playing' and no other flags", () => {
+    expect(shouldShowReconnecting({
+      isReconnecting: false,
+      hasMidGameFlag: false,
+      lobbyPhase: "playing",
+    })).toBe(false);
   });
 
 });

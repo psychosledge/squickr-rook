@@ -2204,6 +2204,178 @@ describe("onlineGameStore", () => {
     });
   });
 
+  // ── Fix 1: stale-socket guard in ws.onmessage ────────────────────────────
+  describe("Fix 1: stale socket onmessage guard", () => {
+    const localStorageStore: Record<string, string> = {};
+    const sessionStorageStore: Record<string, string> = {};
+
+    beforeEach(() => {
+      vi.stubGlobal("localStorage", {
+        getItem: (k: string) => localStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { localStorageStore[k] = v; },
+        removeItem: (k: string) => { delete localStorageStore[k]; },
+      });
+      vi.stubGlobal("sessionStorage", {
+        getItem: (k: string) => sessionStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { sessionStorageStore[k] = v; },
+        removeItem: (k: string) => { delete sessionStorageStore[k]; },
+      });
+      sessionStorageStore["rookPlayerId"] = "p1";
+      localStorageStore["rookDisplayName"] = "Alice";
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const k of Object.keys(localStorageStore)) delete localStorageStore[k];
+      for (const k of Object.keys(sessionStorageStore)) delete sessionStorageStore[k];
+    });
+
+    it("stale socket onmessage does NOT update store state when a new socket has replaced it", () => {
+      // Capture sockets so we can manually invoke onmessage
+      const capturedSockets: Array<{
+        onmessage: ((e: MessageEvent) => void) | null;
+        close: () => void;
+      }> = [];
+
+      vi.stubGlobal("WebSocket", class {
+        readyState = 1; // OPEN
+        onopen: (() => void) | null = null;
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: (() => void) | null = null;
+        onclose: (() => void) | null = null;
+        close() {}
+        send() {}
+        constructor() { capturedSockets.push(this); }
+      });
+
+      // First connect
+      useOnlineGameStore.getState().connect("ROOM1");
+      const firstSocket = capturedSockets[0];
+      expect(firstSocket).toBeDefined();
+
+      // Second connect (replaces first socket)
+      useOnlineGameStore.getState().connect("ROOM1");
+      expect(capturedSockets).toHaveLength(2);
+
+      // Store is now in connecting phase for the second socket
+      expect(useOnlineGameStore.getState().lobbyPhase).toBe("connecting");
+
+      // Manually fire onmessage on the STALE (first) socket — should be a no-op
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "lobby",
+      };
+
+      // The first socket's onmessage handler should NOT update the store
+      firstSocket.onmessage?.({ data: JSON.stringify(welcomeMsg) } as unknown as MessageEvent);
+
+      // Store lobbyPhase must NOT have changed to "lobby" — the stale message was dropped
+      expect(useOnlineGameStore.getState().lobbyPhase).toBe("connecting");
+    });
+  });
+
+  // ── Fix 2: Welcome handler atomic set() ──────────────────────────────────
+  describe("Fix 2: Welcome with state produces atomic update (no intermediate render gap)", () => {
+    const sessionStorageStore: Record<string, string> = {};
+
+    beforeEach(() => {
+      vi.stubGlobal("sessionStorage", {
+        getItem: (k: string) => sessionStorageStore[k] ?? null,
+        setItem: (k: string, v: string) => { sessionStorageStore[k] = v; },
+        removeItem: (k: string) => { delete sessionStorageStore[k]; },
+      });
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const k of Object.keys(sessionStorageStore)) delete sessionStorageStore[k];
+    });
+
+    it("after Welcome with state: isReconnecting===false AND gameState is non-null simultaneously (atomic)", () => {
+      // Arrange: store in reconnecting state
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        isReconnecting: true,
+        gameState: null,
+      });
+
+      const serverGameState = makeBiddingState("E");
+
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        state: serverGameState,
+      };
+
+      // Act
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+
+      // Assert: in the final state, both conditions must hold together
+      // (The test verifies atomicity by checking final state — if two set() calls
+      // were used, there would be an intermediate state, but we verify the final
+      // state has both correct values simultaneously)
+      const state = useOnlineGameStore.getState();
+      expect(state.isReconnecting).toBe(false);
+      expect(state.gameState).not.toBeNull();
+      expect(state.gameState).toEqual(serverGameState);
+      expect(state.lobbyPhase).toBe("playing");
+    });
+
+    it("after Welcome with state: both isReconnecting and gameState are updated in one logical step", () => {
+      // Additional atomicity check: subscribe to store changes and verify
+      // there is never a state where isReconnecting===false but gameState===null
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "connecting",
+        myPlayerId: "p1",
+        isReconnecting: true,
+        gameState: null,
+      });
+
+      const serverGameState = makeBiddingState("N");
+      let sawBadIntermediateState = false;
+
+      // Subscribe to store to detect any intermediate bad state
+      const unsubscribe = useOnlineGameStore.subscribe((state) => {
+        // If isReconnecting became false but gameState is still null — that's the bug
+        // exclude idle — that's the store reset, not an intermediate bad state
+        if (state.isReconnecting === false && state.gameState === null && state.lobbyPhase !== "idle") {
+          sawBadIntermediateState = true;
+        }
+      });
+
+      const welcomeMsg: WelcomeMsg = {
+        type: "Welcome",
+        roomCode: "ROOM1",
+        hostId: "p1",
+        seats: makeSeats("p1", "N"),
+        phase: "playing",
+        state: serverGameState,
+      };
+
+      useOnlineGameStore.getState()._handleMessage(welcomeMsg);
+      unsubscribe();
+
+      // The bad intermediate state must never have occurred
+      expect(sawBadIntermediateState).toBe(false);
+
+      // And final state is correct
+      const state = useOnlineGameStore.getState();
+      expect(state.isReconnecting).toBe(false);
+      expect(state.gameState).not.toBeNull();
+    });
+  });
+
   // ── Mid-game refresh: sessionStorage flag ────────────────────────────────
   describe("mid-game refresh — sessionStorage flag", () => {
     // Use a shared storage mock for the whole describe block
