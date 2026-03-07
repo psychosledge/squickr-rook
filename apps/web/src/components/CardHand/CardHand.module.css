@@ -41,6 +41,17 @@
   height: fit-content;
 }
 
+/* Re-assert column layout at desktop — the desktop .hand rule runs after .vertical
+   and would otherwise override flex-direction back to row */
+@media (min-width: 901px) {
+  .vertical {
+    flex-direction: column;
+    overflow: visible;
+    position: relative;
+    gap: 0;
+  }
+}
+
 .vertical > * {
   margin-left: 0 !important;
   margin-top: -15px;
