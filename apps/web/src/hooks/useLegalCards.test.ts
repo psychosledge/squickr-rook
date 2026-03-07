@@ -101,4 +101,37 @@ describe("useLegalCards", () => {
     const result = useLegalCards(gameState, "N");
     expect(result).toEqual(["B5", "B10"]);
   });
+
+  it("does NOT throw and returns [] when called for a non-active seat with masked hand ('??')", () => {
+    // Regression test: in online multiplayer, opponents' hands arrive as masked
+    // cardIds ("??"). Before the fix, calling useLegalCards for an opponent seat
+    // (even when that seat is the activePlayer) would crash with
+    // "Unknown color initial: ?" because legalCommands tried to parse "??".
+    //
+    // Two guard lines protect against this:
+    //  1. activePlayer !== seat  → returns [] for any seat that is not active
+    //  2. hand contains "??"    → returns [] when the active seat has a masked hand
+    //     (prevents the throw inside getLegalCards when a trick is already in progress)
+    const gameState = makePlayingGameState({
+      activePlayer: "S",
+      hands: {
+        N: ["R5", "G7", "B10"] as CardId[],
+        E: ["??", "??", "??"] as CardId[],
+        S: ["??", "??", "??"] as CardId[], // S is active but hand is masked (opponent)
+        W: ["??", "??", "??"] as CardId[],
+      },
+      // Non-empty trick forces getLegalCards to call cardFromId on hand cards —
+      // the actual crash path that produced "Unknown color initial: ?"
+      currentTrick: [{ seat: "N", cardId: "R5" as CardId }],
+    });
+
+    // Calling for seat "N" (not active) — must return [] without throwing
+    expect(() => useLegalCards(gameState, "N")).not.toThrow();
+    expect(useLegalCards(gameState, "N")).toEqual([]);
+
+    // Calling for seat "S" (active, but masked hand with a trick in progress) —
+    // must return [] without throwing. This is the real crash scenario.
+    expect(() => useLegalCards(gameState, "S")).not.toThrow();
+    expect(useLegalCards(gameState, "S")).toEqual([]);
+  });
 });

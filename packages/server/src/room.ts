@@ -254,12 +254,6 @@ export default class RookRoom implements Party.Server {
   // ── Private handlers ────────────────────────────────────────────────────────
 
   private async handleJoinRoom(msg: JoinRoom, conn: Party.Connection): Promise<void> {
-    console.log('[handleJoinRoom] playerId=%s | phase=%s | inDisconnectedSeats=%s | inSeatedPlayers=%s',
-      msg.playerId,
-      this.phase,
-      [...this.disconnectedSeats.values()].some(e => e.playerId === msg.playerId),
-      [...this.seatedPlayers.values()].some(e => e.playerId === msg.playerId)
-    );
     // ── Reconnect path ────────────────────────────────────────────────────────
     // Check if this player was disconnected mid-game and is rejoining.
     const reconnectEntry = [...this.disconnectedSeats.entries()]
@@ -304,11 +298,6 @@ export default class RookRoom implements Party.Server {
         seats: this.buildSeatInfoArray(),
         state: maskState(this.gameState!, disconnectedSeat),
       } satisfies Welcome;
-      console.log('[handleJoinRoom] sending Welcome | phase=%s | hasState=%s | seat=%s',
-        reconnectWelcome.phase,
-        !!(reconnectWelcome as any).state,
-        disconnectedSeat
-      );
       this.sendTo(conn, reconnectWelcome);
 
       // Clear gamePaused if no more disconnected seats remain
@@ -374,11 +363,6 @@ export default class RookRoom implements Party.Server {
         ? { state: maskState(this.gameState, seat) }
         : {}),
     };
-    console.log('[handleJoinRoom] sending Welcome | phase=%s | hasState=%s | seat=%s',
-      welcome.phase,
-      !!(welcome as any).state,
-      (welcome as any).seat ?? seat ?? 'none'
-    );
     this.sendTo(conn, welcome);
 
     // Normal-path mid-game reconnect: if the game is playing and this player has a seat,
@@ -656,10 +640,6 @@ export default class RookRoom implements Party.Server {
   // ── Broadcast helpers ───────────────────────────────────────────────────────
 
   private broadcastEvents(events: GameEvent[]): void {
-    console.log('[broadcastEvents] events=%s | to=%d connections',
-      events.map(e => e.type).join(','),
-      [...this.room.getConnections()].filter(c => getState(c)?.seat).length
-    );
     for (const conn of this.room.getConnections()) {
       const state = getState(conn);
       if (!state?.seat) continue;

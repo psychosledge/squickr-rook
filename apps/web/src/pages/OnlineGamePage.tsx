@@ -263,16 +263,6 @@ export default function OnlineGamePage() {
 
   const hasMidGameFlag = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === code;
 
-  console.log('[OnlineGamePage render] gameState=%s | lobbyPhase=%s | isReconnecting=%s | hasMidGameFlag=%s | overlay=%s | connectionError=%s | socket=%s',
-    !!gameState,
-    lobbyPhase,
-    isReconnecting,
-    hasMidGameFlag,
-    overlay,
-    connectionError,
-    !!_socket
-  );
-
   if (!gameState) {
     if (shouldShowReconnecting({ isReconnecting, hasMidGameFlag, lobbyPhase })) {
       return <div className={styles.reconnecting}><p>Reconnecting…</p></div>;
