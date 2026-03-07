@@ -1,18 +1,24 @@
 /* BiddingOverlay.module.css */
 .overlay {
-  position: static;
-  background: none;
-  display: block;
-  width: 100%;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
 }
 
 .panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 0;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
-  padding: 12px 16px;
-  width: 100%;
+  border-radius: 12px;
+  padding: 16px;
+  width: calc(100% - 32px);
+  max-width: 360px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
 }
 
 .title {
