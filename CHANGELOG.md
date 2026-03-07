@@ -4,9 +4,14 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
-## [v1.1.0] — 2026-03-06
+## [v1.1.0] — 2026-03-07
+
+### New Features
+- **Opponent hand display** — face-down card backs are now shown for all opponent hands, with correct rotation for side seats (East/West), so the table always looks like a real game in progress
+- **Automatic misdeal handling** — if any player is dealt a hand with no point cards, the engine silently redeals with an alternate deterministic seed; players never receive an unplayable all-blank hand, and online multiplayer stays in sync
 
 ### Bug Fixes
+- **BiddingOverlay mobile layout** — the bidding overlay now uses `position: fixed` on mobile so it renders as a true overlay instead of pushing game content down
 - **Blank screen on reconnect** — the reconnecting splash text was invisible (`color: #555` on a dark background); fixed to use the correct `--color-text` token so the "Reconnecting…" message is always legible
 - **Redirect loop on mid-game rejoin** — when the server sent `Welcome { phase: "playing" }` without a game state (e.g. during a race between the new and old socket), the client entered an infinite navigate loop between the lobby and game pages; fixed by falling back to `lobbyPhase: "lobby"` in that case so the client waits for a full state sync
 - **Game not pausing on non-active-player disconnect** — if a player who was NOT the current active player disconnected mid-game, `gamePaused` was never set; the game would silently continue until it stalled on that player's turn; now `gamePaused = true` for any human disconnect during the playing phase
