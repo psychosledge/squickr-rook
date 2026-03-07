@@ -14,6 +14,7 @@ vi.mock("./PlayingCard.module.css", () => ({
     bottomRight: "bottomRight",
     displayOnly: "displayOnly",
     fromNest: "fromNest",
+    small: "small",
   },
 }));
 
@@ -224,5 +225,47 @@ describe("PlayingCard — aria-label (from nest)", () => {
   it('does NOT include " (from nest)" in aria-label when isFromNest is omitted', () => {
     const el = renderCard({ cardId: "R5" });
     expect(getProps(el)["aria-label"]).toBe("5 Red");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: size prop
+// ---------------------------------------------------------------------------
+
+describe("PlayingCard — size prop", () => {
+  it("applies 'small' class when size='sm' and faceDown=true", () => {
+    const el = renderCard({ cardId: "R5", faceDown: true, size: "sm" });
+    const className = getProps(el).className as string;
+    expect(className).toContain("small");
+  });
+
+  it("does NOT apply 'small' class when size='normal' and faceDown=true", () => {
+    const el = renderCard({ cardId: "R5", faceDown: true, size: "normal" });
+    const className = getProps(el).className as string;
+    expect(className).not.toContain("small");
+  });
+
+  it("does NOT apply 'small' class when size is omitted and faceDown=true", () => {
+    const el = renderCard({ cardId: "R5", faceDown: true });
+    const className = getProps(el).className as string;
+    expect(className).not.toContain("small");
+  });
+
+  it("applies 'small' class when size='sm' and faceDown=false", () => {
+    const el = renderCard({ cardId: "R5", faceDown: false, size: "sm" });
+    const className = getProps(el).className as string;
+    expect(className).toContain("small");
+  });
+
+  it("does NOT apply 'small' class when size='normal' and faceDown=false", () => {
+    const el = renderCard({ cardId: "R5", faceDown: false, size: "normal" });
+    const className = getProps(el).className as string;
+    expect(className).not.toContain("small");
+  });
+
+  it("does NOT apply 'small' class when size is omitted and faceDown=false", () => {
+    const el = renderCard({ cardId: "R5", faceDown: false });
+    const className = getProps(el).className as string;
+    expect(className).not.toContain("small");
   });
 });

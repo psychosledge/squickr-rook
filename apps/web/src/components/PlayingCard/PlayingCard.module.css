@@ -100,3 +100,8 @@
   border: 1.5px solid var(--color-bg);
   z-index: 2;
 }
+
+.small {
+  width: var(--card-w-sm);
+  height: var(--card-h-sm);
+}

@@ -7,6 +7,7 @@ import type { CardId } from "@rook/engine";
 vi.mock("./CardHand.module.css", () => ({
   default: {
     hand: "hand",
+    vertical: "vertical",
   },
 }));
 
@@ -94,5 +95,73 @@ describe("CardHand — key uniqueness", () => {
 
     // Assert
     expect(uniqueKeys.size).toBe(children.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers for new tests
+// ---------------------------------------------------------------------------
+
+const testHand: CardId[] = ["R5", "G7", "B10"] as CardId[];
+
+function getHandElement(node: React.ReactNode): React.ReactElement {
+  if (!React.isValidElement(node)) throw new Error("Not a valid element");
+  return node as React.ReactElement;
+}
+
+// ---------------------------------------------------------------------------
+// Tests: orientation prop
+// ---------------------------------------------------------------------------
+
+describe("CardHand — orientation prop", () => {
+  it("does NOT apply 'vertical' class when orientation='horizontal'", () => {
+    const element = CardHand({ cards: testHand, faceDown: false, orientation: "horizontal" });
+    const handEl = getHandElement(element);
+    const className = (handEl.props as Record<string, unknown>).className as string;
+    expect(className).not.toContain("vertical");
+  });
+
+  it("does NOT apply 'vertical' class when orientation is omitted", () => {
+    const element = CardHand({ cards: testHand, faceDown: false });
+    const handEl = getHandElement(element);
+    const className = (handEl.props as Record<string, unknown>).className as string;
+    expect(className).not.toContain("vertical");
+  });
+
+  it("applies 'vertical' class when orientation='vertical'", () => {
+    const element = CardHand({ cards: testHand, faceDown: false, orientation: "vertical" });
+    const handEl = getHandElement(element);
+    const className = (handEl.props as Record<string, unknown>).className as string;
+    expect(className).toContain("vertical");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: size prop passthrough
+// ---------------------------------------------------------------------------
+
+describe("CardHand — size prop passthrough", () => {
+  it("passes size='sm' to all PlayingCard children when size='sm'", () => {
+    const element = CardHand({ cards: testHand, faceDown: false, size: "sm" });
+    const children = getDirectChildren(element);
+    const sizes = children.map((el) => (el.props as Record<string, unknown>)["size"]);
+    expect(sizes).toHaveLength(3);
+    sizes.forEach((s) => expect(s).toBe("sm"));
+  });
+
+  it("passes size='normal' to all PlayingCard children when size='normal'", () => {
+    const element = CardHand({ cards: testHand, faceDown: false, size: "normal" });
+    const children = getDirectChildren(element);
+    const sizes = children.map((el) => (el.props as Record<string, unknown>)["size"]);
+    expect(sizes).toHaveLength(3);
+    sizes.forEach((s) => expect(s).toBe("normal"));
+  });
+
+  it("passes undefined to all PlayingCard children when size is omitted", () => {
+    const element = CardHand({ cards: testHand, faceDown: false });
+    const children = getDirectChildren(element);
+    const sizes = children.map((el) => (el.props as Record<string, unknown>)["size"]);
+    expect(sizes).toHaveLength(3);
+    sizes.forEach((s) => expect(s).toBeUndefined());
   });
 });

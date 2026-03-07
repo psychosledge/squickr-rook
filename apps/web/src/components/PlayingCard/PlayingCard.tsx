@@ -10,6 +10,7 @@ type Props = {
   isDisplay?: boolean;
   isSelected?: boolean;
   isFromNest?: boolean;
+  size?: 'normal' | 'sm';
   onClick?: () => void;
   style?: CSSProperties;
 };
@@ -21,18 +22,19 @@ export default function PlayingCard({
   isDisplay = false,
   isSelected = false,
   isFromNest = false,
+  size = 'normal',
   onClick,
   style,
 }: Props) {
   if (faceDown) {
-    return <div className={styles.faceDown} style={style} />;
+    return <div className={`${styles.faceDown}${size === 'sm' ? ` ${styles.small}` : ''}`} style={style} />;
   }
 
   const display = getCardDisplay(cardId);
 
   return (
     <div
-      className={`${styles.card} ${!isPlayable && !isDisplay ? styles.unplayable : ""} ${isDisplay ? styles.displayOnly : ""} ${isSelected ? styles.selected : ""} ${isFromNest ? styles.fromNest : ""}`}
+      className={`${styles.card} ${!isPlayable && !isDisplay ? styles.unplayable : ""} ${isDisplay ? styles.displayOnly : ""} ${isSelected ? styles.selected : ""} ${isFromNest ? styles.fromNest : ""}${size === 'sm' ? ` ${styles.small}` : ''}`}
       style={{
         backgroundColor: display.bgColor,
         borderColor: isSelected ? "#ffffff" : display.borderColor,

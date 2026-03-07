@@ -14,6 +14,9 @@
   /* mobile-first: base = mobile */
   --card-w: 48px;
   --card-h: 68px;
+  /* opponent card size: ~60% of normal */
+  --card-w-sm: 29px;
+  --card-h-sm: 41px;
 }
 
 body {
@@ -35,6 +38,8 @@ body {
   :root {
     --card-w: 52px;
     --card-h: 74px;
+    --card-w-sm: 31px;
+    --card-h-sm: 44px;
   }
 }
 
@@ -43,6 +48,8 @@ body {
   :root {
     --card-w: 56px;
     --card-h: 80px;
+    --card-w-sm: 34px;
+    --card-h-sm: 48px;
   }
 }
 

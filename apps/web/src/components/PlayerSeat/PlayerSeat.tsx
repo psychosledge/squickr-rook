@@ -25,6 +25,11 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
   const label = displayName ?? getSeatLabel(seat);
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
 
+  const cardOrientation: 'horizontal' | 'vertical' =
+    (position === 'left' || position === 'right') ? 'vertical' : 'horizontal';
+
+  const cardSize: 'normal' | 'sm' = (position === 'top' || position === 'left' || position === 'right') ? 'sm' : 'normal';
+
   return (
     <div className={`${styles.seat} ${isActive ? styles.active : ""}`} data-seat={seat} data-face-down={faceDown ? "true" : undefined} data-position={position}>
       <div className={styles.nameRow}>
@@ -37,6 +42,8 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
         <CardHand
           cards={cards}
           faceDown={faceDown}
+          orientation={cardOrientation}
+          size={cardSize}
           legalCardIds={faceDown ? undefined : (phase === "playing" && onCardClick ? legalCards : undefined)}
           onCardClick={!faceDown ? onCardClick : undefined}
         />

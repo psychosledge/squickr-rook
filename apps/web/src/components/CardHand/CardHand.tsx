@@ -7,17 +7,20 @@ type Props = {
   faceDown: boolean;
   legalCardIds?: CardId[];
   onCardClick?: (cardId: CardId) => void;
+  orientation?: 'horizontal' | 'vertical';
+  size?: 'normal' | 'sm';
 };
 
-export default function CardHand({ cards, faceDown, legalCardIds, onCardClick }: Props) {
+export default function CardHand({ cards, faceDown, legalCardIds, onCardClick, orientation, size }: Props) {
   return (
-    <div className={styles.hand}>
+    <div className={`${styles.hand}${orientation === 'vertical' ? ` ${styles.vertical}` : ''}`}>
       {cards.map((cardId, index) => (
         <PlayingCard
           // key=index intentional: cardId can be "??" for masked hands (not unique)
           key={index}
           cardId={cardId}
           faceDown={faceDown}
+          size={size}
           isPlayable={faceDown ? false : (legalCardIds ? legalCardIds.includes(cardId) : true)}
           onClick={onCardClick ? () => onCardClick(cardId) : undefined}
           style={{ zIndex: index, ...(index === 0 ? { marginLeft: 0 } : {}) }}

@@ -14,8 +14,8 @@
 }
 
 .top    { grid-area: top;    display: flex; justify-content: center; }
-.left   { grid-area: left;   display: flex; align-items: center; padding: 2px; }
-.right  { grid-area: right;  display: flex; align-items: center; padding: 2px; }
+.left   { grid-area: left;   display: flex; align-items: center; padding: 2px; overflow: visible; }
+.right  { grid-area: right;  display: flex; align-items: center; padding: 2px; overflow: visible; }
 .center { grid-area: center; display: flex; align-items: center; justify-content: center; min-height: 0; }
 .bottom { grid-area: bottom; display: flex; justify-content: center; }
 
@@ -39,6 +39,6 @@
     padding: 4px;
   }
 
-  .left  { align-items: center; padding: 4px; }
-  .right { align-items: center; padding: 4px; }
+  .left  { align-items: center; padding: 4px; overflow: visible; }
+  .right { align-items: center; padding: 4px; overflow: visible; }
 }

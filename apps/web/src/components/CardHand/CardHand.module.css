@@ -34,3 +34,18 @@
     display: revert;
   }
 }
+
+.vertical {
+  flex-direction: column;
+  width: fit-content;
+  height: fit-content;
+}
+
+.vertical > * {
+  margin-left: 0 !important;
+  margin-top: -15px;
+}
+
+.vertical > *:first-child {
+  margin-top: 0;
+}

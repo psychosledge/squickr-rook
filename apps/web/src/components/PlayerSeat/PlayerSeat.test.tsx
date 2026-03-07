@@ -327,4 +327,160 @@ describe("PlayerSeat", () => {
       expect(element).not.toBeNull();
     });
   });
+
+  describe("hand always rendered", () => {
+    it("CardHand is present when faceDown=true and position='top'", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: true, position: "top" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+    });
+
+    it("CardHand is present when faceDown=true and position='left'", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: true, position: "left" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+    });
+
+    it("CardHand is present when faceDown=true and position='right'", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: true, position: "right" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+    });
+
+    it("CardHand is present when faceDown=false and position='bottom'", () => {
+      const element = PlayerSeat({ ...baseProps, faceDown: false, position: "bottom" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+    });
+  });
+
+  describe("orientation passed to CardHand", () => {
+    it("passes orientation='horizontal' when position='top'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "top" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).orientation).toBe("horizontal");
+    });
+
+    it("passes orientation='horizontal' when position='bottom'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "bottom" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).orientation).toBe("horizontal");
+    });
+
+    it("passes orientation='horizontal' when position is undefined", () => {
+      const element = PlayerSeat({ ...baseProps });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).orientation).toBe("horizontal");
+    });
+
+    it("passes orientation='vertical' when position='left'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "left" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).orientation).toBe("vertical");
+    });
+
+    it("passes orientation='vertical' when position='right'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "right" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).orientation).toBe("vertical");
+    });
+  });
+
+  describe("size passed to CardHand", () => {
+    it("passes size='sm' when position='top'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "top" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("sm");
+    });
+
+    it("passes size='sm' when position='left'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "left" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("sm");
+    });
+
+    it("passes size='sm' when position='right'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "right" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("sm");
+    });
+
+    it("passes size='normal' when position='bottom'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "bottom" });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("normal");
+    });
+
+    it("passes size='normal' when position is undefined", () => {
+      const element = PlayerSeat({ ...baseProps });
+      const elements = flattenElements(element);
+      const cardHandEls = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return "orientation" in p;
+      });
+      expect(cardHandEls).toHaveLength(1);
+      expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("normal");
+    });
+  });
 });

@@ -64,9 +64,24 @@
   min-width: 0;
 }
 
-/* Opponent seats (face-down): hide the hand — badge conveys all needed info */
-.seat[data-face-down="true"] .handWrap {
-  display: none;
+/* Opponent seats (face-down): hand is always rendered — shown at small size */
+
+/* Left/right side seats: rotate hand fan to be vertical */
+.seat[data-position="left"] .handWrap {
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+
+.seat[data-position="right"] .handWrap {
+  transform: rotate(90deg);
+  transform-origin: center center;
+}
+
+/* Left/right side seats: fit-content width so rotated fan doesn't stretch column */
+.seat[data-position="left"] .handWrap,
+.seat[data-position="right"] .handWrap {
+  width: fit-content;
+  min-width: unset;
 }
 
 /* Left/right side columns: compact badge layout */
