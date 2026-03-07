@@ -11,6 +11,8 @@ All notable changes to Squickr Rook are documented here.
 - **Redirect loop on mid-game rejoin** — when the server sent `Welcome { phase: "playing" }` without a game state (e.g. during a race between the new and old socket), the client entered an infinite navigate loop between the lobby and game pages; fixed by falling back to `lobbyPhase: "lobby"` in that case so the client waits for a full state sync
 - **Game not pausing on non-active-player disconnect** — if a player who was NOT the current active player disconnected mid-game, `gamePaused` was never set; the game would silently continue until it stalled on that player's turn; now `gamePaused = true` for any human disconnect during the playing phase
 - **Reconnect race: `gamePaused` not cleared** — if a player's new connection arrived at the server before their old connection's `onClose` fired, the reconnect path was taken correctly but `gamePaused` could remain `true`; the reconnect path now always checks `disconnectedSeats` and clears `gamePaused` when all seats are filled
+- **Blank screen from masked hand crash** — `useLegalCards` called `cardFromId("??")` on masked opponent cards, throwing an error that unmounted the component tree; fixed with early-return guards for masked hands
+- **Duplicate React key warnings** — `CardHand` used `cardId` as the React `key` prop; masked opponent hands (all `"??"`) caused React to warn "Encountered two children with the same key" on every interaction; fixed by using the array index as the key instead
 
 ---
 
