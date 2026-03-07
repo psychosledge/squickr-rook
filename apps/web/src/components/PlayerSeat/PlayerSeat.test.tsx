@@ -427,6 +427,33 @@ describe("PlayerSeat", () => {
     });
   });
 
+  describe("no rotation class applied to handWrap for side seats", () => {
+    it("handWrap div does NOT have a rotate style for position='left'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "left" });
+      const elements = flattenElements(element);
+      const handWraps = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "div" && typeof p.className === "string" && p.className.includes("handWrap");
+      });
+      expect(handWraps).toHaveLength(1);
+      // No inline rotation style should be applied
+      const style = (handWraps[0].props as Record<string, unknown>).style as React.CSSProperties | undefined;
+      expect(style?.transform).toBeUndefined();
+    });
+
+    it("handWrap div does NOT have a rotate style for position='right'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "right" });
+      const elements = flattenElements(element);
+      const handWraps = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "div" && typeof p.className === "string" && p.className.includes("handWrap");
+      });
+      expect(handWraps).toHaveLength(1);
+      const style = (handWraps[0].props as Record<string, unknown>).style as React.CSSProperties | undefined;
+      expect(style?.transform).toBeUndefined();
+    });
+  });
+
   describe("size passed to CardHand", () => {
     it("passes size='sm' when position='top'", () => {
       const element = PlayerSeat({ ...baseProps, position: "top" });
