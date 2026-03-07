@@ -14,7 +14,8 @@ export default function CardHand({ cards, faceDown, legalCardIds, onCardClick }:
     <div className={styles.hand}>
       {cards.map((cardId, index) => (
         <PlayingCard
-          key={cardId}
+          // key=index intentional: cardId can be "??" for masked hands (not unique)
+          key={index}
           cardId={cardId}
           faceDown={faceDown}
           isPlayable={faceDown ? false : (legalCardIds ? legalCardIds.includes(cardId) : true)}
