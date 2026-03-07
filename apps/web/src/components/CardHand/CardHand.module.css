@@ -41,8 +41,10 @@
   height: fit-content;
 }
 
-/* Re-assert column layout at desktop — the desktop .hand rule runs after .vertical
-   and would otherwise override flex-direction back to row */
+/* Fallback for CSS-only environments (SSR/print). In the React component,
+   flex-direction, overflow, position, and gap are set via inline style on the
+   .hand div when orientation='vertical' to defeat the Vite/LightningCSS
+   @media merge ordering issue that makes the .hand desktop block win the cascade. */
 @media (min-width: 901px) {
   .vertical {
     flex-direction: column;

@@ -134,6 +134,27 @@ describe("CardHand — orientation prop", () => {
     const className = (handEl.props as Record<string, unknown>).className as string;
     expect(className).toContain("vertical");
   });
+
+  it("applies inline style with flexDirection:'column' when orientation='vertical'", () => {
+    const element = CardHand({ cards: testHand, faceDown: false, orientation: "vertical" });
+    const handEl = getHandElement(element);
+    const style = (handEl.props as Record<string, unknown>).style as React.CSSProperties | undefined;
+    expect(style?.flexDirection).toBe("column");
+  });
+
+  it("does NOT apply inline flexDirection style when orientation='horizontal'", () => {
+    const element = CardHand({ cards: testHand, faceDown: false, orientation: "horizontal" });
+    const handEl = getHandElement(element);
+    const style = (handEl.props as Record<string, unknown>).style as React.CSSProperties | undefined;
+    expect(style).toBeUndefined();
+  });
+
+  it("does NOT apply inline flexDirection style when orientation is omitted", () => {
+    const element = CardHand({ cards: testHand, faceDown: false });
+    const handEl = getHandElement(element);
+    const style = (handEl.props as Record<string, unknown>).style as React.CSSProperties | undefined;
+    expect(style).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

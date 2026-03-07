@@ -13,7 +13,17 @@ type Props = {
 
 export default function CardHand({ cards, faceDown, legalCardIds, onCardClick, orientation, size }: Props) {
   return (
-    <div className={`${styles.hand}${orientation === 'vertical' ? ` ${styles.vertical}` : ''}`}>
+    <div
+      className={`${styles.hand}${orientation === 'vertical' ? ` ${styles.vertical}` : ''}`}
+      // Inline style defeats Vite/LightningCSS @media merge ordering at ≥901px breakpoint
+      // (see CardHand.module.css for details). Inline styles always win the cascade.
+      style={orientation === 'vertical' ? {
+        flexDirection: 'column',
+        overflow: 'visible',
+        position: 'relative',
+        gap: 0,
+      } : undefined}
+    >
       {cards.map((cardId, index) => (
         <PlayingCard
           // key=index intentional: cardId can be "??" for masked hands (not unique)
