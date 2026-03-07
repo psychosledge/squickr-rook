@@ -1,5 +1,5 @@
 import * as prand from "pure-rand";
-import { buildDeck } from "./deck.js";
+import { buildDeck, CARD_POINTS } from "./deck.js";
 import type { CardId, Seat } from "./types.js";
 
 /**
@@ -37,4 +37,42 @@ export function deriveDeal(
     },
     nest: deck.slice(40, 45) as CardId[],
   };
+}
+
+/**
+ * Returns true if the hand contains at least one point-scoring card
+ * (1s=15pts, 5s=5pts, 10s=10pts, 14s=10pts, ROOK=20pts).
+ */
+export function handHasPointCards(hand: CardId[]): boolean {
+  return hand.some((cardId) => (CARD_POINTS[cardId] ?? 0) !== 0);
+}
+
+/**
+ * Returns true if every seat's hand contains at least one point card.
+ * A deal where any hand has zero point cards is a misdeal.
+ */
+export function dealIsValid(deal: { hands: Record<Seat, CardId[]> }): boolean {
+  const SEATS: Seat[] = ["N", "E", "S", "W"];
+  return SEATS.every((seat) => handHasPointCards(deal.hands[seat]!));
+}
+
+/**
+ * Repeatedly derive deals until a valid one is found (no misdeal).
+ * Each retry uses a deterministically derived seed to stay reproducible.
+ * Same (seed, handNumber) always returns the same deal.
+ */
+export function dealUntilValid(
+  seed: number,
+  handNumber: number,
+): { hands: Record<Seat, CardId[]>; nest: CardId[] } {
+  const MISDEAL_MAX_ATTEMPTS = 1000;
+  for (let attempt = 0; attempt < MISDEAL_MAX_ATTEMPTS; attempt++) {
+    const attemptSeed = (seed ^ (handNumber * 1_000_003) ^ (attempt * 7_919)) >>> 0;
+    const deal = deriveDeal(attemptSeed, 0); // pass 0 — seed already encodes hand/attempt
+    if (dealIsValid(deal)) return deal;
+  }
+  throw new Error(
+    `dealUntilValid: no valid deal found after ${MISDEAL_MAX_ATTEMPTS} attempts ` +
+      `(seed=${seed}, handNumber=${handNumber})`,
+  );
 }

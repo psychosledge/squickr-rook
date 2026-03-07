@@ -1,4 +1,4 @@
-import { deriveDeal } from "./deal.js";
+import { dealUntilValid } from "./deal.js";
 import type { GameEvent } from "./events.js";
 import type { GameState, Team } from "./types.js";
 import {
@@ -43,7 +43,7 @@ export const INITIAL_STATE: GameState = {
 export function applyEvent(state: GameState, event: GameEvent): GameState {
   switch (event.type) {
     case "GameStarted": {
-      const deal = deriveDeal(event.seed, 0);
+      const deal = dealUntilValid(event.seed, 0);
       const firstBidder = leftOf(event.dealer);
       return {
         ...state,
@@ -79,7 +79,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     }
 
     case "HandStarted": {
-      const deal = deriveDeal(state.seed, event.handNumber);
+      const deal = dealUntilValid(state.seed, event.handNumber);
       const firstBidder = leftOf(event.dealer);
       return {
         ...state,
