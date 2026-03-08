@@ -1,9 +1,7 @@
 import { useNavigate } from "react-router";
 import { useGameStore } from "@/store/gameStore";
-import type { BotDifficulty } from "@rook/engine";
+import { ALL_BOT_DIFFICULTIES, BOT_DIFFICULTY_LABELS } from "@rook/engine";
 import styles from "./LobbyPage.module.css";
-
-const DIFFICULTIES: BotDifficulty[] = ["easy", "normal", "hard"];
 
 export default function LobbyPage() {
   const navigate = useNavigate();
@@ -28,13 +26,13 @@ export default function LobbyPage() {
       <div className={styles.section}>
         <label className={styles.label}>Bot Difficulty</label>
         <div className={styles.difficultyPicker}>
-          {DIFFICULTIES.map((d) => (
+          {ALL_BOT_DIFFICULTIES.map((d) => (
             <button
               key={d}
               className={`${styles.diffBtn} ${botDifficulty === d ? styles.active : ""}`}
               onClick={() => setBotDifficulty(d)}
             >
-              {d.charAt(0).toUpperCase() + d.slice(1)}
+              {BOT_DIFFICULTY_LABELS[d]}
             </button>
           ))}
         </div>

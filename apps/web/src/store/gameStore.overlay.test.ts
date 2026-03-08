@@ -12,7 +12,7 @@ function resetStore() {
     pendingDiscards: [],
     pendingHandScore: null,
     botTimeoutId: null,
-    botDifficulty: "normal",
+    botDifficulty: 3,
     announcement: null,
     gameOverReason: null,
   });

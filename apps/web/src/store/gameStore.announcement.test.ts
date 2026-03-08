@@ -12,7 +12,7 @@ function resetStore() {
     pendingDiscards: [],
     pendingHandScore: null,
     botTimeoutId: null,
-    botDifficulty: "normal",
+    botDifficulty: 3,
     announcement: null,
     gameOverReason: null,
   });
@@ -190,7 +190,7 @@ describe("gameStore announcement state", () => {
 
   describe("startGame", () => {
     it("does NOT set announcement immediately (bidding hasn't completed yet)", () => {
-      useGameStore.getState().startGame("normal");
+      useGameStore.getState().startGame(3);
       const { announcement } = useGameStore.getState();
       expect(announcement).toBeNull();
     });

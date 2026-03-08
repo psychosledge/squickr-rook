@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useOnlineGameStore, INITIAL_ONLINE_STATE } from "../onlineGameStore";
-import { INITIAL_STATE, DEFAULT_RULES, applyEvent } from "@rook/engine";
+import { INITIAL_STATE, DEFAULT_RULES, applyEvent, BOT_PRESETS } from "@rook/engine";
 import type { GameEvent, GameState, Seat } from "@rook/engine";
 import type { WelcomeMsg, LobbyUpdatedMsg, EventBatchMsg, CommandErrorMsg } from "../onlineGameStore.types";
 
@@ -28,9 +28,9 @@ function makeBiddingState(activePlayer: "N" | "E" | "S" | "W" = "N"): GameState 
     dealer: "W",
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "Bot E", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-      { seat: "S", name: "Bot S", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-      { seat: "W", name: "Bot W", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+      { seat: "E", name: "Bot E", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "S", name: "Bot S", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "W", name: "Bot W", kind: "bot", botProfile: BOT_PRESETS[3] },
     ],
     rules: DEFAULT_RULES,
     timestamp: Date.now(),
@@ -273,9 +273,9 @@ describe("onlineGameStore", () => {
         dealer: "W",
         players: [
           { seat: "N", name: "Alice", kind: "human" },
-          { seat: "E", name: "Bot E", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-          { seat: "S", name: "Bot S", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-          { seat: "W", name: "Bot W", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+          { seat: "E", name: "Bot E", kind: "bot", botProfile: BOT_PRESETS[3] },
+          { seat: "S", name: "Bot S", kind: "bot", botProfile: BOT_PRESETS[3] },
+          { seat: "W", name: "Bot W", kind: "bot", botProfile: BOT_PRESETS[3] },
         ],
         rules: DEFAULT_RULES,
         timestamp: Date.now(),
@@ -640,9 +640,9 @@ describe("onlineGameStore", () => {
         dealer: "W",
         players: [
           { seat: "N", name: "Alice", kind: "human" },
-          { seat: "E", name: "Bot E", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-          { seat: "S", name: "Bot S", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-          { seat: "W", name: "Bot W", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+          { seat: "E", name: "Bot E", kind: "bot", botProfile: BOT_PRESETS[3] },
+          { seat: "S", name: "Bot S", kind: "bot", botProfile: BOT_PRESETS[3] },
+          { seat: "W", name: "Bot W", kind: "bot", botProfile: BOT_PRESETS[3] },
         ],
         rules: DEFAULT_RULES,
         timestamp: Date.now(),
@@ -2415,9 +2415,9 @@ describe("onlineGameStore", () => {
         dealer: "W",
         players: [
           { seat: "N", name: "Alice", kind: "human" },
-          { seat: "E", name: "Bot E", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-          { seat: "S", name: "Bot S", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-          { seat: "W", name: "Bot W", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+          { seat: "E", name: "Bot E", kind: "bot", botProfile: BOT_PRESETS[3] },
+          { seat: "S", name: "Bot S", kind: "bot", botProfile: BOT_PRESETS[3] },
+          { seat: "W", name: "Bot W", kind: "bot", botProfile: BOT_PRESETS[3] },
         ],
         rules: DEFAULT_RULES,
         timestamp: Date.now(),

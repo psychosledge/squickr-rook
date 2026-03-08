@@ -3,6 +3,7 @@ import { maskState, filterEvent } from "../mask.js";
 import { INITIAL_STATE } from "../reducer.js";
 import type { GameState, Seat } from "../types.js";
 import type { GameEvent } from "../events.js";
+import { BOT_PRESETS } from "../types.js";
 
 // ---------------------------------------------------------------------------
 // Base state helper — spread INITIAL_STATE and override only what we need
@@ -231,9 +232,9 @@ describe("filterEvent — pass-through", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE", kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS", kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW", kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE", kind: "bot", botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS", kind: "bot", botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW", kind: "bot", botProfile: BOT_PRESETS[1] },
       ],
       rules: {
         version: 1,

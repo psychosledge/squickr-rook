@@ -11,7 +11,7 @@ function resetStore() {
     pendingDiscards: [],
     pendingHandScore: null,
     botTimeoutId: null,
-    botDifficulty: "normal",
+    botDifficulty: 3,
     announcement: null,
     gameOverReason: null,
     historyModalOpen: false,
@@ -56,7 +56,7 @@ describe("gameStore history modal", () => {
     expect(useGameStore.getState().historyModalOpen).toBe(true);
 
     // Act
-    useGameStore.getState().startGame("normal");
+    useGameStore.getState().startGame(3);
 
     // Assert
     expect(useGameStore.getState().historyModalOpen).toBe(false);

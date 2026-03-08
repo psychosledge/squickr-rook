@@ -37,7 +37,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   pendingDiscards: [],
   pendingHandScore: null,
   botTimeoutId: null,
-  botDifficulty: "normal",
+  botDifficulty: 3,
   announcement: null,
   gameOverReason: null,
   historyModalOpen: false,

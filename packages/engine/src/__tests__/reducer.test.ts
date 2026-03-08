@@ -3,7 +3,7 @@ import { INITIAL_STATE, applyEvent, reduceEvents } from "../reducer.js";
 import { validateCommand, legalCommands } from "../validator.js";
 import type { GameEvent } from "../events.js";
 import type { GameState, Seat } from "../types.js";
-import { DEFAULT_RULES, leftOf } from "../types.js";
+import { DEFAULT_RULES, leftOf, BOT_PRESETS } from "../types.js";
 
 
 // Helper to create a GameStarted event
@@ -14,9 +14,9 @@ function makeGameStarted(seed = 42, dealer: Seat = "N"): GameEvent {
     dealer,
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+      { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+      { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
     ],
     rules: {
       version: 1,
@@ -677,9 +677,9 @@ describe("Full hand integration — 10 tricks, scoring, next hand", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,
@@ -1170,9 +1170,9 @@ describe("Full hand integration — 10 tricks, scoring, next hand", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,

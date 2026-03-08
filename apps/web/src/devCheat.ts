@@ -30,9 +30,9 @@ function dealMoonHand(): void {
     rules: DEFAULT_RULES,
     players: [
       { seat: "N", name: "You", kind: "human" },
-      { seat: "E", name: "East", kind: "bot", botProfile: BOT_PRESETS["normal"] },
-      { seat: "S", name: "South", kind: "bot", botProfile: BOT_PRESETS["normal"] },
-      { seat: "W", name: "West", kind: "bot", botProfile: BOT_PRESETS["normal"] },
+      { seat: "E", name: "East", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "S", name: "South", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "W", name: "West", kind: "bot", botProfile: BOT_PRESETS[3] },
     ],
     handNumber: 0,
     dealer: "N",

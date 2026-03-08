@@ -15,9 +15,9 @@ function makeGameStarted(seed = 42, dealer: Seat = "N"): GameEvent {
     dealer,
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS.easy },
-      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS.normal },
-      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS.hard },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS[1] },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS[5] },
     ],
     rules: DEFAULT_RULES,
     timestamp: 1000,
@@ -101,7 +101,7 @@ function isLegalCommand(state: GameState, seat: Seat, cmd: import("../commands.j
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("botChooseCommand", () => {
-  const difficulties: Array<"easy" | "normal" | "hard"> = ["easy", "normal", "hard"];
+  const difficulties: import("../types.js").BotDifficulty[] = [1, 2, 3, 4, 5];
 
   it("always returns a legal command in nest phase (before nest taken)", () => {
     const state = stateAfterBiddingComplete();
@@ -139,7 +139,7 @@ describe("botChooseCommand", () => {
   it("always returns a legal DiscardCard across multiple calls", () => {
     let state = stateAfterNestTaken();
     const nestPlayer = leftOf(state.dealer);
-    const profile = BOT_PRESETS.hard;
+    const profile = BOT_PRESETS[5];
 
     for (let i = 0; i < 5; i++) {
       const cmd = botChooseCommand(state, nestPlayer, profile);
@@ -220,7 +220,7 @@ describe("botChooseCommand", () => {
     });
 
     const nextPlayer = state.activePlayer!;
-    const profile = BOT_PRESETS.hard;
+    const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, nextPlayer, profile);
 
     expect(cmd.type).toBe("PlayCard");
@@ -229,12 +229,12 @@ describe("botChooseCommand", () => {
 });
 
 describe("botChooseCommand - bidding phase", () => {
-  const difficulties: Array<"easy" | "normal" | "hard"> = ["easy", "normal", "hard"];
+  const difficulties: import("../types.js").BotDifficulty[] = [1, 2, 3, 4, 5];
 
-  it("easy bot always passes", () => {
+  it("beginner bot always passes", () => {
     const state = stateAfterGameStarted();
     const firstBidder = leftOf(state.dealer); // "E"
-    const profile = BOT_PRESETS.easy;
+    const profile = BOT_PRESETS[1];
     const cmd = botChooseCommand(state, firstBidder, profile);
     expect(cmd.type).toBe("PassBid");
   });
@@ -244,7 +244,7 @@ describe("botChooseCommand - bidding phase", () => {
     // Force a weak state by checking if strength < 80 and expecting pass
     const state = stateAfterGameStarted();
     const firstBidder = leftOf(state.dealer);
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, firstBidder, profile);
     // Either bids or passes — just verify it's a legal bidding command
     expect(["PlaceBid", "PassBid", "ShootMoon"]).toContain(cmd.type);
@@ -253,10 +253,10 @@ describe("botChooseCommand - bidding phase", () => {
     }
   });
 
-  it("hard bot passes when hand is weak", () => {
+  it("expert bot passes when hand is weak", () => {
     const state = stateAfterGameStarted();
     const firstBidder = leftOf(state.dealer);
-    const profile = BOT_PRESETS.hard;
+    const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, firstBidder, profile);
     expect(["PlaceBid", "PassBid", "ShootMoon"]).toContain(cmd.type);
     if (cmd.type === "PlaceBid") {
@@ -278,8 +278,8 @@ describe("botChooseCommand - bidding phase", () => {
     let state = stateAfterGameStarted();
     // E bids 100
     state = applyEvent(state, { type: "BidPlaced", seat: "E", amount: 100, handNumber: 0, timestamp: 2000 });
-    // S is now active - hard bot should bid 105 if strong enough, or pass
-    const profile = BOT_PRESETS.hard;
+    // S is now active - expert bot should bid 105 if strong enough, or pass
+    const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, "S", profile);
     expect(["PlaceBid", "PassBid", "ShootMoon"]).toContain(cmd.type);
     if (cmd.type === "PlaceBid") {
@@ -298,9 +298,9 @@ function makeBiddingStateWithHand(seat: Seat, hand: import("../types.js").CardId
     dealer: "N",
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS.easy },
-      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS.normal },
-      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS.hard },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS[1] },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS[5] },
     ],
     rules: DEFAULT_RULES,
     timestamp: 1000,
@@ -320,8 +320,7 @@ describe("botChooseCommand - bidWillingness thresholds", () => {
     // Weak hand: no point-value cards → strength = 0
     const weakHand: import("../types.js").CardId[] = ["B2", "B3", "B4", "B6", "B7", "B8", "B9", "R2", "R3", "R4"];
     const state = makeBiddingStateWithHand("E", weakHand);
-    state.currentBid; // just to use it
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PassBid");
   });
@@ -332,18 +331,18 @@ describe("botChooseCommand - bidWillingness thresholds", () => {
     const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"];
     const base = makeBiddingStateWithHand("E", hand);
     const state = { ...base, currentBid: 110 };
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PassBid");
   });
 
   it("hard bot passes when minNextBid > bidWillingness(strength ~50) + 10", () => {
-    // strength ~50: willingness = 110; hard ceiling = 110 + 10 = 120
-    // Set currentBid = 120 so minNextBid = 125 > 120
+    // strength ~50: willingness = 110; hard (level 4, bidAggressiveness=1.1) ceiling = round(110*1.1) = 121
+    // Set currentBid = 120 so minNextBid = 125 > 121
     const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"];
     const base = makeBiddingStateWithHand("E", hand);
     const state = { ...base, currentBid: 120 };
-    const profile = BOT_PRESETS.hard;
+    const profile = BOT_PRESETS[4];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PassBid");
   });
@@ -352,7 +351,7 @@ describe("botChooseCommand - bidWillingness thresholds", () => {
     // strength ~50 → willingness = 110; minNextBid at 100 (currentBid = 0)
     const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"];
     const state = makeBiddingStateWithHand("E", hand);
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PlaceBid");
     if (cmd.type === "PlaceBid") {
@@ -367,7 +366,7 @@ describe("botChooseCommand - bidWillingness thresholds", () => {
     const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R1", "R14", "G14", "B10", "Y5", "B2", "B3", "B4"];
     const base = makeBiddingStateWithHand("E", hand);
     const state = { ...base, currentBid: 150 };
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PassBid");
   });
@@ -380,7 +379,7 @@ describe("botChooseCommand - bidWillingness thresholds", () => {
     const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10"];
     const base = makeBiddingStateWithHand("E", hand);
     const state = { ...base, currentBid: 175, moonShooters: ["E"] as import("../types.js").Seat[] };
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     // With currentBid=175, minNextBid=180 which equals the ceiling (180) → bot bids 180
     expect(cmd.type).toBe("PlaceBid");
@@ -394,7 +393,7 @@ describe("botChooseCommand - bidWillingness thresholds", () => {
     const hand: import("../types.js").CardId[] = ["ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10"];
     const base = makeBiddingStateWithHand("E", hand);
     const state = { ...base, currentBid: 180, moonShooters: ["E"] as import("../types.js").Seat[] };
-    const profile = BOT_PRESETS.normal;
+    const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     // minNextBid = 185 > 180 → should pass
     expect(cmd.type).toBe("PassBid");

@@ -3,7 +3,7 @@ import { validateCommand, legalCommands } from "../validator.js";
 import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import type { GameEvent } from "../events.js";
 import type { GameState, Seat } from "../types.js";
-import { DEFAULT_RULES, leftOf, SEAT_TEAM } from "../types.js";
+import { DEFAULT_RULES, leftOf, SEAT_TEAM, BOT_PRESETS } from "../types.js";
 import type { PlaceBid } from "../commands.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -15,9 +15,9 @@ function makeGameStarted(seed = 42, dealer: Seat = "N"): GameEvent {
     dealer,
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+      { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+      { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
     ],
     rules: DEFAULT_RULES,
     timestamp: 1000,
@@ -554,9 +554,9 @@ describe("bidding - legalCommands in bidding phase", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,
@@ -674,9 +674,9 @@ describe("bidding - PlaceBid validation", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,
@@ -792,9 +792,9 @@ describe("bidding - PassBid validation", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,
@@ -919,9 +919,9 @@ describe("bidding - ShootMoon validation", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,
@@ -1095,9 +1095,9 @@ describe("bidding - ShootMoon after numeric bid: legalCommands", () => {
       dealer: "N",
       players: [
         { seat: "N", name: "Alice", kind: "human" },
-        { seat: "E", name: "BotE",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "S", name: "BotS",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-        { seat: "W", name: "BotW",  kind: "bot",  botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+        { seat: "E", name: "BotE",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "S", name: "BotS",  kind: "bot",  botProfile: BOT_PRESETS[1] },
+        { seat: "W", name: "BotW",  kind: "bot",  botProfile: BOT_PRESETS[1] },
       ],
       rules: DEFAULT_RULES,
       timestamp: 1000,
@@ -1157,9 +1157,9 @@ function lastCardState(
     rules: DEFAULT_RULES,
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "BotE",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "S", name: "BotS",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "W", name: "BotW",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS[1] },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS[1] },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS[1] },
     ],
     handNumber: 0,
     dealer: "N",
@@ -1224,9 +1224,9 @@ function lastCardStateEW(
     rules: DEFAULT_RULES,
     players: [
       { seat: "N", name: "Alice", kind: "human" },
-      { seat: "E", name: "BotE",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "S", name: "BotS",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
-      { seat: "W", name: "BotW",  kind: "bot", botProfile: { difficulty: "easy", playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false } },
+      { seat: "E", name: "BotE",  kind: "bot", botProfile: BOT_PRESETS[1] },
+      { seat: "S", name: "BotS",  kind: "bot", botProfile: BOT_PRESETS[1] },
+      { seat: "W", name: "BotW",  kind: "bot", botProfile: BOT_PRESETS[1] },
     ],
     handNumber: 0,
     dealer: "N",

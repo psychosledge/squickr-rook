@@ -21,6 +21,16 @@ function bidWillingness(strength: number): number {
   return 180;
 }
 
+// BotProfile fields active in current implementation:
+//   playAccuracy, trackPlayedCards, sluffStrategy, trumpManagement, canShootMoon,
+//   moonShootThreshold, contextualMoonShoot
+//
+// Reserved for future phases (currently populated in BOT_PRESETS but not yet read):
+//   handValuationAccuracy (Phase 2), bidAggressiveness (Phase 2),
+//   bluffResistance (Phase 2), scoreContextAwareness (Phase 2),
+//   voidExploitation (Phase 5), endgameCardAwareness (Phase 6),
+//   roleAwareness (Phase 4)
+
 /**
  * Choose the best command for a bot player.
  */
@@ -45,33 +55,21 @@ export function botChooseCommand(
         ? rules.minimumBid
         : state.currentBid + rules.bidIncrement;
 
-      if (profile.difficulty === "easy") {
-        // Easy always passes
+      if (profile.difficulty <= 2) {
+        // Beginner/Easy always passes
         return { type: "PassBid", seat };
       }
 
-      if (profile.difficulty === "normal") {
-        // Shoot moon if very strong and not already declared
-        if (strength >= 85 && !state.moonShooters.includes(seat)) {
-          const shootCmd = legal.find(c => c.type === "ShootMoon");
-          if (shootCmd) return shootCmd;
-        }
-        // Bid only up to bidWillingness ceiling
-        const ceiling = bidWillingness(strength);
-        if (minNextBid <= ceiling) {
-          const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
-          if (bidCmd) return bidCmd;
-        }
-        return { type: "PassBid", seat };
-      }
-
-      // Hard
-      if (strength >= 95 && !state.moonShooters.includes(seat)) {
+      // Normal–Expert: attempt moon shoot if enabled and hand is strong enough
+      if (profile.canShootMoon && strength >= profile.moonShootThreshold && !state.moonShooters.includes(seat)) {
         const shootCmd = legal.find(c => c.type === "ShootMoon");
         if (shootCmd) return shootCmd;
       }
-      // Hard bots bid 10 higher than normal bots
-      if (minNextBid <= bidWillingness(strength) + 10) {
+
+      // Bid up to aggressiveness-adjusted ceiling
+      const baseCeiling = bidWillingness(strength);
+      const ceiling = Math.round(baseCeiling * profile.bidAggressiveness);
+      if (minNextBid <= ceiling) {
         const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
         if (bidCmd) return bidCmd;
       }
@@ -92,8 +90,8 @@ export function botChooseCommand(
         return legal[0]!;
       }
 
-      if (profile.difficulty === "easy") {
-        // Random discard
+      if (profile.difficulty <= 2) {
+        // Beginner/Easy: random discard
         return pickRandom(discardCommands);
       }
 
@@ -105,7 +103,7 @@ export function botChooseCommand(
       const selectCommands = legal.filter((c) => c.type === "SelectTrump");
       if (selectCommands.length === 0) return legal[0]!;
 
-      if (profile.difficulty === "easy") {
+      if (profile.difficulty <= 2) {
         return pickRandom(selectCommands);
       }
 
@@ -151,6 +149,7 @@ function chooseBestDiscard(
   discardCommands: GameCommand[],
   state: GameState,
   _seat: Seat,
+  // TODO Phase 5: apply profile.voidExploitation to target color voids
   _profile: BotProfile,
 ): GameCommand {
   // Score each card: lower score = better to discard
@@ -196,7 +195,7 @@ function chooseBestTrump(
 ): GameCommand {
   const hand = state.hands[seat] ?? [];
 
-  if (profile.difficulty === "normal") {
+  if (profile.trumpManagement < 0.7) {
     // Most cards by color
     const colorCounts: Record<Color, number> = {
       Black: 0, Red: 0, Green: 0, Yellow: 0,
@@ -222,7 +221,7 @@ function chooseBestTrump(
     return cmd ?? selectCommands[0]!;
   }
 
-  // Hard: most cards weighted by point value
+  // High trump management (>= 0.7): weight by point value
   const colorWeights: Record<Color, number> = {
     Black: 0, Red: 0, Green: 0, Yellow: 0,
   };
@@ -257,7 +256,7 @@ function chooseBestPlay(
 ): GameCommand {
   const isLeading = state.currentTrick.length === 0;
 
-  if (profile.difficulty === "easy") {
+  if (profile.difficulty <= 2) {
     return pickRandom(playCommands);
   }
 
@@ -325,8 +324,8 @@ function chooseFollowCard(
   const partnerTeam = SEAT_TEAM[seat];
   const partnerIsWinning = SEAT_TEAM[currentWinnerPlay.seat] === partnerTeam;
 
-  // Hard + sluffStrategy + partner is winning: play highest point card
-  if (profile.sluffStrategy && partnerIsWinning && profile.difficulty === "hard") {
+  // sluffStrategy + partner is winning: play highest point card
+  if (profile.sluffStrategy && partnerIsWinning) {
     return chooseHighestPointCard(playCommands);
   }
 

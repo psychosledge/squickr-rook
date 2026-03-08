@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { useLegalCards } from "./useLegalCards";
 import type { GameState, CardId } from "@rook/engine";
-import { DEFAULT_RULES } from "@rook/engine";
+import { DEFAULT_RULES, BOT_PRESETS } from "@rook/engine";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -14,9 +14,9 @@ function makePlayingGameState(overrides: Partial<GameState> = {}): GameState {
     rules: DEFAULT_RULES,
     players: [
       { seat: "N", name: "You", kind: "human" },
-      { seat: "E", name: "P2", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-      { seat: "S", name: "P3", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-      { seat: "W", name: "P4", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+      { seat: "E", name: "P2", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "S", name: "P3", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "W", name: "P4", kind: "bot", botProfile: BOT_PRESETS[3] },
     ],
     handNumber: 1,
     dealer: "W",

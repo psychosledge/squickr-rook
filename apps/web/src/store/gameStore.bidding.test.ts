@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useGameStore } from "./gameStore";
-import { INITIAL_STATE, DEFAULT_RULES, applyEvent } from "@rook/engine";
+import { INITIAL_STATE, DEFAULT_RULES, applyEvent, BOT_PRESETS } from "@rook/engine";
 import type { GameEvent, GameState } from "@rook/engine";
 
 function resetStore() {
@@ -11,7 +11,7 @@ function resetStore() {
     pendingDiscards: [],
     pendingHandScore: null,
     botTimeoutId: null,
-    botDifficulty: "normal",
+    botDifficulty: 3,
     announcement: null,
     gameOverReason: null,
     biddingThinkingSeat: null,
@@ -26,9 +26,9 @@ function makeBiddingState(dealer: "N" | "E" | "S" | "W" = "N"): GameState {
     dealer,
     players: [
       { seat: "N", name: "You",   kind: "human" },
-      { seat: "E", name: "P2", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-      { seat: "S", name: "P3", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
-      { seat: "W", name: "P4", kind: "bot", botProfile: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true, sluffStrategy: false } },
+      { seat: "E", name: "P2", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "S", name: "P3", kind: "bot", botProfile: BOT_PRESETS[3] },
+      { seat: "W", name: "P4", kind: "bot", botProfile: BOT_PRESETS[3] },
     ],
     rules: DEFAULT_RULES,
     timestamp: Date.now(),

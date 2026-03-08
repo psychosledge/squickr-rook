@@ -88,19 +88,143 @@ export type PlayerInfo = {
   botProfile?: BotProfile;
 };
 
-export type BotDifficulty = "easy" | "normal" | "hard";
+/** 1=Beginner, 2=Easy, 3=Normal, 4=Hard, 5=Expert */
+export type BotDifficulty = 1 | 2 | 3 | 4 | 5;
+
+export const BOT_DIFFICULTY_LABELS: Record<BotDifficulty, string> = {
+  1: "Beginner",
+  2: "Easy",
+  3: "Normal",
+  4: "Hard",
+  5: "Expert",
+};
+
+export const ALL_BOT_DIFFICULTIES: BotDifficulty[] = [1, 2, 3, 4, 5];
 
 export type BotProfile = {
   difficulty: BotDifficulty;
+
+  // Bidding parameters
+  /** 0.0 = completely random noise; 1.0 = perfect hand value computation */
+  handValuationAccuracy: number;
+  /** Multiplier on computed bid ceiling. 1.0 = exact ceiling */
+  bidAggressiveness: number;
+  /** 0.0 = fold at ceiling; 1.0 = push up to 30 pts above ceiling */
+  bluffResistance: number;
+  /** Whether bot adjusts bid ceiling based on current scores */
+  scoreContextAwareness: boolean;
+  /** Whether bot attempts moon shoots (levels 3–5) */
+  canShootMoon: boolean;
+  /** Minimum hand strength to consider moon shooting */
+  moonShootThreshold: number;
+  /** Expert only: lowers moon threshold when opponents near win threshold */
+  contextualMoonShoot: boolean;
+
+  // Discard parameters
+  /** 0.0 = no void strategy; 0.5 = target one void; 0.8+ = target two voids */
+  voidExploitation: number;
+
+  // Card-play parameters
+  /** Probability of playing optimally; otherwise plays random legal card */
   playAccuracy: number;
+  /** Whether bot tracks which cards have been played */
   trackPlayedCards: boolean;
+  /** 0.0 = random trump; 0.5 = basic; 0.7 = intermediate; 1.0 = expert */
+  trumpManagement: number;
+  /** Whether bot dumps point cards onto partner's winning tricks */
   sluffStrategy: boolean;
+  /** 0.0 = no endgame awareness; 0.5+ = adjusts play when tricksPlayed >= 7 */
+  endgameCardAwareness: number;
+  /** Whether bot adjusts strategy based on bidding vs defending role */
+  roleAwareness: boolean;
 };
 
 export const BOT_PRESETS: Record<BotDifficulty, BotProfile> = {
-  easy:   { difficulty: "easy",   playAccuracy: 0.3, trackPlayedCards: false, sluffStrategy: false },
-  normal: { difficulty: "normal", playAccuracy: 0.6, trackPlayedCards: true,  sluffStrategy: false },
-  hard:   { difficulty: "hard",   playAccuracy: 1.0, trackPlayedCards: true,  sluffStrategy: true  },
+  1: {
+    difficulty: 1,
+    handValuationAccuracy: 0.0,
+    bidAggressiveness:     0.7,
+    bluffResistance:       0.0,
+    scoreContextAwareness: false,
+    canShootMoon:          false,
+    moonShootThreshold:    999,
+    contextualMoonShoot:   false,
+    voidExploitation:      0.0,
+    playAccuracy:          0.15,
+    trackPlayedCards:      false,
+    trumpManagement:       0.0,
+    sluffStrategy:         false,
+    endgameCardAwareness:  0.0,
+    roleAwareness:         false,
+  },
+  2: {
+    difficulty: 2,
+    handValuationAccuracy: 0.4,
+    bidAggressiveness:     0.85,
+    bluffResistance:       0.1,
+    scoreContextAwareness: false,
+    canShootMoon:          false,
+    moonShootThreshold:    999,
+    contextualMoonShoot:   false,
+    voidExploitation:      0.0,
+    playAccuracy:          0.45,
+    trackPlayedCards:      false,
+    trumpManagement:       0.2,
+    sluffStrategy:         false,
+    endgameCardAwareness:  0.0,
+    roleAwareness:         false,
+  },
+  3: {
+    difficulty: 3,
+    handValuationAccuracy: 0.75,
+    bidAggressiveness:     1.0,
+    bluffResistance:       0.3,
+    scoreContextAwareness: true,
+    canShootMoon:          true,
+    moonShootThreshold:    110,
+    contextualMoonShoot:   false,
+    voidExploitation:      0.5,
+    playAccuracy:          0.70,
+    trackPlayedCards:      true,
+    trumpManagement:       0.5,
+    sluffStrategy:         false,
+    endgameCardAwareness:  0.0,
+    roleAwareness:         true,
+  },
+  4: {
+    difficulty: 4,
+    handValuationAccuracy: 0.90,
+    bidAggressiveness:     1.1,
+    bluffResistance:       0.6,
+    scoreContextAwareness: true,
+    canShootMoon:          true,
+    moonShootThreshold:    90,
+    contextualMoonShoot:   false,
+    voidExploitation:      0.8,
+    playAccuracy:          0.90,
+    trackPlayedCards:      true,
+    trumpManagement:       0.7,
+    sluffStrategy:         true,
+    endgameCardAwareness:  0.5,
+    roleAwareness:         true,
+  },
+  5: {
+    difficulty: 5,
+    handValuationAccuracy: 1.0,
+    bidAggressiveness:     1.15,
+    bluffResistance:       1.0,
+    scoreContextAwareness: true,
+    canShootMoon:          true,
+    moonShootThreshold:    75,
+    contextualMoonShoot:   true,
+    voidExploitation:      1.0,
+    playAccuracy:          1.0,
+    trackPlayedCards:      true,
+    trumpManagement:       1.0,
+    sluffStrategy:         true,
+    endgameCardAwareness:  1.0,
+    roleAwareness:         true,
+  },
 };
 
 export type GameState = {

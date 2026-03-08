@@ -476,7 +476,7 @@ export default class RookRoom implements Party.Server {
       if (human !== undefined) {
         return { seat, name: human.displayName, kind: "human" };
       }
-      return { seat, name: "Bot", kind: "bot", botProfile: BOT_PRESETS["normal"] };
+      return { seat, name: "Bot", kind: "bot", botProfile: BOT_PRESETS[3] };
     });
 
     const seed = Math.floor(Math.random() * 2 ** 31);
@@ -574,7 +574,7 @@ export default class RookRoom implements Party.Server {
             seat: msg.seat,
             name: p.name,
             kind: "bot",
-            botProfile: BOT_PRESETS["normal"],
+            botProfile: BOT_PRESETS[3],
           };
         }
         return p;
@@ -613,7 +613,7 @@ export default class RookRoom implements Party.Server {
           await new Promise<void>((r) => setTimeout(r, delayMs));
         }
 
-        const profile = playerInfo.botProfile ?? BOT_PRESETS["normal"];
+        const profile = playerInfo.botProfile ?? BOT_PRESETS[3];
         const command = botChooseCommand(this.gameState, activePlayer, profile);
         const result = validateCommand(this.gameState, command, this.gameState.rules);
 
