@@ -7,29 +7,186 @@ import { DEFAULT_RULES, SEAT_TEAM } from "./types.js";
 
 const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
 
+/** Returns the partner seat (opposite in N↔S, E↔W). */
+function partnerOf(seat: Seat): Seat {
+  switch (seat) {
+    case "N": return "S";
+    case "S": return "N";
+    case "E": return "W";
+    case "W": return "E";
+  }
+}
+
+// ── Phase 2: Hand valuation ───────────────────────────────────────────────────
+
 /**
- * Returns the maximum bid amount this bot is willing to reach.
- * Returns 0 if the bot won't bid at all.
+ * True hand strength: point-card base + trump-length bonus + void/near-void bonuses.
+ * Trump is estimated as the most-weighted color (count + point fraction).
+ *
+ * Strength reference:
+ *   Junk:        0–25
+ *   Weak:       26–45
+ *   Marginal:   46–60   (opens at 100)
+ *   Solid:      61–80   (bids 100–130)
+ *   Strong:     81–100  (bids 130–150)
+ *   Near-moon: 101–120  (bids 150–175)
+ *   Moon:      120+     (bids 175–200 or shoots)
  */
-function bidWillingness(strength: number): number {
+function estimateHandValue(hand: CardId[]): number {
+  const colorCounts: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
+  const colorPointWeight: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
+
+  for (const cardId of hand) {
+    if (cardId === "ROOK") continue;
+    const card = cardFromId(cardId);
+    if (card.kind !== "regular") continue;
+    colorCounts[card.color]++;
+    colorPointWeight[card.color] += 1 + pointValue(cardId) * 0.1;
+  }
+
+  // Probable trump = color with highest weighted score
+  let probableTrump: Color = "Black";
+  let bestWeight = -1;
+  for (const color of COLORS) {
+    if (colorPointWeight[color] > bestWeight) {
+      bestWeight = colorPointWeight[color];
+      probableTrump = color;
+    }
+  }
+
+  // Base: point-card values
+  let strength = 0;
+  for (const cardId of hand) {
+    if (cardId === "ROOK") { strength += 15; continue; }
+    const card = cardFromId(cardId);
+    if (card.kind !== "regular") continue;
+    if (card.value === 1)  strength += 15;  // Ace
+    if (card.value === 14) strength += 10;  // 14-point card
+    if (card.value === 10) strength += 8;   // 10-point card
+    if (card.value === 5)  strength += 5;   // 5-point card
+  }
+
+  // Trump-length bonus: indexed by trump count (0–7)
+  const trumpLengthBonuses = [0, 0, 0, 5, 10, 18, 28, 35];
+  const trumpLength = colorCounts[probableTrump];
+  strength += trumpLengthBonuses[Math.min(trumpLength, 7)] ?? 35;
+
+  // Void bonus: +8 per void in non-trump colors
+  for (const color of COLORS) {
+    if (color !== probableTrump && colorCounts[color] === 0) strength += 8;
+  }
+
+  // Near-void bonus: +3 per singleton non-trump suit
+  for (const color of COLORS) {
+    if (color !== probableTrump && colorCounts[color] === 1) strength += 3;
+  }
+
+  return strength;
+}
+
+/**
+ * Hand strength with noise scaled by (1 - accuracy) * 40.
+ * accuracy=1 → perfect (no noise). accuracy=0 → ±40 random noise.
+ */
+function estimateHandValueWithNoise(hand: CardId[], accuracy: number): number {
+  const trueStrength = estimateHandValue(hand);
+  if (accuracy >= 1.0) return trueStrength;
+  const noiseRange = (1 - accuracy) * 40;
+  const noise = (Math.random() - 0.5) * 2 * noiseRange;
+  return Math.max(0, trueStrength + noise);
+}
+
+// ── Phase 2: Bid ceiling ──────────────────────────────────────────────────────
+
+/**
+ * Continuous linear interpolation between strength→bid anchors.
+ * Returns 0 if strength < 40 (bot will not open).
+ * Anchors: [40→100, 60→115, 75→130, 90→150, 110→175, 130→200]
+ */
+function baseBidCeiling(strength: number): number {
   if (strength < 40) return 0;
-  if (strength < 55) return 110;
-  if (strength < 65) return 120;
-  if (strength < 75) return 135;
-  if (strength < 85) return 150;
-  if (strength < 95) return 165;
-  return 180;
+  const anchors: [number, number][] = [
+    [40, 100], [60, 115], [75, 130], [90, 150], [110, 175], [130, 200],
+  ];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [s0, b0] = anchors[i]!;
+    const [s1, b1] = anchors[i + 1]!;
+    if (strength <= s1) {
+      const t = (strength - s0) / (s1 - s0);
+      return Math.round(b0 + t * (b1 - b0));
+    }
+  }
+  return 200;
+}
+
+/**
+ * Full bid ceiling: base ceiling × aggressiveness, adjusted by score context
+ * and partner bid inference. Clamped to [minimumBid, maximumBid].
+ */
+function computeBidCeiling(
+  hand: CardId[],
+  state: GameState,
+  seat: Seat,
+  profile: BotProfile,
+): number {
+  const strength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy);
+  let ceiling = baseBidCeiling(strength);
+  if (ceiling === 0) return 0;
+
+  const rules = state.rules ?? DEFAULT_RULES;
+
+  // Aggressiveness multiplier
+  ceiling = Math.round(ceiling * profile.bidAggressiveness);
+
+  // Score context: losing badly → bid more; winning big → bid less
+  if (profile.scoreContextAwareness) {
+    const myTeam = SEAT_TEAM[seat];
+    const oppTeam = myTeam === "NS" ? "EW" : "NS";
+    const delta = state.scores[oppTeam] - state.scores[myTeam]; // positive = we are behind
+    if (delta > 100)       ceiling += 15;
+    else if (delta > 50)   ceiling += 8;
+    if (delta < -150)      ceiling -= 15;
+    else if (delta < -80)  ceiling -= 8;
+
+    // Partner bid inference: if partner already bid, raise ceiling slightly
+    const partnerBid = state.bids[partnerOf(seat)];
+    if (typeof partnerBid === "number" && partnerBid > 0) {
+      ceiling += Math.max(0, Math.round((partnerBid - 100) * 0.3));
+    }
+  }
+
+  return Math.max(rules.minimumBid, Math.min(ceiling, rules.maximumBid));
+}
+
+// ── Phase 2: Bluff resistance ─────────────────────────────────────────────────
+
+/**
+ * Decides whether to bid given the minimum next bid and the computed ceiling.
+ * bluffResistance (0–1) adds up to 30 pts above the base ceiling.
+ * The combined ceiling is snapped down to the nearest bid increment.
+ */
+function shouldBid(
+  minNextBid: number,
+  ceiling: number,
+  profile: BotProfile,
+  state: GameState,
+): boolean {
+  if (ceiling === 0) return false;
+  const rules = state.rules ?? DEFAULT_RULES;
+  const bluffBudget = Math.round(profile.bluffResistance * 30);
+  const snappedCeiling =
+    Math.floor((ceiling + bluffBudget) / rules.bidIncrement) * rules.bidIncrement;
+  return minNextBid <= snappedCeiling;
 }
 
 // BotProfile fields active in current implementation:
-//   playAccuracy, trackPlayedCards, sluffStrategy, trumpManagement, canShootMoon,
-//   moonShootThreshold, contextualMoonShoot
+//   Phase 2 (this file):   handValuationAccuracy, bidAggressiveness, bluffResistance,
+//                          scoreContextAwareness, canShootMoon, moonShootThreshold,
+//                          contextualMoonShoot
+//   Phase 1 carry-overs:   playAccuracy, trackPlayedCards, sluffStrategy, trumpManagement
 //
-// Reserved for future phases (currently populated in BOT_PRESETS but not yet read):
-//   handValuationAccuracy (Phase 2), bidAggressiveness (Phase 2),
-//   bluffResistance (Phase 2), scoreContextAwareness (Phase 2),
-//   voidExploitation (Phase 5), endgameCardAwareness (Phase 6),
-//   roleAwareness (Phase 4)
+// Reserved for future phases (populated in BOT_PRESETS but not yet read):
+//   voidExploitation (Phase 5), endgameCardAwareness (Phase 6), roleAwareness (Phase 4)
 
 /**
  * Choose the best command for a bot player.
@@ -49,27 +206,34 @@ export function botChooseCommand(
   switch (state.phase) {
     case "bidding": {
       const hand = state.hands[seat] ?? [];
-      const strength = estimateBidStrength(hand);
       const rules = state.rules ?? DEFAULT_RULES;
       const minNextBid = state.currentBid === 0
         ? rules.minimumBid
         : state.currentBid + rules.bidIncrement;
 
-      if (profile.difficulty <= 2) {
-        // Beginner/Easy always passes
+      // ── Level 1 (Beginner): 25% chance to open at minimum; never raises ──
+      if (profile.difficulty === 1) {
+        if (state.currentBid === 0 && Math.random() < 0.25) {
+          const openCmd = legal.find(c => c.type === "PlaceBid" && c.amount === rules.minimumBid);
+          if (openCmd) return openCmd;
+        }
         return { type: "PassBid", seat };
       }
 
-      // Normal–Expert: attempt moon shoot if enabled and hand is strong enough
-      if (profile.canShootMoon && strength >= profile.moonShootThreshold && !state.moonShooters.includes(seat)) {
-        const shootCmd = legal.find(c => c.type === "ShootMoon");
-        if (shootCmd) return shootCmd;
+      // ── Level 2+ ──────────────────────────────────────────────────────────
+
+      // Moon-shoot check (uses true hand strength, no noise)
+      if (profile.canShootMoon && !state.moonShooters.includes(seat)) {
+        const trueStrength = estimateHandValue(hand);
+        if (trueStrength >= profile.moonShootThreshold) {
+          const shootCmd = legal.find(c => c.type === "ShootMoon");
+          if (shootCmd) return shootCmd;
+        }
       }
 
-      // Bid up to aggressiveness-adjusted ceiling
-      const baseCeiling = bidWillingness(strength);
-      const ceiling = Math.round(baseCeiling * profile.bidAggressiveness);
-      if (minNextBid <= ceiling) {
+      // Compute ceiling and decide whether to bid
+      const ceiling = computeBidCeiling(hand, state, seat, profile);
+      if (shouldBid(minNextBid, ceiling, profile, state)) {
         const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
         if (bidCmd) return bidCmd;
       }
@@ -79,7 +243,6 @@ export function botChooseCommand(
     case "nest": {
       // Check if we need to take nest or discard
       if (state.nest.length > 0) {
-        // Take the nest
         const takeNest = legal.find((c) => c.type === "TakeNest");
         if (takeNest) return takeNest;
       }
@@ -95,7 +258,7 @@ export function botChooseCommand(
         return pickRandom(discardCommands);
       }
 
-      // Normal/Hard: discard lowest-point non-trump cards first; prefer keeping 1s and 14s
+      // Normal+: discard lowest-point non-trump cards first; keep 1s, 14s, trump
       return chooseBestDiscard(discardCommands, state, seat, profile);
     }
 
@@ -127,22 +290,6 @@ export function botChooseCommand(
   }
 }
 
-// ── Bid strength estimation ───────────────────────────────────────────────────
-
-function estimateBidStrength(hand: CardId[]): number {
-  let strength = 0;
-  for (const cardId of hand) {
-    if (cardId === "ROOK") { strength += 15; continue; }
-    const card = cardFromId(cardId);
-    if (card.kind !== "regular") continue;
-    if (card.value === 1) strength += 15;   // Ace (highest)
-    if (card.value === 14) strength += 10;  // 14-point card
-    if (card.value === 10) strength += 8;   // 10-point card
-    if (card.value === 5) strength += 5;    // 5-point card
-  }
-  return strength;
-}
-
 // ── Discard strategy ──────────────────────────────────────────────────────────
 
 function chooseBestDiscard(
@@ -153,9 +300,9 @@ function chooseBestDiscard(
   _profile: BotProfile,
 ): GameCommand {
   // Score each card: lower score = better to discard
-  // Prefer discarding: zero-point non-trump cards, then low-point cards
-  // Keep: 1s (15 pts), 14s (10 pts), 10s (10 pts), trump cards
-  const trump = state.trump; // May be null at discard phase (always null, trump not set yet)
+  // Prefer discarding: zero-point non-trump, then low-point non-high-value
+  // Keep: 1s, 14s, trump cards
+  const trump = state.trump; // null at discard phase (trump not set yet)
 
   const scored = discardCommands.map((cmd) => {
     if (cmd.type !== "DiscardCard") return { cmd, score: 0 };
@@ -164,16 +311,15 @@ function chooseBestDiscard(
     const isTrump = trump !== null && trumpRank(cardId, trump) >= 0;
     const isHighValue = isHighValueCard(cardId);
 
-    let score = 100; // Start with high (keep)
-    if (pts === 0 && !isTrump) score = pts; // Prefer discarding zero-point non-trump
-    else if (pts > 0 && !isHighValue) score = pts + 10; // Medium priority to discard
-    else if (isHighValue) score = 500; // Keep high value cards
-    else if (isTrump) score = 400; // Keep trump
+    let score = 100;
+    if (pts === 0 && !isTrump) score = pts;         // discard first: zero-point non-trump
+    else if (pts > 0 && !isHighValue) score = pts + 10; // medium: low point-value
+    else if (isHighValue) score = 500;               // keep: aces and 14s
+    else if (isTrump) score = 400;                   // keep: trump
 
     return { cmd, score };
   });
 
-  // Sort ascending (lower score = discard first)
   scored.sort((a, b) => a.score - b.score);
   return scored[0]!.cmd;
 }
@@ -196,16 +342,12 @@ function chooseBestTrump(
   const hand = state.hands[seat] ?? [];
 
   if (profile.trumpManagement < 0.7) {
-    // Most cards by color
-    const colorCounts: Record<Color, number> = {
-      Black: 0, Red: 0, Green: 0, Yellow: 0,
-    };
+    // Most cards by color (count only)
+    const colorCounts: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
     for (const cardId of hand) {
       if (cardId === "ROOK") continue;
       const card = cardFromId(cardId);
-      if (card.kind === "regular") {
-        colorCounts[card.color]++;
-      }
+      if (card.kind === "regular") colorCounts[card.color]++;
     }
     let bestColor: Color = "Black";
     let bestCount = -1;
@@ -215,16 +357,12 @@ function chooseBestTrump(
         bestColor = color;
       }
     }
-    const cmd = selectCommands.find(
-      (c) => c.type === "SelectTrump" && c.color === bestColor,
-    );
+    const cmd = selectCommands.find((c) => c.type === "SelectTrump" && c.color === bestColor);
     return cmd ?? selectCommands[0]!;
   }
 
   // High trump management (>= 0.7): weight by point value
-  const colorWeights: Record<Color, number> = {
-    Black: 0, Red: 0, Green: 0, Yellow: 0,
-  };
+  const colorWeights: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
   for (const cardId of hand) {
     if (cardId === "ROOK") continue;
     const card = cardFromId(cardId);
@@ -240,9 +378,7 @@ function chooseBestTrump(
       bestColor = color;
     }
   }
-  const cmd = selectCommands.find(
-    (c) => c.type === "SelectTrump" && c.color === bestColor,
-  );
+  const cmd = selectCommands.find((c) => c.type === "SelectTrump" && c.color === bestColor);
   return cmd ?? selectCommands[0]!;
 }
 
@@ -261,7 +397,6 @@ function chooseBestPlay(
   }
 
   if (isLeading) {
-    // Normal/Hard: play highest trump if available, else highest card
     return chooseLeadCard(playCommands, state, seat, profile);
   }
 
@@ -291,7 +426,7 @@ function chooseLeadCard(
     }
   }
 
-  // No trump or no trump cards — play highest off-suit card
+  // No trump cards — play highest off-suit card
   return playCommands.reduce((best, cmd) => {
     if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
     return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
@@ -304,7 +439,6 @@ function chooseFollowCard(
   seat: Seat,
   profile: BotProfile,
 ): GameCommand {
-  // Determine current winning card
   const trump = state.trump;
   const trick = state.currentTrick;
   if (trick.length === 0) return playCommands[0]!;
@@ -321,10 +455,10 @@ function chooseFollowCard(
     if (cmp > 0) currentWinnerPlay = play;
   }
 
-  const partnerTeam = SEAT_TEAM[seat];
-  const partnerIsWinning = SEAT_TEAM[currentWinnerPlay.seat] === partnerTeam;
+  const myTeam = SEAT_TEAM[seat];
+  const partnerIsWinning = SEAT_TEAM[currentWinnerPlay.seat] === myTeam;
 
-  // sluffStrategy + partner is winning: play highest point card
+  // sluffStrategy + partner is winning: dump highest point card
   if (profile.sluffStrategy && partnerIsWinning) {
     return chooseHighestPointCard(playCommands);
   }
@@ -332,21 +466,15 @@ function chooseFollowCard(
   // Find winning cards
   const winningCommands = playCommands.filter((c) => {
     if (c.type !== "PlayCard") return false;
-    const cmp = compareTrickCards(
-      c.cardId,
-      currentWinnerPlay.cardId,
-      leadColor,
-      trump,
-    );
-    return cmp > 0;
+    return compareTrickCards(c.cardId, currentWinnerPlay.cardId, leadColor, trump) > 0;
   });
 
   if (winningCommands.length > 0) {
-    // Play lowest winning card
+    // Play the cheapest winning card
     return chooseLowestWinningCard(winningCommands, leadColor, trump);
   }
 
-  // Cannot win — play lowest non-point card, or if all are point cards, lowest point card
+  // Cannot win — shed lowest-cost card
   return chooseLowestCard(playCommands);
 }
 
@@ -362,11 +490,9 @@ function chooseLowestWinningCard(
   leadColor: Color | null,
   trump: Color | null,
 ): GameCommand {
-  // Among winning cards, pick the weakest one
   return winningCommands.reduce((best, cmd) => {
     if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-    const cmpResult = compareTrickCards(cmd.cardId, best.cardId, leadColor, trump);
-    return cmpResult < 0 ? cmd : best; // cmd is weaker than best
+    return compareTrickCards(cmd.cardId, best.cardId, leadColor, trump) < 0 ? cmd : best;
   });
 }
 
@@ -377,7 +503,6 @@ function chooseLowestCard(playCommands: GameCommand[]): GameCommand {
   });
 
   if (nonPointCards.length > 0) {
-    // Play lowest non-point card by off-suit rank
     return nonPointCards.reduce((best, cmd) => {
       if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
       return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
