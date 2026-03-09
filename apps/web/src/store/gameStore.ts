@@ -7,11 +7,28 @@ import {
   applyEvent,
   validateCommand,
   botChooseCommand,
+  estimateHandValue,
+  estimateHandValueWithNoise,
+  computeBidCeiling,
+  SEAT_TEAM,
+  pointValue,
+  cardFromId,
 } from "@rook/engine";
-import type { GameEvent, GameState, GameRules, Seat } from "@rook/engine";
+import type { GameCommand, GameEvent, GameState, GameRules, Seat, BotProfile, CardId } from "@rook/engine";
+import type { BotDecisionAnnotation, BiddingAnnotation, DiscardAnnotation, TrumpAnnotation, PlayAnnotation, PlayReason } from "../devLog";
 import { getSeatLabel } from "@/utils/seatLabel";
 
 const HUMAN_SEAT: Seat = "N";
+
+/** Returns the partner seat (opposite in N↔S, E↔W). */
+function partnerOf(seat: Seat): Seat {
+  switch (seat) {
+    case "N": return "S";
+    case "S": return "N";
+    case "E": return "W";
+    case "W": return "E";
+  }
+}
 
 /**
  * Returns an announcement string for events that warrant one, or null otherwise.
@@ -29,6 +46,190 @@ function buildAnnouncementFromEvent(ev: GameEvent, _rules: GameRules): string | 
   return null;
 }
 
+// ── Dev logging helpers ───────────────────────────────────────────────────────
+
+/**
+ * Infer the reasoning code for a bot's play decision (best-effort approximation).
+ */
+function _inferReasoning(
+  state: GameState,
+  seat: Seat,
+  profile: BotProfile,
+  cardId: CardId,
+  isLeading: boolean,
+  trumpPulled: boolean,
+  isBiddingTeam: boolean,
+): PlayReason {
+  const trump = state.trump;
+  const isTrump = (cId: CardId): boolean => {
+    if (cId === "ROOK") return true;
+    const c = cardFromId(cId);
+    return c.kind === "regular" && trump !== null && c.color === trump;
+  };
+
+  if (isLeading) {
+    if (profile.endgameCardAwareness >= 0.5 && state.tricksPlayed >= 7)
+      return "endgame_lead";
+    if (profile.roleAwareness && trump !== null) {
+      if (isBiddingTeam && !trumpPulled && isTrump(cardId))
+        return "pull_trump";
+      if (!isBiddingTeam && !isTrump(cardId) && state.tricksPlayed < 7)
+        return "avoid_trump_lead";
+      if (!isBiddingTeam && state.tricksPlayed >= 7)
+        return "longest_suit";
+    }
+    return "default_lead";
+  } else {
+    // Following
+    const partnerSeat = partnerOf(seat);
+    const partnerPlay = state.currentTrick.find((p) => p.seat === partnerSeat);
+    if (profile.sluffStrategy && partnerPlay) {
+      return "sluff_to_partner";
+    }
+    return isTrump(cardId) ? "lowest_winning" : "lowest_losing";
+  }
+}
+
+/**
+ * Build a BotDecisionAnnotation for the given command, or null if not applicable.
+ */
+function _buildAnnotation(
+  state: GameState,
+  seat: Seat,
+  profile: BotProfile,
+  command: GameCommand,
+): BotDecisionAnnotation | null {
+  switch (state.phase) {
+    case "bidding": {
+      const hand = state.hands[seat] ?? [];
+      const rules = state.rules ?? DEFAULT_RULES;
+      const minNextBid = state.currentBid === 0
+        ? rules.minimumBid
+        : state.currentBid + rules.bidIncrement;
+      const partnerSeat = partnerOf(seat);
+      const partnerBid = state.bids[partnerSeat];
+      const partnerHoldsBid = state.bidder === partnerSeat;
+      const trueVal = estimateHandValue(hand);
+      const estVal = estimateHandValueWithNoise(hand, profile.handValuationAccuracy);
+      const ceil = computeBidCeiling(hand, state, seat, profile);
+      const partnerCeilingBonus = (!partnerHoldsBid && typeof partnerBid === "number" && partnerBid > 0)
+        ? Math.max(0, Math.round((partnerBid - 100) * 0.3))
+        : 0;
+      return {
+        phase: "bidding",
+        seat,
+        difficulty: profile.difficulty,
+        trueHandValue: trueVal,
+        estimatedHandValue: estVal,
+        ceiling: ceil,
+        minNextBid,
+        partnerBid: partnerBid ?? null,
+        partnerHoldsBid,
+        partnerCeilingBonus,
+        moonShootAttempted: command.type === "ShootMoon",
+        decision: command.type === "PlaceBid" ? command.amount
+          : command.type === "ShootMoon" ? "pass"
+            : "pass",
+      } satisfies BiddingAnnotation;
+    }
+
+    case "nest": {
+      if (command.type !== "DiscardCard") return null;
+      const hand = state.hands[seat] ?? [];
+      const colorCounts: Record<string, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
+      for (const cId of hand) {
+        if (cId === "ROOK") continue;
+        const c = cardFromId(cId);
+        if (c.kind === "regular") colorCounts[c.color]++;
+      }
+      const sorted = (Object.entries(colorCounts) as [string, number][])
+        .sort((a, b) => b[1] - a[1]);
+      const probableTrump = (sorted[0]?.[0] ?? "Black") as import("@rook/engine").Color;
+      const voidTargets: import("@rook/engine").Color[] = [];
+      const nonTrump = sorted.filter(([c]) => c !== probableTrump);
+      if (nonTrump.length > 0 && profile.voidExploitation >= 0.5)
+        voidTargets.push((nonTrump[nonTrump.length - 1]?.[0] ?? "Red") as import("@rook/engine").Color);
+      if (nonTrump.length > 1 && profile.voidExploitation >= 0.8)
+        voidTargets.push((nonTrump[nonTrump.length - 2]?.[0] ?? "Green") as import("@rook/engine").Color);
+      return {
+        phase: "discard",
+        seat,
+        difficulty: profile.difficulty,
+        probableTrump,
+        voidTargetSuits: voidTargets,
+        cardDiscarded: command.cardId,
+      } satisfies DiscardAnnotation;
+    }
+
+    case "trump": {
+      if (command.type !== "SelectTrump") return null;
+      return {
+        phase: "trump",
+        seat,
+        difficulty: profile.difficulty,
+        strategy: profile.trumpManagement >= 0.7 ? "weighted" : "count-only",
+        chosenTrump: command.color,
+      } satisfies TrumpAnnotation;
+    }
+
+    case "playing": {
+      if (command.type !== "PlayCard") return null;
+      const trump = state.trump;
+      const trumpPlayedCount = trump !== null
+        ? state.playedCards.filter((cId) => {
+            if (cId === "ROOK") return true;
+            const c = cardFromId(cId);
+            return c.kind === "regular" && c.color === trump;
+          }).length
+        : 0;
+      const trumpPulled = trumpPlayedCount >= 9;
+      const isBiddingTeam = state.bidder !== null &&
+        SEAT_TEAM[seat] === SEAT_TEAM[state.bidder];
+      const myTeam = SEAT_TEAM[seat];
+      const teamPointsCaptured = state.capturedCards[myTeam]
+        .reduce((sum, cId) => sum + pointValue(cId), 0);
+      const isLeading = state.currentTrick.length === 0;
+      const reasoning = _inferReasoning(state, seat, profile, command.cardId, isLeading, trumpPulled, isBiddingTeam);
+      return {
+        phase: "playing",
+        seat,
+        difficulty: profile.difficulty,
+        trickIndex: state.tricksPlayed,
+        leadOrFollow: isLeading ? "lead" : "follow",
+        trumpPulled,
+        isBiddingTeam,
+        teamPointsCaptured,
+        cardChosen: command.cardId,
+        reasoning,
+      } satisfies PlayAnnotation;
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Wrapper around botChooseCommand that fires a dev-log annotation callback
+ * (if registered) without affecting the command itself.
+ */
+function _botChooseCommandWithLog(
+  state: GameState,
+  seat: Seat,
+  profile: BotProfile,
+  storeState: AppStore,
+): GameCommand {
+  const command = botChooseCommand(state, seat, profile);
+  const cb = storeState._devOnBotDecision;
+  if (!cb) return command;
+
+  const annotation = _buildAnnotation(state, seat, profile, command);
+  if (annotation) cb(annotation);
+  return command;
+}
+
+// ── Store ─────────────────────────────────────────────────────────────────────
+
 export const useGameStore = create<AppStore>((set, get) => ({
   // ── Initial state ──────────────────────────────────────────────────────────
   gameState: null,
@@ -42,6 +243,9 @@ export const useGameStore = create<AppStore>((set, get) => ({
   gameOverReason: null,
   historyModalOpen: false,
   biddingThinkingSeat: null,
+  _devOnBotDecision: undefined,
+  _devOnHandComplete: undefined,
+  _devOnHandStart: undefined,
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -109,10 +313,55 @@ export const useGameStore = create<AppStore>((set, get) => ({
       let gameOverReason = s.gameOverReason;
       for (const ev of events) {
         gs = applyEvent(gs, ev);
-        if (ev.type === "HandScored") pendingHandScore = ev.score;
+        if (ev.type === "HandStarted") {
+          s._devOnHandStart?.(ev.timestamp);
+        }
+        if (ev.type === "HandScored") {
+          pendingHandScore = ev.score;
+          s._devOnHandComplete?.(gs);
+        }
         if (ev.type === "GameFinished") gameOverReason = ev.reason;
         const next = buildAnnouncementFromEvent(ev, gs.rules);
         if (next !== null) announcement = next;
+        // Log human card plays
+        if (ev.type === "CardPlayed") {
+          const player = gs.players.find((p) => p.seat === ev.seat);
+          if (player?.kind === "human" && s._devOnBotDecision) {
+            const trump = gs.trump;
+            const trumpPlayedCount = trump !== null
+              ? gs.playedCards.filter((cId) => {
+                  if (cId === "ROOK") return true;
+                  const c = cardFromId(cId);
+                  return c.kind === "regular" && c.color === trump;
+                }).length
+              : 0;
+            const trumpPulled = trumpPlayedCount >= 9;
+            const isBiddingTeam = gs.bidder !== null &&
+              SEAT_TEAM[ev.seat] === SEAT_TEAM[gs.bidder];
+            const myTeam = SEAT_TEAM[ev.seat];
+            const teamPointsCaptured = gs.capturedCards[myTeam]
+              .reduce((sum, cId) => sum + pointValue(cId), 0);
+            // trickIndex: the current trick index at the time of play
+            // After applyEvent, if card was played, we use the completed tricks count
+            // or tricksPlayed. Before the trick completes, tricksPlayed hasn't incremented.
+            const trickIndex = gs.tricksPlayed;
+            const isLeading = ev.trickIndex === 0 ||
+              (gs.currentTrick.length === 0 && gs.completedTricks.length === trickIndex);
+            const humanAnnotation: PlayAnnotation = {
+              phase: "playing",
+              seat: ev.seat,
+              difficulty: null,
+              trickIndex: ev.trickIndex,
+              leadOrFollow: isLeading ? "lead" : "follow",
+              trumpPulled,
+              isBiddingTeam,
+              teamPointsCaptured,
+              cardChosen: ev.cardId,
+              reasoning: "human",
+            };
+            s._devOnBotDecision(humanAnnotation);
+          }
+        }
       }
       return { gameState: gs, eventLog: [...s.eventLog, ...events], pendingHandScore, announcement, gameOverReason };
     });
@@ -184,7 +433,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
     const player = gameState.players.find((p) => p.seat === seat);
     if (!player || player.kind !== "bot" || !player.botProfile) return;
 
-    const command = botChooseCommand(gameState, seat, player.botProfile);
+    const command = _botChooseCommandWithLog(gameState, seat, player.botProfile, get());
     const result = validateCommand(gameState, command, gameState.rules);
 
     if (!result.ok) {
@@ -396,4 +645,10 @@ export const useGameStore = create<AppStore>((set, get) => ({
 
   openHistoryModal: () => set({ historyModalOpen: true }),
   closeHistoryModal: () => set({ historyModalOpen: false }),
+
+  _setLoggerCallbacks: (callbacks) => set({
+    _devOnBotDecision: callbacks.onBotDecision,
+    _devOnHandComplete: callbacks.onHandComplete,
+    _devOnHandStart: callbacks.onHandStart,
+  }),
 }));

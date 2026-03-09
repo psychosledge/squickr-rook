@@ -1,4 +1,5 @@
 import type { GameState, GameEvent, CardId, Color, BotDifficulty, HandScore, Seat } from "@rook/engine";
+import type { BotDecisionAnnotation } from "../devLog";
 
 export type OverlayKind = "none" | "bidding" | "nest" | "trump" | "hand-result" | "game-over";
 
@@ -14,6 +15,9 @@ export type AppState = {
   gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
   historyModalOpen: boolean;
   biddingThinkingSeat: Seat | null;
+  _devOnBotDecision: ((annotation: BotDecisionAnnotation) => void) | undefined;
+  _devOnHandComplete: ((gameState: GameState) => void) | undefined;
+  _devOnHandStart: ((timestamp: number) => void) | undefined;
 };
 
 export type AppActions = {
@@ -35,6 +39,11 @@ export type AppActions = {
   _applyEvents: (events: GameEvent[]) => void;
   _scheduleNextTurn: () => void;
   _dispatchBotTurn: () => void;
+  _setLoggerCallbacks: (callbacks: {
+    onBotDecision: (annotation: BotDecisionAnnotation) => void;
+    onHandComplete: (gameState: GameState) => void;
+    onHandStart: (timestamp: number) => void;
+  }) => void;
 };
 
 export type AppStore = AppState & AppActions;

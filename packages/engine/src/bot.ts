@@ -32,7 +32,7 @@ function partnerOf(seat: Seat): Seat {
  *   Near-moon: 101–120  (bids 150–175)
  *   Moon:      120+     (bids 175–200 or shoots)
  */
-function estimateHandValue(hand: CardId[]): number {
+export function estimateHandValue(hand: CardId[]): number {
   const colorCounts: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
   const colorPointWeight: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
 
@@ -88,7 +88,7 @@ function estimateHandValue(hand: CardId[]): number {
  * Hand strength with noise scaled by (1 - accuracy) * 40.
  * accuracy=1 → perfect (no noise). accuracy=0 → ±40 random noise.
  */
-function estimateHandValueWithNoise(hand: CardId[], accuracy: number): number {
+export function estimateHandValueWithNoise(hand: CardId[], accuracy: number): number {
   const trueStrength = estimateHandValue(hand);
   if (accuracy >= 1.0) return trueStrength;
   const noiseRange = (1 - accuracy) * 40;
@@ -103,7 +103,7 @@ function estimateHandValueWithNoise(hand: CardId[], accuracy: number): number {
  * Returns 0 if strength < 40 (bot will not open).
  * Anchors: [40→100, 60→115, 75→130, 90→150, 110→175, 130→200]
  */
-function baseBidCeiling(strength: number): number {
+export function baseBidCeiling(strength: number): number {
   if (strength < 40) return 0;
   const anchors: [number, number][] = [
     [40, 100], [60, 115], [75, 130], [90, 150], [110, 175], [130, 200],
@@ -124,7 +124,7 @@ function baseBidCeiling(strength: number): number {
  * Full bid ceiling: base ceiling × aggressiveness, adjusted by score context
  * and partner bid inference. Clamped to [minimumBid, maximumBid].
  */
-function computeBidCeiling(
+export function computeBidCeiling(
   hand: CardId[],
   state: GameState,
   seat: Seat,

@@ -16,4 +16,5 @@ createRoot(root).render(
 
 if (import.meta.env.DEV) {
   void import("./devCheat").then((m) => m.registerCheat());
+  void import("./devLog").then((m) => m.registerLogger());
 }
