@@ -116,6 +116,7 @@ function baseBidCeiling(strength: number): number {
       return Math.round(b0 + t * (b1 - b0));
     }
   }
+  // Strength above the last anchor — hard cap at 200
   return 200;
 }
 

@@ -33,6 +33,8 @@ This plan fixes both exploits across all five levels, calibrated so that Level 1
 
 ### Recommendation: Separate `/setup` Route (Option B)
 
+> **Implementation note:** The per-seat difficulty UI described here is deferred to **Phase 3**. Phases 1 and 2 use a single global `botDifficulty` value (store field) and a single picker in `LobbyPage`. Phase 3 replaces this with `botDifficulties: Record<"E"|"S"|"W", BotDifficulty>` and the full `SetupPage` described below.
+
 LobbyPage becomes a pure launcher: title → "New Game" → "Play Online". Tapping "New Game" navigates to `/setup`, which has the full per-bot difficulty UI, then a "Start Game" button that navigates to `/game`.
 
 ```

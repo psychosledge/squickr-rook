@@ -2,9 +2,12 @@ import { describe, it, expect } from "vitest";
 import { botChooseCommand } from "../bot.js";
 import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import { legalCommands } from "../validator.js";
+import type { GameCommand } from "../commands.js";
 import type { GameEvent } from "../events.js";
-import type { GameState, Seat } from "../types.js";
+import type { BotDifficulty, CardId, GameState, Seat } from "../types.js";
 import { BOT_PRESETS, DEFAULT_RULES, leftOf } from "../types.js";
+
+const ALL_DIFFICULTIES: BotDifficulty[] = [1, 2, 3, 4, 5];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -93,7 +96,7 @@ function stateAfterBiddingComplete(seed = 42, dealer: Seat = "N"): GameState {
   return applyEvent(state, { type: "BiddingComplete", winner: bidder, amount: 100, forced: false, shotMoon: false, handNumber: 0, timestamp: 1700 });
 }
 
-function isLegalCommand(state: GameState, seat: Seat, cmd: import("../commands.js").GameCommand): boolean {
+function isLegalCommand(state: GameState, seat: Seat, cmd: GameCommand): boolean {
   const legal = legalCommands(state, seat);
   return legal.some(c => JSON.stringify(c) === JSON.stringify(cmd));
 }
@@ -101,7 +104,7 @@ function isLegalCommand(state: GameState, seat: Seat, cmd: import("../commands.j
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("botChooseCommand", () => {
-  const difficulties: import("../types.js").BotDifficulty[] = [1, 2, 3, 4, 5];
+  const difficulties = ALL_DIFFICULTIES;
 
   it("always returns a legal command in nest phase (before nest taken)", () => {
     const state = stateAfterBiddingComplete();
@@ -229,7 +232,7 @@ describe("botChooseCommand", () => {
 });
 
 describe("botChooseCommand - bidding phase", () => {
-  const difficulties: import("../types.js").BotDifficulty[] = [1, 2, 3, 4, 5];
+  const difficulties = ALL_DIFFICULTIES;
 
   it("beginner bot mostly passes (never raises, opens only 25% of the time)", () => {
     // Run 50 trials — beginner should pass at least 25% of the time (not always bid).
@@ -311,7 +314,7 @@ describe("botChooseCommand - bidding phase", () => {
 
 // ── Helper: build a bidding-phase state with a custom hand for a seat ─────────
 
-function makeBiddingStateWithHand(seat: Seat, hand: import("../types.js").CardId[]): GameState {
+function makeBiddingStateWithHand(seat: Seat, hand: CardId[]): GameState {
   const base = applyEvent(INITIAL_STATE, {
     type: "GameStarted",
     seed: 42,
@@ -341,7 +344,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
   it("normal bot passes on a truly junk hand (no point cards, no distribution bonus)", () => {
     // No point-value cards → base = 0; 4 colors, each 2–3 cards → no voids/singletons
     // Trump length ≤ 3 (e.g. 3) → bonus = 5; no voids/singletons; total ~5 < 40 → ceiling=0 → pass
-    const junkHand: import("../types.js").CardId[] = [
+    const junkHand: CardId[] = [
       "B2", "B3", "B4", "R2", "R3", "R4", "G2", "G3", "Y2", "Y3",
     ];
     const state = makeBiddingStateWithHand("E", junkHand);
@@ -356,7 +359,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
     // baseBidCeiling(44): anchor [40,100]→[60,115], t=(44-40)/(60-40)=0.2; ceil=100+0.2*15=103 → 103
     // Normal aggressiveness=1.0, bluffResistance=0.3: snappedCeiling=floor((103+9)/5)*5=110
     // minNextBid=100 ≤ 110 → bid 100
-    const hand: import("../types.js").CardId[] = [
+    const hand: CardId[] = [
       "ROOK", "B1", "B2", "B3", "B4", "B6", "B7", "B8", "G9", "Y9",
     ];
     const state = makeBiddingStateWithHand("E", hand);
@@ -370,7 +373,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
 
   it("normal bot passes when min bid would exceed bluff-adjusted ceiling", () => {
     // Pure junk hand: strength ≈ 0 → baseBidCeiling(0) = 0 → ceiling stays 0 → pass
-    const junkHand: import("../types.js").CardId[] = [
+    const junkHand: CardId[] = [
       "B2", "B3", "B4", "R2", "R3", "R4", "G2", "G3", "Y2", "Y3",
     ];
     const base = makeBiddingStateWithHand("E", junkHand);
@@ -393,12 +396,12 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
     // Expert bluffResistance=1.0: budget=30; snapped=floor((146+30)/5)*5=175
     // Normal bluffResistance=0.3: budget=9; snapped=floor((146+9)/5)*5=155
     // Set currentBid=155 so minNextBid=160: expert (175) bids, normal (155) passes
-    const hand: import("../types.js").CardId[] = [
+    const hand: CardId[] = [
       "ROOK", "B1", "R14", "R10", "R2", "G5", "Y5", "B2", "B3", "B4",
     ];
     const base = makeBiddingStateWithHand("E", hand);
     // Block moon shoot so we test bid ceiling
-    const state = { ...base, currentBid: 155, moonShooters: ["E"] as import("../types.js").Seat[] };
+    const state = { ...base, currentBid: 155, moonShooters: ["E"] as Seat[] };
 
     const expertProfile = BOT_PRESETS[5];
     const expertCmd = botChooseCommand(state, "E", expertProfile);
@@ -411,16 +414,17 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
     }
   });
 
-  it("normal bot caps at maximumBid (200) even with high strength", () => {
+  it("expert bot caps at maximumBid (200) even with very high strength", () => {
     // Super-strong hand: ROOK + four aces + four 14s + B10
     // strength is very high → baseBidCeiling → 200 (max anchor)
-    const hand: import("../types.js").CardId[] = [
+    // Uses expert (accuracy=1.0) so hand valuation is deterministic — no noise.
+    const hand: CardId[] = [
       "ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10",
     ];
     const base = makeBiddingStateWithHand("E", hand);
     // currentBid=195, minNextBid=200 which equals maximumBid → should bid 200
-    const state = { ...base, currentBid: 195, moonShooters: ["E"] as import("../types.js").Seat[] };
-    const profile = BOT_PRESETS[3];
+    const state = { ...base, currentBid: 195, moonShooters: ["E"] as Seat[] };
+    const profile = BOT_PRESETS[5]; // expert: accuracy=1.0, deterministic
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PlaceBid");
     if (cmd.type === "PlaceBid") {
@@ -429,19 +433,19 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
   });
 
   it("normal bot passes when minNextBid exceeds maximumBid (200)", () => {
-    const hand: import("../types.js").CardId[] = [
+    const hand: CardId[] = [
       "ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10",
     ];
     const base = makeBiddingStateWithHand("E", hand);
     // currentBid=200, minNextBid=205 → always passes (no bid above max)
-    const state = { ...base, currentBid: 200, moonShooters: ["E"] as import("../types.js").Seat[] };
+    const state = { ...base, currentBid: 200, moonShooters: ["E"] as Seat[] };
     const profile = BOT_PRESETS[3];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PassBid");
   });
 
   it("Level 2 bot passes when junk hand (bidAggressiveness=0.85 doesn't help 0-ceiling)", () => {
-    const junkHand: import("../types.js").CardId[] = [
+    const junkHand: CardId[] = [
       "B2", "B3", "B4", "R2", "R3", "R4", "G2", "G3", "Y2", "Y3",
     ];
     const state = makeBiddingStateWithHand("E", junkHand);
@@ -451,7 +455,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
   });
 
   it("all levels always return a legal bidding command for any hand", () => {
-    const difficulties: import("../types.js").BotDifficulty[] = [1, 2, 3, 4, 5];
+    const difficulties = ALL_DIFFICULTIES;
     const hands = [
       // Junk
       ["B2", "B3", "B4", "R2", "R3", "R4", "G2", "G3", "Y2", "Y3"],
@@ -459,7 +463,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
       ["ROOK", "B1", "R14", "G5", "Y5", "B2", "B3", "B4", "R2", "R3"],
       // Strong
       ["ROOK", "B1", "R1", "G1", "Y1", "R14", "G14", "B14", "Y14", "B10"],
-    ] as import("../types.js").CardId[][];
+    ] as CardId[][];
 
     for (const hand of hands) {
       for (const difficulty of difficulties) {
