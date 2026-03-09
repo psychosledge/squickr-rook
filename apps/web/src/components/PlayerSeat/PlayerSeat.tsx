@@ -16,14 +16,16 @@ type Props = {
   onCardClick?: (cardId: CardId) => void;
   displayName?: string;
   position?: "bottom" | "top" | "left" | "right";
+  difficultyLabel?: string;
 };
 
 const BIDDER_PHASES: GamePhase[] = ["nest", "trump", "playing", "scoring"];
 
-export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, gameState, onCardClick, displayName, position }: Props) {
+export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, isDealer, phase, gameState, onCardClick, displayName, position, difficultyLabel }: Props) {
   const legalCards = useLegalCards(gameState, seat);
   const label = displayName ?? getSeatLabel(seat);
   const showBidBadge = isBidder === true && BIDDER_PHASES.includes(phase);
+  const showDiffBadge = position !== "bottom" && difficultyLabel !== undefined;
 
   const cardOrientation: 'horizontal' | 'vertical' =
     (position === 'left' || position === 'right') ? 'vertical' : 'horizontal';
@@ -36,6 +38,7 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
         <span className={styles.name}>{label}</span>
         {isDealer && <span className={styles.dealerBadge} aria-label="Dealer">D</span>}
         {showBidBadge && <span className={styles.bidBadge} aria-label="Bidder">★ BID</span>}
+        {showDiffBadge && <span className={styles.diffBadge}>{difficultyLabel}</span>}
         {isActive && <span className={styles.indicator}>●</span>}
       </div>
       <div className={styles.handWrap}>

@@ -56,6 +56,17 @@
   padding: 0 3px;
 }
 
+.diffBadge {
+  color: #888;
+  font-size: 0.60rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: rgba(128, 128, 128, 0.10);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
 /* Real block box so overflow-x: auto on .hand actually works.
    min-width: 0 prevents flex/grid min-width: auto expansion that blocks scroll. */
 .handWrap {

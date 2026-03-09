@@ -9,10 +9,11 @@ type Props = {
   gameState: GameState;
   onPlayCard: (cardId: CardId) => void;
   seatNames?: Partial<Record<Seat, string>>;
+  difficultyLabels?: Partial<Record<Seat, string>>;
   humanSeat?: Seat;
 };
 
-export default function GameTable({ gameState, onPlayCard, seatNames, humanSeat = "N" }: Props) {
+export default function GameTable({ gameState, onPlayCard, seatNames, difficultyLabels, humanSeat = "N" }: Props) {
   const { hands, activePlayer, currentTrick, trump, phase, dealer, bidder } = gameState;
   const isHumanTurn = phase === "playing" && activePlayer === humanSeat;
 
@@ -24,12 +25,12 @@ export default function GameTable({ gameState, onPlayCard, seatNames, humanSeat 
     <div className={styles.table}>
       {/* Partner — top center */}
       <div className={styles.top}>
-        <PlayerSeat seat={top} cards={hands[top] ?? []} faceDown isActive={activePlayer === top} isBidder={bidder === top} isDealer={dealer === top} phase={phase} gameState={gameState} displayName={seatNames?.[top]} position="top" />
+        <PlayerSeat seat={top} cards={hands[top] ?? []} faceDown isActive={activePlayer === top} isBidder={bidder === top} isDealer={dealer === top} phase={phase} gameState={gameState} displayName={seatNames?.[top]} difficultyLabel={difficultyLabels?.[top]} position="top" />
       </div>
 
       {/* Opponent — screen-left (next clockwise from human) */}
       <div className={styles.left}>
-        <PlayerSeat seat={left} cards={hands[left] ?? []} faceDown isActive={activePlayer === left} isBidder={bidder === left} isDealer={dealer === left} phase={phase} gameState={gameState} displayName={seatNames?.[left]} position="left" />
+        <PlayerSeat seat={left} cards={hands[left] ?? []} faceDown isActive={activePlayer === left} isBidder={bidder === left} isDealer={dealer === left} phase={phase} gameState={gameState} displayName={seatNames?.[left]} difficultyLabel={difficultyLabels?.[left]} position="left" />
       </div>
 
       {/* Center trick area */}
@@ -39,7 +40,7 @@ export default function GameTable({ gameState, onPlayCard, seatNames, humanSeat 
 
       {/* Opponent — screen-right (previous clockwise from human) */}
       <div className={styles.right}>
-        <PlayerSeat seat={right} cards={hands[right] ?? []} faceDown isActive={activePlayer === right} isBidder={bidder === right} isDealer={dealer === right} phase={phase} gameState={gameState} displayName={seatNames?.[right]} position="right" />
+        <PlayerSeat seat={right} cards={hands[right] ?? []} faceDown isActive={activePlayer === right} isBidder={bidder === right} isDealer={dealer === right} phase={phase} gameState={gameState} displayName={seatNames?.[right]} difficultyLabel={difficultyLabels?.[right]} position="right" />
       </div>
 
       {/* Human — bottom */}

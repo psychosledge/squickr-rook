@@ -10,6 +10,8 @@ import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay"
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
 import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+import { BOT_DIFFICULTY_LABELS } from "@rook/engine";
+import type { Seat } from "@rook/engine";
 import { sortHand } from "@/utils/sortHand";
 import { buildHandHistoryRows } from "@/utils/handHistory";
 import styles from "./GamePage.module.css";
@@ -44,6 +46,14 @@ export default function GamePage() {
 
   if (!gameState) return null;
 
+  // Build difficulty labels for bot seats (human seat N gets nothing)
+  const difficultyLabels: Partial<Record<Seat, string>> = {};
+  for (const player of gameState.players) {
+    if (player.kind === "bot" && player.botProfile) {
+      difficultyLabels[player.seat] = BOT_DIFFICULTY_LABELS[player.botProfile.difficulty];
+    }
+  }
+
   function handlePlayAgain() {
     resetGame();
     void navigate("/");
@@ -76,7 +86,7 @@ export default function GamePage() {
         <TrumpPicker onSelect={humanSelectTrump} />
       )}
 
-      <GameTable gameState={gameState} onPlayCard={humanPlayCard} />
+      <GameTable gameState={gameState} onPlayCard={humanPlayCard} difficultyLabels={difficultyLabels} />
 
       {overlay === "nest" && (
         <NestOverlay

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router";
 import LobbyPage from "@/pages/LobbyPage";
 import GamePage from "@/pages/GamePage";
+import SetupPage from "@/pages/SetupPage";
 import OnlineLobbyPage from "@/pages/OnlineLobbyPage";
 import OnlineGamePage from "@/pages/OnlineGamePage";
 import UpdateBanner from "@/components/UpdateBanner/UpdateBanner";
@@ -11,6 +12,7 @@ export default function App() {
       <UpdateBanner />
       <Routes>
         <Route path="/" element={<LobbyPage />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/game" element={<GamePage />} />
         <Route path="/online" element={<OnlineLobbyPage />} />
         <Route path="/online/:code" element={<OnlineLobbyPage />} />

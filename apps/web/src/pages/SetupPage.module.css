@@ -1,0 +1,159 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 16px;
+  min-height: 100dvh;
+  background: var(--color-bg);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 480px;
+  gap: 12px;
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 0;
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .backBtn:hover {
+    opacity: 0.8;
+  }
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px 16px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHeading {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  margin: 0 0 4px;
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setAllRow {
+  padding-bottom: 4px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+.seatLabel {
+  font-size: 0.85rem;
+  color: var(--color-text);
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.pickerButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.diffBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+@media (hover: hover) {
+  .diffBtn:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+.diffBtn.active {
+  border-color: var(--color-accent);
+  background: #2a1f0a;
+  color: var(--color-accent);
+}
+
+.diffLabel {
+  font-size: 0.8rem;
+  color: #888;
+  min-width: 60px;
+}
+
+.startBtn {
+  padding: 14px 48px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-accent);
+  color: #1a1a2e;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  width: 100%;
+  max-width: 480px;
+  margin-top: 4px;
+}
+
+@media (hover: hover) {
+  .startBtn:hover {
+    opacity: 0.9;
+  }
+}
+
+@media (max-width: 600px) {
+  .diffBtn {
+    width: 40px;
+    height: 40px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .startBtn {
+    min-height: 56px;
+    font-size: 1.1rem;
+  }
+}

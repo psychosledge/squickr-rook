@@ -17,6 +17,7 @@ vi.mock("./PlayerSeat.module.css", () => ({
     indicator: "indicator",
     bidBadge: "bidBadge",
     dealerBadge: "dealerBadge",
+    diffBadge: "diffBadge",
     handWrap: "handWrap",
   },
 }));
@@ -508,6 +509,91 @@ describe("PlayerSeat", () => {
       });
       expect(cardHandEls).toHaveLength(1);
       expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("normal");
+    });
+  });
+
+  describe("difficultyLabel badge", () => {
+    it("renders a diffBadge when difficultyLabel is provided and position is not 'bottom'", () => {
+      const element = PlayerSeat({ ...baseProps, position: "top", difficultyLabel: "Lvl 3" });
+      const elements = flattenElements(element);
+
+      const badges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("diffBadge")
+        );
+      });
+
+      expect(badges).toHaveLength(1);
+      expect((badges[0].props as Record<string, unknown>).children).toBe("Lvl 3");
+    });
+
+    it("renders a diffBadge when position='left' and difficultyLabel is provided", () => {
+      const element = PlayerSeat({ ...baseProps, position: "left", difficultyLabel: "Lvl 5" });
+      const elements = flattenElements(element);
+
+      const badges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("diffBadge")
+        );
+      });
+
+      expect(badges).toHaveLength(1);
+      expect((badges[0].props as Record<string, unknown>).children).toBe("Lvl 5");
+    });
+
+    it("does NOT render a diffBadge when position='bottom', even if difficultyLabel is provided", () => {
+      const element = PlayerSeat({ ...baseProps, position: "bottom", difficultyLabel: "Lvl 3" });
+      const elements = flattenElements(element);
+
+      const badges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("diffBadge")
+        );
+      });
+
+      expect(badges).toHaveLength(0);
+    });
+
+    it("does NOT render a diffBadge when difficultyLabel is not provided", () => {
+      const element = PlayerSeat({ ...baseProps, position: "top" });
+      const elements = flattenElements(element);
+
+      const badges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("diffBadge")
+        );
+      });
+
+      expect(badges).toHaveLength(0);
+    });
+
+    it("does NOT render a diffBadge when position is undefined (treated as non-bottom, but no label provided)", () => {
+      // no difficultyLabel → no badge
+      const element = PlayerSeat({ ...baseProps });
+      const elements = flattenElements(element);
+
+      const badges = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return (
+          el.type === "span" &&
+          typeof p.className === "string" &&
+          p.className.includes("diffBadge")
+        );
+      });
+
+      expect(badges).toHaveLength(0);
     });
   });
 });

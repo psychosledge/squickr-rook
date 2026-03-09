@@ -9,7 +9,7 @@ export type AppState = {
   pendingDiscards: CardId[];
   pendingHandScore: HandScore | null;
   botTimeoutId: ReturnType<typeof setTimeout> | null;
-  botDifficulty: BotDifficulty;
+  botDifficulties: Record<"E" | "S" | "W", BotDifficulty>;
   announcement: string | null;
   gameOverReason: "threshold-reached" | "bust" | "moon-set" | "moon-made" | null;
   historyModalOpen: boolean;
@@ -17,7 +17,7 @@ export type AppState = {
 };
 
 export type AppActions = {
-  startGame: (difficulty: BotDifficulty) => void;
+  startGame: (difficulties: Record<"E" | "S" | "W", BotDifficulty>) => void;
   resetGame: () => void;
   humanPlayCard: (cardId: CardId) => void;
   humanPlaceBid: (amount: number) => void;
@@ -27,7 +27,8 @@ export type AppActions = {
   confirmDiscards: () => void;
   humanSelectTrump: (color: Color) => void;
   acknowledgeHandResult: () => void;
-  setBotDifficulty: (difficulty: BotDifficulty) => void;
+  setAllBotDifficulty: (difficulty: BotDifficulty) => void;
+  setBotDifficultySeat: (seat: "E" | "S" | "W", difficulty: BotDifficulty) => void;
   clearAnnouncement: () => void;
   openHistoryModal: () => void;
   closeHistoryModal: () => void;

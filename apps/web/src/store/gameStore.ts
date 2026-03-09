@@ -37,7 +37,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   pendingDiscards: [],
   pendingHandScore: null,
   botTimeoutId: null,
-  botDifficulty: 3,
+  botDifficulties: { E: 3, S: 3, W: 3 },
   announcement: null,
   gameOverReason: null,
   historyModalOpen: false,
@@ -45,12 +45,11 @@ export const useGameStore = create<AppStore>((set, get) => ({
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  startGame: (difficulty) => {
+  startGame: (difficulties) => {
     const { botTimeoutId } = get();
     if (botTimeoutId !== null) clearTimeout(botTimeoutId);
 
     const seed = Math.floor(Math.random() * 2 ** 31);
-    const profiles = BOT_PRESETS[difficulty];
 
     const gameStartedEvent: GameEvent = {
       type: "GameStarted",
@@ -58,9 +57,9 @@ export const useGameStore = create<AppStore>((set, get) => ({
       dealer: "N",
       players: [
         { seat: "N", name: "You",   kind: "human" },
-        { seat: "E", name: "P2", kind: "bot", botProfile: profiles },
-        { seat: "S", name: "P3", kind: "bot", botProfile: profiles },
-        { seat: "W", name: "P4", kind: "bot", botProfile: profiles },
+        { seat: "E", name: "P2", kind: "bot", botProfile: BOT_PRESETS[difficulties.E] },
+        { seat: "S", name: "P3", kind: "bot", botProfile: BOT_PRESETS[difficulties.S] },
+        { seat: "W", name: "P4", kind: "bot", botProfile: BOT_PRESETS[difficulties.W] },
       ],
       rules: DEFAULT_RULES,
       timestamp: Date.now(),
@@ -75,7 +74,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       pendingDiscards: [],
       pendingHandScore: null,
       botTimeoutId: null,
-      botDifficulty: difficulty,
+      botDifficulties: difficulties,
       announcement: null,
       gameOverReason: null,
       historyModalOpen: false,
@@ -387,7 +386,11 @@ export const useGameStore = create<AppStore>((set, get) => ({
     }
   },
 
-  setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
+  setAllBotDifficulty: (difficulty) =>
+    set({ botDifficulties: { E: difficulty, S: difficulty, W: difficulty } }),
+
+  setBotDifficultySeat: (seat, difficulty) =>
+    set((s) => ({ botDifficulties: { ...s.botDifficulties, [seat]: difficulty } })),
 
   clearAnnouncement: () => set({ announcement: null }),
 
