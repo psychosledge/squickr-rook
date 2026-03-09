@@ -180,14 +180,54 @@ function shouldBid(
   return minNextBid <= snappedCeiling;
 }
 
+// ── Phase 7: Contextual moon shoot ───────────────────────────────────────────
+
+/**
+ * Evaluate whether the bot should shoot the moon.
+ * Contextual bots (level 5) adjust the threshold based on score context.
+ */
+function evaluateMoonShoot(
+  hand: CardId[],
+  state: GameState,
+  seat: Seat,
+  profile: BotProfile,
+): boolean {
+  if (!profile.canShootMoon) return false;
+  if (state.moonShooters.includes(seat)) return false;
+
+  const strength = estimateHandValue(hand); // true strength, no noise
+
+  const myTeam = SEAT_TEAM[seat];
+  const oppTeam = myTeam === "NS" ? "EW" : "NS";
+  const winThreshold = state.rules.winThreshold;
+  let threshold = profile.moonShootThreshold;
+
+  if (profile.contextualMoonShoot) {
+    // Opponents near winning: lower the bar (they're about to win anyway)
+    if (state.scores[oppTeam] >= winThreshold - 150) threshold -= 20;
+    // Own team in deep hole: desperation factor
+    if (state.scores[myTeam] <= -200) threshold -= 10;
+    // Winning comfortably: do not gamble
+    if (
+      state.scores[myTeam] >= winThreshold - 100 &&
+      state.scores[myTeam] > state.scores[oppTeam] + 150
+    ) {
+      threshold += 20;
+    }
+  }
+
+  return strength >= threshold;
+}
+
 // BotProfile fields active in current implementation:
 //   Phase 2 (this file):   handValuationAccuracy, bidAggressiveness, bluffResistance,
 //                          scoreContextAwareness, canShootMoon, moonShootThreshold,
 //                          contextualMoonShoot
 //   Phase 1 carry-overs:   playAccuracy, trackPlayedCards, sluffStrategy, trumpManagement
-//
-// Reserved for future phases (populated in BOT_PRESETS but not yet read):
-//   voidExploitation (Phase 5), endgameCardAwareness (Phase 6), roleAwareness (Phase 4)
+//   Phase 4:               roleAwareness
+//   Phase 5:               voidExploitation
+//   Phase 6:               endgameCardAwareness
+//   Phase 7:               contextualMoonShoot (evaluateMoonShoot)
 
 /**
  * Choose the best command for a bot player.
@@ -223,13 +263,10 @@ export function botChooseCommand(
 
       // ── Level 2+ ──────────────────────────────────────────────────────────
 
-      // Moon-shoot check (uses true hand strength, no noise)
-      if (profile.canShootMoon && !state.moonShooters.includes(seat)) {
-        const trueStrength = estimateHandValue(hand);
-        if (trueStrength >= profile.moonShootThreshold) {
-          const shootCmd = legal.find(c => c.type === "ShootMoon");
-          if (shootCmd) return shootCmd;
-        }
+      // ── Phase 7: Moon-shoot check (contextual for expert) ─────────────────
+      if (evaluateMoonShoot(hand, state, seat, profile)) {
+        const shootCmd = legal.find(c => c.type === "ShootMoon");
+        if (shootCmd) return shootCmd;
       }
 
       // Compute ceiling and decide whether to bid
@@ -291,45 +328,99 @@ export function botChooseCommand(
   }
 }
 
-// ── Discard strategy ──────────────────────────────────────────────────────────
+// ── Phase 5: Discard strategy ─────────────────────────────────────────────────
 
 function chooseBestDiscard(
   discardCommands: GameCommand[],
   state: GameState,
   _seat: Seat,
-  // TODO Phase 5: apply profile.voidExploitation to target color voids
-  _profile: BotProfile,
+  profile: BotProfile,
 ): GameCommand {
-  // Score each card: lower score = better to discard
-  // Prefer discarding: zero-point non-trump, then low-point non-high-value
-  // Keep: 1s, 14s, trump cards
   const trump = state.trump; // null at discard phase (trump not set yet)
 
+  // ── Phase 5: Void exploitation ────────────────────────────────────────────
+  // Identify probable trump using same weighted method as estimateHandValue
+  const colorCounts: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
+  const colorPointWeight: Record<Color, number> = { Black: 0, Red: 0, Green: 0, Yellow: 0 };
+
+  // Build counts from ALL cards currently in hand (cards available to discard + kept)
+  // discardCommands only contains legal discards, but we need the full hand view.
+  // Use state hands if available; fallback to deriving from discardCommands.
+  // At discard phase, the hand has been merged with nest cards.
+  // We can approximate from the discard commands plus trump color (trump=null here).
+  for (const cmd of discardCommands) {
+    if (cmd.type !== "DiscardCard") continue;
+    const cardId = cmd.cardId;
+    if (cardId === "ROOK") continue;
+    const card = cardFromId(cardId);
+    if (card.kind !== "regular") continue;
+    colorCounts[card.color]++;
+    colorPointWeight[card.color] += 1 + pointValue(cardId) * 0.1;
+  }
+
+  let probableTrump: Color = "Black";
+  let bestWeight = -1;
+  for (const color of COLORS) {
+    if (colorPointWeight[color] > bestWeight) {
+      bestWeight = colorPointWeight[color];
+      probableTrump = color;
+    }
+  }
+
+  // Determine void targets
+  const voidTargets = new Set<Color>();
+  if (profile.voidExploitation >= 0.5) {
+    // Sort non-trump colors by count (ascending) to find shortest suits
+    const nonTrumpColors = COLORS.filter(c => c !== probableTrump);
+    const sorted = [...nonTrumpColors].sort(
+      (a, b) => colorCounts[a] - colorCounts[b],
+    );
+    // >= 0.5: target one void (shortest non-trump color)
+    if (sorted[0] !== undefined) voidTargets.add(sorted[0]);
+    // >= 0.8: target two voids (two shortest non-trump colors)
+    if (profile.voidExploitation >= 0.8 && sorted[1] !== undefined) {
+      voidTargets.add(sorted[1]);
+    }
+  }
+
+  // Score each card: lower score = better to discard
   const scored = discardCommands.map((cmd) => {
     if (cmd.type !== "DiscardCard") return { cmd, score: 0 };
     const cardId = cmd.cardId;
     const pts = pointValue(cardId);
     const isTrump = trump !== null && trumpRank(cardId, trump) >= 0;
-    const isHighValue = isHighValueCard(cardId);
 
-    let score = 100;
-    if (pts === 0 && !isTrump) score = pts;         // discard first: zero-point non-trump
-    else if (pts > 0 && !isHighValue) score = pts + 10; // medium: low point-value
-    else if (isHighValue) score = 500;               // keep: aces and 14s
-    else if (isTrump) score = 400;                   // keep: trump
+    // ROOK: never discard
+    if (cardId === "ROOK") return { cmd, score: 600 };
 
-    return { cmd, score };
+    // Probable trump: keep (score 400)
+    const card = cardFromId(cardId);
+    const cardColor = card.kind === "regular"
+      ? (card as { kind: "regular"; color: Color }).color
+      : null;
+    const isProbableTrump = cardColor === probableTrump || isTrump;
+
+    // Aces (value=1) and 14s (value=14): keep (score 500)
+    if (card.kind === "regular" && (card.value === 1 || card.value === 14)) {
+      return { cmd, score: 500 };
+    }
+
+    if (isProbableTrump) return { cmd, score: 400 };
+
+    // Void exploitation scoring (only if voidExploitation >= 0.5)
+    if (profile.voidExploitation >= 0.5 && cardColor !== null && voidTargets.has(cardColor)) {
+      if (pts === 0) return { cmd, score: 0 };         // zero-point in void target: discard first
+      return { cmd, score: pts };                        // point card in void target: discard after zero-point
+    }
+
+    // Non-trump, non-void-target
+    if (pts === 0) return { cmd, score: 50 };
+    if (pts <= 5)  return { cmd, score: 100 };
+    return { cmd, score: 200 };
   });
 
   scored.sort((a, b) => a.score - b.score);
   return scored[0]!.cmd;
-}
-
-function isHighValueCard(cardId: CardId): boolean {
-  if (cardId === "ROOK") return true;
-  const card = cardFromId(cardId);
-  if (card.kind !== "regular") return false;
-  return card.value === 1 || card.value === 14;
 }
 
 // ── Trump selection strategy ──────────────────────────────────────────────────
@@ -383,6 +474,12 @@ function chooseBestTrump(
   return cmd ?? selectCommands[0]!;
 }
 
+// ── Phase 6: Endgame nest value ───────────────────────────────────────────────
+
+function nestPointValue(state: GameState): number {
+  return state.originalNest.reduce((sum, c) => sum + pointValue(c), 0);
+}
+
 // ── Play strategy ─────────────────────────────────────────────────────────────
 
 function chooseBestPlay(
@@ -407,12 +504,158 @@ function chooseBestPlay(
 function chooseLeadCard(
   playCommands: GameCommand[],
   state: GameState,
-  _seat: Seat,
-  _profile: BotProfile,
+  seat: Seat,
+  profile: BotProfile,
 ): GameCommand {
   const trump = state.trump;
+  const isBiddingTeam = state.bidder !== null && SEAT_TEAM[seat] === SEAT_TEAM[state.bidder];
 
-  // Find trump cards
+  // ── Phase 6: Endgame awareness ────────────────────────────────────────────
+  if (profile.endgameCardAwareness >= 0.5 && state.tricksPlayed >= 7) {
+    const nestVal = nestPointValue(state);
+    if (nestVal > 15) {
+      // Trick 10 (tricksPlayed >= 9): lead highest-value card
+      if (state.tricksPlayed >= 9) {
+        // Lead the highest-value card (point value first, then off-suit rank)
+        return playCommands.reduce((best, cmd) => {
+          if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+          const cmpPts = pointValue(cmd.cardId) - pointValue(best.cardId);
+          if (cmpPts !== 0) return cmpPts > 0 ? cmd : best;
+          return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+        });
+      }
+
+      // Tricks 7–8: preserve strong trump/ace for trick 10
+      if (isBiddingTeam && state.tricksPlayed < 9) {
+        // Prefer leading a non-trump, non-ace card to preserve the strong card
+        const nonTrumpNonAce = playCommands.filter((c) => {
+          if (c.type !== "PlayCard") return false;
+          if (trump !== null && trumpRank(c.cardId, trump) >= 0) return false;
+          const card = cardFromId(c.cardId);
+          if (card.kind === "regular" && (card.value === 1 || card.value === 14)) return false;
+          return true;
+        });
+        if (nonTrumpNonAce.length > 0) {
+          // Lead lowest-ranked among these to preserve strong ones
+          return nonTrumpNonAce.reduce((best, cmd) => {
+            if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+            return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
+          });
+        }
+        // No non-trump non-ace available — fall through to role logic
+      }
+
+      if (!isBiddingTeam && state.tricksPlayed < 9) {
+        // Defending team: also save strong card for trick 10
+        const nonTrumpNonAce = playCommands.filter((c) => {
+          if (c.type !== "PlayCard") return false;
+          if (trump !== null && trumpRank(c.cardId, trump) >= 0) return false;
+          const card = cardFromId(c.cardId);
+          if (card.kind === "regular" && (card.value === 1 || card.value === 14)) return false;
+          return true;
+        });
+        if (nonTrumpNonAce.length > 0) {
+          return nonTrumpNonAce.reduce((best, cmd) => {
+            if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+            return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
+          });
+        }
+      }
+    }
+  }
+
+  // ── Phase 4: Role-aware leading ───────────────────────────────────────────
+  if (profile.roleAwareness && trump !== null) {
+
+    // Count played trump cards to determine if trump is "pulled"
+    let trumpPlayedCount = 0;
+    if (profile.trackPlayedCards) {
+      for (const cardId of state.playedCards) {
+        if (trumpRank(cardId, trump) >= 0) trumpPlayedCount++;
+      }
+    }
+    const trumpPulled = trumpPlayedCount >= 9;
+
+    // Partition hand into trump / non-trump
+    const trumpCards = playCommands.filter((c) => {
+      if (c.type !== "PlayCard") return false;
+      return trumpRank(c.cardId, trump) >= 0;
+    });
+    const nonTrumpCards = playCommands.filter((c) => {
+      if (c.type !== "PlayCard") return false;
+      return trumpRank(c.cardId, trump) < 0;
+    });
+
+    if (isBiddingTeam) {
+      // ── Bidding team: pull trump or lead high off-suit ──────────────────
+      if (!trumpPulled && trumpCards.length > 0) {
+        // Lead highest trump — but respect ROOK-management rule
+        const nonRookTrump = trumpCards.filter(c => c.type === "PlayCard" && c.cardId !== "ROOK");
+        const candidates = nonRookTrump.length > 0 ? nonRookTrump : trumpCards;
+        return candidates.reduce((best, cmd) => {
+          if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+          return trumpRank(cmd.cardId, trump) > trumpRank(best.cardId, trump) ? cmd : best;
+        });
+      }
+      // Trump pulled or no trump — lead highest off-suit card
+      const offSuitCandidates = nonTrumpCards.length > 0 ? nonTrumpCards : playCommands;
+      return offSuitCandidates.reduce((best, cmd) => {
+        if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+        return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+      });
+    } else {
+      // ── Defending team ──────────────────────────────────────────────────
+      // Do not lead trump before trick 7 unless bot has ONLY trump cards
+      const onlyHasTrump = nonTrumpCards.length === 0;
+      const canLeadTrump = state.tricksPlayed >= 7 || onlyHasTrump;
+
+      if (nonTrumpCards.length > 0) {
+        // Lead from longest side suit (most cards in a single non-trump color)
+        const colorGroups: Record<Color, GameCommand[]> = {
+          Black: [], Red: [], Green: [], Yellow: [],
+        };
+        for (const cmd of nonTrumpCards) {
+          if (cmd.type !== "PlayCard") continue;
+          const card = cardFromId(cmd.cardId);
+          if (card.kind === "regular") colorGroups[card.color].push(cmd);
+        }
+        let longestColor: Color = "Black";
+        let longestCount = -1;
+        for (const color of COLORS) {
+          if (colorGroups[color].length > longestCount) {
+            longestCount = colorGroups[color].length;
+            longestColor = color;
+          }
+        }
+        const suitCards = colorGroups[longestColor];
+        if (suitCards.length > 0) {
+          // Lead lowest in suit to exhaust (or highest — lead a strong card)
+          return suitCards.reduce((best, cmd) => {
+            if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+            return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+          });
+        }
+      }
+
+      if (canLeadTrump && trumpCards.length > 0) {
+        // Lead lowest trump
+        return trumpCards.reduce((best, cmd) => {
+          if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+          return trumpRank(cmd.cardId, trump) < trumpRank(best.cardId, trump) ? cmd : best;
+        });
+      }
+
+      // Fallback: play any legal card
+      if (nonTrumpCards.length > 0) {
+        return nonTrumpCards.reduce((best, cmd) => {
+          if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+          return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+        });
+      }
+    }
+  }
+
+  // ── Default lead logic (no role awareness or trump not set) ───────────────
   if (trump !== null) {
     const trumpCards = playCommands.filter((c) => {
       if (c.type !== "PlayCard") return false;
@@ -469,6 +712,27 @@ function chooseFollowCard(
     if (c.type !== "PlayCard") return false;
     return compareTrickCards(c.cardId, currentWinnerPlay.cardId, leadColor, trump) > 0;
   });
+
+  // ── Phase 4: ROOK burning avoidance (defending team, early game) ──────────
+  if (profile.roleAwareness && profile.trumpManagement >= 0.7 && winningCommands.length > 0) {
+    const isBiddingTeam =
+      state.bidder !== null && SEAT_TEAM[seat] === SEAT_TEAM[state.bidder];
+    if (!isBiddingTeam && state.tricksPlayed < 5) {
+      // Check if ROOK is the only winning card
+      const rookWins = winningCommands.some(c => c.type === "PlayCard" && c.cardId === "ROOK");
+      const nonRookWins = winningCommands.filter(c => c.type === "PlayCard" && c.cardId !== "ROOK");
+      if (rookWins && nonRookWins.length === 0) {
+        // ROOK is the only winning card — prefer to lose the trick instead
+        const losingCards = playCommands.filter((c) => {
+          if (c.type !== "PlayCard") return false;
+          return compareTrickCards(c.cardId, currentWinnerPlay.cardId, leadColor, trump) <= 0;
+        });
+        if (losingCards.length > 0) {
+          return chooseLowestCard(losingCards);
+        }
+      }
+    }
+  }
 
   if (winningCommands.length > 0) {
     // Play the cheapest winning card
