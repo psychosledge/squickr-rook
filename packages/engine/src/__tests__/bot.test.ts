@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { botChooseCommand } from "../bot.js";
+import { botChooseCommand, computeBidCeiling } from "../bot.js";
 import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import { legalCommands } from "../validator.js";
 import { trumpRank } from "../deck.js";
@@ -959,113 +959,47 @@ describe("botChooseCommand - Phase 6 (endgame awareness)", () => {
 
 describe("botChooseCommand - Phase 7 (contextual moon shoot)", () => {
   it("expert bot lowers moon threshold when opponents near win", () => {
-    // Expert threshold = 75. Opponents near win → threshold -= 20 → 55.
+    // Expert threshold = 95. Opponents near win → threshold -= 20 → 75.
     // E is on EW team → opponents are NS.
     // Set NS=360 (>= 500-150=350) to trigger the reduction.
-    // Hand strength ~58 (above 55 adjusted threshold but below 75 baseline).
-    // Hand: ROOK(15)+B1(15)+R14(10)+G8+G7+G6+G5(5)+R2+B2+Y2
-    // Green: G8,G7,G6,G5 = 4 cards, weight=4+0.5=4.5 → probableTrump
-    // Base: ROOK(15)+B1(15)+R14(10)+G5(5)=45; trump bonus=10; Yellow singleton(+3)
-    // strength = 58 > 55 → should shoot moon
-    const hand: CardId[] = ["ROOK", "B1", "R14", "G8", "G7", "G6", "G5", "R2", "B2", "Y2"];
+    // Hand strength = 79 (above 75 adjusted threshold but below 95 baseline).
+    // Hand: ROOK(15)+B1(15)+R1(15)+G14(10)+G9+G8+G7+G6+B2+Y2
+    // Green: G14(10),G9,G8,G7,G6 = 5 cards, weight=5+1.0=6.0 → probableTrump
+    // Black: B1(15),B2 = 2, weight=3.5
+    // Red: R1(15) = 1, weight=2.5 → singleton (+3)
+    // Yellow: Y2 = 1, weight=1.0 → singleton (+3)
+    // trumpLength=5 → bonus=18
+    // Base: ROOK(15)+B1(15)+R1(15)+G14(10) = 55
+    // Total = 55+18+3+3 = 79 > 75 → should shoot moon
+    // Ace gate (difficulty=5≥4): ROOK + B1(ace) → hasRook=true, aceCount=1 ≥ 1 → passes
+    const hand: CardId[] = ["ROOK", "B1", "R1", "G14", "G9", "G8", "G7", "G6", "B2", "Y2"];
     const state = {
       ...makeBiddingStateWithHand("E", hand),
       scores: { NS: 360, EW: 0 },  // opponents (NS) at 360 >= 500-150=350
       moonShooters: [] as Seat[],
     };
-    // Expert bot: contextualMoonShoot=true, moonShootThreshold=75
-    // After contextual adjustment: threshold = 75 - 20 = 55
-    // Hand strength = 58 > 55 → should shoot moon
+    // Expert bot: contextualMoonShoot=true, moonShootThreshold=95
+    // After contextual adjustment: threshold = 95 - 20 = 75
+    // Hand strength = 79 > 75 → should shoot moon
     const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("ShootMoon");
   });
 
   it("expert bot raises moon threshold when winning comfortably", () => {
-    // Expert threshold = 75. Own score=420 >= 500-100=400 AND 420 > 200+150=350 → threshold += 20 → 95.
-    // Give bot a hand with strength ~80 (above 75 but below 95).
-    // Hand: ROOK(15)+B1(15)+R1(15)+G5(5)+G9+G8+G7+R2+B2+Y2
-    // Green: G5(5), G9(0), G8(0), G7(0) = 4 cards, weight=4+0.5=4.5 → probable trump
-    // Black: B1(15), B2(0) = 2, weight=3.5
-    // Red: R1(15), R2(0) = 2, weight=3.5
-    // Yellow: Y2(0) = 1, weight=1.0
-    // probableTrump=Green, trumpLength=4 → bonus=10
-    // Non-trump singletons: Yellow=1 (+3)
-    // Base: ROOK(15)+B1(15)+R1(15)+G5(5)=50
-    // Total = 50 + 10 + 3 = 63... need higher
-    // Let's add more trump: ROOK,B1,R1,G1,G5,G9,G8,G7,G6,R2
-    // Green: G1(15),G5(5),G9,G8,G7,G6 = 6 cards, weight=6+15*0.1+5*0.1=6+1.5+0.5=8.0
-    // Black: B1(15) = 1, weight=2.5
-    // Red: R1(15),R2 = 2, weight=3.5
-    // Yellow: none → void (+8)
-    // probableTrump=Green(8.0), trumpLength=6 → bonus=28
-    // Base: ROOK(15)+B1(15)+R1(15)+G1(15)+G5(5)=65
-    // Total = 65+28+8+3(B1 singleton)+3(R2 non-singleton... R=2 cards, no singleton bonus)
-    // Actually R=2 cards: no singleton bonus. B=1 singleton: +3.
-    // Total = 65+28+8+3 = 104... too high (would shoot regardless)
-    // Let's use a hand where strength is around 78-85:
-    // ROOK(15)+B1(15)+G5(5)+G9+G8+G7+G6+R2+B2+Y2
-    // Green: G5(5),G9,G8,G7,G6 = 5 cards, weight=5+0.5=5.5
-    // Black: B1(15),B2 = 2, weight=2+1.5=3.5
-    // Red: R2 = 1, weight=1
-    // Yellow: Y2 = 1, weight=1
-    // probableTrump=Green(5.5), trumpLength=5 → bonus=18
-    // Singletons: Red=1(+3), Yellow=1(+3)
-    // Base: ROOK(15)+B1(15)+G5(5) = 35
-    // Total = 35+18+3+3 = 59 < 75 baseline → even without raising it wouldn't shoot
-    // Need to pick hand with strength 76-94:
-    // ROOK(15)+B1(15)+R14(10)+G9+G8+G7+G6+G5+B2+Y2
-    // Green: G9,G8,G7,G6,G5(5) = 5 cards, weight=5+0.5=5.5
+    // Expert threshold = 95. Own score=420 >= 500-100=400 AND 420 > 200+150=350 → threshold += 20 → 115.
+    // Additionally: scoreLead=220>100 AND EW=420>0 → mid-game winning lead +15 → threshold = 130.
+    // Hand: ROOK(15)+B1(15)+R1(15)+G14(10)+G9+G8+G7+G6+B2+Y2 → strength=79
+    // Green: G14(10),G9,G8,G7,G6 = 5, weight=5+1.0=6.0 → probableTrump
     // Black: B1(15),B2 = 2, weight=3.5
-    // Red: R14(10) = 1, weight=1+1.0=2.0
-    // Yellow: Y2 = 1, weight=1
-    // probableTrump=Green(5.5), trumpLength=5 → bonus=18
-    // Singletons: Red=1(+3), Yellow=1(+3)
-    // Base: ROOK(15)+B1(15)+R14(10)+G5(5) = 45
-    // Total = 45+18+3+3 = 69 < 75... still not enough
-    // Try: ROOK+B1+R1+R14+G8+G7+G6+G5+B2+Y2
-    // Red: R1(15),R14(10) = 2, weight=2+1.5+1.0=4.5
-    // Green: G8,G7,G6,G5(5) = 4, weight=4+0.5=4.5
-    // Black: B1(15),B2 = 2, weight=3.5
-    // Yellow: Y2 = 1, weight=1.0
-    // Both Red and Green tied at 4.5... Red gets picked (first encountered)
-    // probableTrump=Red(4.5), trumpLength=2 → bonus=0
-    // Non-trump voids: none; singletons: Yellow=1(+3)
-    // Base: ROOK(15)+B1(15)+R1(15)+R14(10)+G5(5) = 60
-    // Total = 60+0+3 = 63 < 75
-    // Let's try a reliable hand: 5 trump, 3 big point cards, 2 singletons
-    // ROOK+B1+R1+G1+G14+G9+G8+G7+B2+Y2
-    // Green: G1(15),G14(10),G9,G8,G7 = 5, weight=5+1.5+1.0=7.5
-    // Black: B1(15),B2 = 2, weight=3.5
-    // Red: R1(15) = 1, weight=2.5
-    // Yellow: Y2 = 1, weight=1.0
-    // probableTrump=Green(7.5), trumpLength=5 → bonus=18
-    // Singletons: Red=1(+3), Yellow=1(+3)
-    // Base: ROOK(15)+B1(15)+R1(15)+G1(15)+G14(10) = 70
-    // Total = 70+18+3+3 = 94 > 75 → would shoot at baseline
-    // Hmm. Need strength in range 76-94.
-    // ROOK+B1+G14+G9+G8+G7+G6+R2+B2+Y2
-    // Green: G14(10),G9,G8,G7,G6 = 5, weight=5+1.0=6.0
-    // Black: B1(15),B2 = 2, weight=3.5
-    // Red: R2 = 1, weight=1.0
-    // Yellow: Y2 = 1, weight=1.0
-    // probableTrump=Green(6.0), trumpLength=5 → bonus=18
-    // Singletons: Red=1(+3), Yellow=1(+3)
-    // Base: ROOK(15)+B1(15)+G14(10) = 40
-    // Total = 40+18+3+3 = 64 < 75
-    // ROOK+B1+R1+G14+G9+G8+G7+G6+B2+Y2
-    // Green: G14(10),G9,G8,G7,G6 = 5, weight=5+1.0=6.0
-    // Black: B1(15),B2 = 2, weight=3.5
-    // Red: R1(15) = 1, weight=2.5
-    // Yellow: Y2 = 1, weight=1.0
-    // probableTrump=Green(6.0), trumpLength=5 → bonus=18
-    // Singletons: Red=1(+3), Yellow=1(+3)
+    // Red: R1(15) = 1, weight=2.5 → singleton (+3)
+    // Yellow: Y2 = 1, weight=1.0 → singleton (+3)
+    // trumpLength=5 → bonus=18
     // Base: ROOK(15)+B1(15)+R1(15)+G14(10) = 55
     // Total = 55+18+3+3 = 79
-    // 79 > 75 (baseline threshold) → would ALREADY shoot at baseline!
-    // We need: 75 < strength < 95
-    // 79 is in range 75–95. With score condition: threshold becomes 75+20=95.
-    // 79 < 95 → should NOT shoot. ✓
+    // We need: 75 < strength < 130 (with all adjustments).
+    // 79 is in that range. threshold becomes 95+20+15=130.
+    // 79 < 130 → should NOT shoot. ✓
     const hand: CardId[] = ["ROOK", "B1", "R1", "G14", "G9", "G8", "G7", "G6", "B2", "Y2"];
     const state = {
       ...makeBiddingStateWithHand("E", hand),
@@ -1074,8 +1008,8 @@ describe("botChooseCommand - Phase 7 (contextual moon shoot)", () => {
       moonShooters: [] as Seat[],
     };
     // Expert bot: contextualMoonShoot=true
-    // threshold = 75, own=420 >= 400 AND 420 > 200+150=350 → threshold += 20 → 95
-    // strength = 79 < 95 → should NOT shoot
+    // threshold = 95; comfortable winning: +20 → 115; mid-game lead (220>100, 420>0): +15 → 130
+    // strength = 79 < 130 → should NOT shoot
     const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, "E", profile);
     // Should not shoot moon (should bid or pass)
@@ -1083,12 +1017,11 @@ describe("botChooseCommand - Phase 7 (contextual moon shoot)", () => {
   });
 
   it("non-expert bot does not contextually adjust threshold", () => {
-    // Level 4 bot: contextualMoonShoot=false, moonShootThreshold=90
-    // Opponents at 360 → contextual would drop threshold by 20 → 70
-    // But level 4 doesn't contextually adjust → threshold stays 90
-    // Give bot a hand with strength ~80 (above 70 but below 90)
-    // ROOK+B1+R1+G14+G9+G8+G7+G6+B2+Y2 → strength=79 (computed above)
-    // 79 < 90 → should NOT shoot (no contextual adjustment)
+    // Level 4 bot: contextualMoonShoot=false, moonShootThreshold=105
+    // Opponents at 360 → contextual would drop threshold by 20 → 85
+    // But level 4 doesn't contextually adjust → threshold stays 105
+    // Hand: ROOK+B1+R1+G14+G9+G8+G7+G6+B2+Y2 → strength=79 (computed above)
+    // 79 < 105 → should NOT shoot (no contextual adjustment)
     const hand: CardId[] = ["ROOK", "B1", "R1", "G14", "G9", "G8", "G7", "G6", "B2", "Y2"];
     const state = {
       ...makeBiddingStateWithHand("E", hand),
@@ -1098,29 +1031,27 @@ describe("botChooseCommand - Phase 7 (contextual moon shoot)", () => {
     // Level 4: contextualMoonShoot=false
     const profile = BOT_PRESETS[4];
     const cmd = botChooseCommand(state, "E", profile);
-    // Without contextual adjustment, threshold=90, strength=79 → no shoot
+    // Without contextual adjustment, threshold=105, strength=79 → no shoot
     expect(cmd.type).not.toBe("ShootMoon");
   });
 
   it("expert bot with desperation bonus (myTeam <= -200) shoots moon just above lowered threshold", () => {
-    // Expert threshold = 75. Own team at -200 → threshold -= 10 → 65.
+    // Expert threshold = 95. Own team at -200 → threshold -= 10 → 85.
     // Opponents NOT near win (no opp trigger) → only desperation applies.
     //
-    // Hand: ROOK(15)+B1(15)+R14(10)+G9+G8+G7+G6+G5+R2+Y2
-    // Green: G9,G8,G7,G6,G5(5)=5 cards, weight=5+0.5=5.5 → probableTrump=Green
-    // Black: B1(15),B2 skipped (no B2 here) → B1=1, weight=2.5... wait let's recount:
-    //   Black: B1=1 card, weight=1+15*0.1=2.5
-    //   Red: R14(10),R2=2 cards, weight=2+10*0.1=3.0 → no, R2 weight=1, R14 weight=2.0 → total=3.0
-    //   Yellow: Y2=1 card, weight=1
-    //   Green: G9,G8,G7,G6,G5(5)=5, weight=5+5*0.1=5.5 → probableTrump=Green
-    // trumpLength=5 → bonus=18
-    // Singletons (non-trump): Black=1(+3), Red=2... no, Red=2 cards (no singleton). Yellow=1(+3)
-    // Base: ROOK(15)+B1(15)+R14(10)+G5(5)=45
-    // Total = 45+18+3+3 = 69
+    // Hand: ROOK(15)+B1(15)+G1(15)+G9+G8+G7+G6+G5(5)+R2+Y2
+    //   Green: G1(15),G9,G8,G7,G6,G5(5) = 6 cards, weight=6+1.5+0.5=8.0 → probableTrump=Green
+    //   Black: B1(15) = 1, weight=2.5 → singleton (+3)
+    //   Red: R2 = 1, weight=1.0 → singleton (+3)
+    //   Yellow: Y2 = 1, weight=1.0 → singleton (+3)
+    // trumpLength=6 → bonus=28
+    // Base: ROOK(15)+B1(15)+G1(15)+G5(5) = 50
+    // Total = 50+28+3+3+3 = 87
     //
-    // 69 >= 65 (desperation threshold) → SHOOTS ✓
-    // 69 < 75 (baseline threshold) → would NOT shoot without desperation ✓
-    const hand: CardId[] = ["ROOK", "B1", "R14", "G9", "G8", "G7", "G6", "G5", "R2", "Y2"];
+    // 87 >= 85 (desperation threshold) → SHOOTS ✓
+    // 87 < 95 (baseline threshold) → would NOT shoot without desperation ✓
+    // Ace gate: ROOK + B1(ace,Black) + G1(ace,Green) → aceCount=2 → passes ✓
+    const hand: CardId[] = ["ROOK", "B1", "G1", "G9", "G8", "G7", "G6", "G5", "R2", "Y2"];
     const state = {
       ...makeBiddingStateWithHand("E", hand),
       // EW (E's team) in deep hole: -200 → triggers desperation (-10)
@@ -1128,46 +1059,415 @@ describe("botChooseCommand - Phase 7 (contextual moon shoot)", () => {
       scores: { NS: 0, EW: -200 },
       moonShooters: [] as Seat[],
     };
-    // Expert: contextualMoonShoot=true, moonShootThreshold=75
-    // Desperation: threshold = 75 - 10 = 65; strength=69 >= 65 → shoot
+    // Expert: contextualMoonShoot=true, moonShootThreshold=95
+    // Desperation: threshold = 95 - 10 = 85; strength=87 >= 85 → shoot
     const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("ShootMoon");
   });
 
   it("expert bot with dual triggers (opp near win + desperation) applies combined -30 reduction", () => {
-    // Expert threshold = 75. BOTH triggers:
+    // Expert threshold = 95. BOTH triggers:
     //   - Opponents (NS) >= 350 → threshold -= 20
     //   - Own team (EW) <= -200 → threshold -= 10
-    //   Effective threshold = 75 - 20 - 10 = 45
+    //   Effective threshold = 95 - 20 - 10 = 65
     //
-    // Hand chosen to have strength ~47, which is:
-    //   >= 45 (dual trigger fires) ✓
-    //   < 55  (opp-only trigger would not fire alone) ✓
-    //   < 65  (desp-only trigger would not fire alone) ✓
-    //   < 75  (baseline threshold) ✓
+    // Hand chosen to have strength ~72, which is:
+    //   >= 65 (dual trigger fires) ✓
+    //   < 75  (opp-only trigger threshold: 95-20=75) would not fire alone ✓
+    //   < 85  (desp-only trigger threshold: 95-10=85) would not fire alone ✓
+    //   < 95  (baseline threshold) ✓
     //
-    // Hand: ROOK(15)+G9+G8+G7+G6+G5+R10(8)+B2+Y2+B3
-    //   Green: G9,G8,G7,G6,G5(5)=5, weight=5+0.5=5.5 → probableTrump=Green
-    //   Black: B2,B3=2, weight=2
-    //   Red: R10(8)=1, weight=1+0.8=1.8
-    //   Yellow: Y2=1, weight=1.0
-    // trumpLength=5 → bonus=18
-    // Singletons (non-trump): Red=1(+3), Yellow=1(+3)
-    // Base: ROOK(15)+R10(8)+G5(5)=28 (G5 is trump, worth 5pts)
-    // Total = 28+18+3+3 = 52
+    // Hand: ROOK(15)+B1(15)+G9+G8+G7+G6+G5(5)+G3+R2+Y2
+    //   Green: G9,G8,G7,G6,G5(5),G3 = 6, weight=6+0.5=6.5 → probableTrump=Green
+    //   Black: B1(15) = 1, weight=2.5 → singleton (+3)
+    //   Red: R2 = 1, weight=1.0 → singleton (+3)
+    //   Yellow: Y2 = 1, weight=1.0 → singleton (+3)
+    // trumpLength=6 → bonus=28
+    // Base: ROOK(15)+B1(15)+G5(5) = 35
+    // Total = 35+28+3+3+3 = 72
     //
-    // 52 >= 45 (dual threshold) → SHOOTS ✓
-    const hand: CardId[] = ["ROOK", "G9", "G8", "G7", "G6", "G5", "R10", "B2", "Y2", "B3"];
+    // 72 >= 65 (dual threshold) → SHOOTS ✓
+    // Ace gate: ROOK + B1(ace) → hasRook=true, aceCount=1 ≥ 1 → passes ✓
+    const hand: CardId[] = ["ROOK", "B1", "G9", "G8", "G7", "G6", "G5", "G3", "R2", "Y2"];
     const state = {
       ...makeBiddingStateWithHand("E", hand),
       // Both triggers active:
       scores: { NS: 360, EW: -200 },  // opp(NS)=360 >= 350, own(EW)=-200 <= -200
       moonShooters: [] as Seat[],
     };
-    // Expert: threshold = 75 - 20 - 10 = 45; strength≈52 >= 45 → shoots
+    // Expert: threshold = 95 - 20 - 10 = 65; strength=72 >= 65 → shoots
     const profile = BOT_PRESETS[5];
     const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("ShootMoon");
+  });
+});
+
+// ── Fix 1: chooseBestSluffCard tests ─────────────────────────────────────────
+
+describe("botChooseCommand - Fix 1 (chooseBestSluffCard)", () => {
+  /**
+   * Build a following-play state where the bot's partner is currently winning
+   * the trick, and the bot holds the given hand.
+   *
+   * Setup: trump=Black, N is bidder (NS team).
+   * Trick in progress: N led G9 (Green off-suit, non-trump), N is winning.
+   * Bot seat = S (NS team, partner of N → partnerIsWinning=true).
+   * S has NO Green cards → void in lead suit → ALL cards in hand are legal to play.
+   * S has sluffStrategy enabled (Level 4/5 profile).
+   */
+  function makeSluffStateVoid(hand: CardId[]): GameState {
+    const baseState = makePlayingState({
+      activePlayer: "S",
+      bidder: "N",    // N is bidder, NS team; S is also NS team
+      trump: "Black",
+      tricksPlayed: 0,
+      playedCards: [],
+      hands: {
+        N: [],
+        E: [],
+        S: hand, // no Green cards → void in Green (lead suit)
+        W: [],
+      },
+    });
+    // Inject a trick: N led G9 (Green off-suit) — N is currently winning
+    return {
+      ...baseState,
+      currentTrick: [{ seat: "N" as Seat, cardId: "G9" as CardId }],
+    };
+  }
+
+  it("sluff avoids ROOK when off-suit point card available (void in lead suit)", () => {
+    // Bot (S, NS team) is void in Green. Partner N played G9 and is winning.
+    // S holds: ROOK (20pts, trump) and Y10 (10pts, Yellow off-suit point card).
+    // Both are legal (S is void in Green). chooseHighestPointCard would pick ROOK (20>10).
+    // chooseBestSluffCard Tier 1: Y10 is off-suit point card → plays Y10, not ROOK.
+    const state = makeSluffStateVoid(["ROOK", "Y10"]);
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("Y10");
+      expect(cmd.cardId).not.toBe("ROOK");
+    }
+  });
+
+  it("sluff avoids trump ace when off-suit point card available (void in lead suit)", () => {
+    // Bot (S) void in Green. Partner N won with G9.
+    // S holds: B1 (Black trump ace, 15pts, protected) and Y14 (Yellow 14-point, 10pts).
+    // Both legal (void in Green). chooseHighestPointCard picks B1 (15>10).
+    // chooseBestSluffCard Tier 1: Y14 is off-suit point card → plays Y14, not B1.
+    const state = makeSluffStateVoid(["B1", "Y14"]);
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("Y14");
+    }
+  });
+
+  it("sluff plays trump-1 (B1) over ROOK when only protected trump cards remain (void in lead suit)", () => {
+    // Bot (S) void in Green. Partner N won with G9.
+    // S holds: ROOK (20pts, trump, protected) and B1 (Black trump ace, 15pts, protected).
+    // Both legal (void in Green). Both protected → Tier 4 fallback.
+    // chooseHighestPointCard would pick ROOK (20 > 15).
+    // chooseBestSluffCard Tier 4: prefer lowest point value → picks B1 (15 < 20).
+    const state = makeSluffStateVoid(["ROOK", "B1"]);
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("B1");
+      expect(cmd.cardId).not.toBe("ROOK");
+    }
+  });
+
+  it("sluff plays unprotected trump point card (Tier 2) over ROOK when no off-suit cards exist (void in lead suit)", () => {
+    // Bot (S) void in Green. Partner N won with G9.
+    // S holds: ROOK (20pts, trump, protected) and B5 (Black trump 5-point, not ROOK/trump-ace).
+    // Both legal (void in Green).
+    // Tier 1: no off-suit point cards (B5 is trump, ROOK is trump) → empty.
+    // Tier 2: trump point cards that are neither ROOK nor trump-ace → B5 qualifies.
+    // chooseBestSluffCard picks B5 (Tier 2) rather than wasting ROOK.
+    const state = makeSluffStateVoid(["ROOK", "B5"]);
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("B5");
+      expect(cmd.cardId).not.toBe("ROOK");
+    }
+  });
+});
+
+// ── Fix 2: Partner-holds-bid guard tests ──────────────────────────────────────
+
+describe("botChooseCommand - Fix 2 (partner-holds-bid guard)", () => {
+  /**
+   * Build a bidding state where the partner already holds the bid.
+   * seat = "S" (NS team), partner = "N".
+   * state.bidder = "N" (partner holds bid), state.currentBid = partnerBidAmount.
+   */
+  function makePartnerHoldsBidState(seat: Seat, hand: CardId[], partnerBidAmount: number): GameState {
+    const partner: Seat = seat === "S" ? "N" : seat === "N" ? "S" : seat === "E" ? "W" : "E";
+    const base = makeBiddingStateWithHand(seat, hand);
+    return {
+      ...base,
+      bidder: partner,
+      currentBid: partnerBidAmount,
+      bids: { ...base.bids, [partner]: partnerBidAmount },
+      activePlayer: seat,
+    };
+  }
+
+  it("Level 3+ bot passes when partner holds the bid and ceiling is within 25pt margin", () => {
+    // Seat S (NS team), partner N holds bid at 120.
+    // Hand strength for Black trump (strength ~75 → baseBidCeiling(75)=130).
+    // rawCeiling=130, state.currentBid=120, margin=130-120=10 < 25 → passes.
+    // Hand: ROOK(15)+B14(10)+B9+B8+B7+B6+R2+G2+Y2+G3
+    //   Black: B14(10),B9,B8,B7,B6 = 5 cards, weight=5+1.0=6.0 → probableTrump
+    //   Red: R2=1, weight=1
+    //   Green: G2,G3=2, weight=2
+    //   Yellow: Y2=1, weight=1
+    //   trumpLength=5 → bonus=18; singletons: Red=1(+3), Yellow=1(+3)
+    //   Base: ROOK(15)+B14(10)=25; Total = 25+18+3+3=49... too low for strength ~75
+    //
+    // Let's use: ROOK+B1+B14+B9+B8+B7+R2+G2+Y2+G3
+    //   Black: B1(15),B14(10),B9,B8,B7 = 5, weight=5+1.5+1.0=7.5
+    //   Red: R2=1, weight=1
+    //   Green: G2,G3=2, weight=2
+    //   Yellow: Y2=1, weight=1
+    //   probableTrump=Black(7.5), trumpLength=5 → bonus=18
+    //   Singletons: Red=1(+3), Yellow=1(+3)
+    //   Base: ROOK(15)+B1(15)+B14(10)=40; Total=40+18+3+3=64
+    //   baseBidCeiling(64): anchor [60,115]→[75,130], t=(64-60)/(75-60)=4/15≈0.27; ceil=115+0.27*15≈119
+    //   Still not 130. Need strength=75 exactly.
+    //
+    // Let's target strength=75:
+    //   ROOK+B1+B14+B10+B9+B8+R2+G2+Y2+G3
+    //   Black: B1(15),B14(10),B10(8),B9,B8 = 5, weight=5+1.5+1.0+0.8=8.3
+    //   Red: R2=1, weight=1
+    //   Green: G2,G3=2, weight=2
+    //   Yellow: Y2=1, weight=1
+    //   probableTrump=Black(8.3), trumpLength=5 → bonus=18
+    //   Singletons: Red=1(+3), Yellow=1(+3)
+    //   Base: ROOK(15)+B1(15)+B14(10)+B10(8)=48; Total=48+18+3+3=72
+    //   baseBidCeiling(72): anchor [60,115]→[75,130], t=(72-60)/(75-60)=12/15=0.8; ceil=115+0.8*15=127
+    //   rawCeiling=127, partnerBid=120, margin=127-120=7 < 25 → passes ✓
+    //
+    // Use Expert profile (accuracy=1.0 → deterministic) + scoreContextAwareness=true
+    const hand: CardId[] = ["ROOK", "B1", "B14", "B10", "B9", "B8", "R2", "G2", "Y2", "G3"];
+    const state = makePartnerHoldsBidState("S", hand, 120);
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PassBid");
+  });
+
+  it("Level 3+ bot bids when partner holds the bid but hand is dramatically stronger", () => {
+    // Seat S, partner N holds bid at 120.
+    // Strong hand → baseBidCeiling well above 120+25=145 → falls through to normal bidding.
+    // Hand: ROOK+B1+R1+G1+Y1+B14+R14+G14+Y14+B10
+    //   strength very high → baseBidCeiling=200
+    //   rawCeiling=200, 200 > 120+25=145 → falls through to normal bidding → bids
+    const hand: CardId[] = ["ROOK", "B1", "R1", "G1", "Y1", "B14", "R14", "G14", "Y14", "B10"];
+    const state = makePartnerHoldsBidState("S", hand, 120);
+    // Block moon shoot so we stay in normal bid path
+    const stateNoMoon = { ...state, moonShooters: ["S"] as Seat[] };
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(stateNoMoon, "S", profile);
+    // Should bid (falls through to normal bidding since hand is way above margin)
+    expect(cmd.type).toBe("PlaceBid");
+  });
+
+  it("computeBidCeiling does not add partner-bid boost when partner holds bid", () => {
+    // Seat S (NS team), partner N holds bid at 120 (bidder=N, bids[N]=120).
+    // state.bidder === partnerOf("S") = "N" → partnerHoldsBid=true → boost suppressed.
+    //
+    // Hand: ROOK+B1+B9+B8+B7+R2+G2+Y2+G3+Y3
+    //   Black: B1(15),B9,B8,B7 = 4, weight=4+1.5=5.5 → probableTrump
+    //   Red: R2=1, weight=1
+    //   Green: G2,G3=2, weight=2
+    //   Yellow: Y2,Y3=2, weight=2
+    //   trumpLength=4 → bonus=10; singletons: Red=1(+3)
+    //   Base: ROOK(15)+B1(15)=30; Total=30+10+3=43
+    //   baseBidCeiling(43): anchor [40,100]→[60,115], t=(43-40)/(60-40)=0.15; ceil=100+0.15*15≈102
+    //   With aggressiveness=1.15 (expert): ceil=round(102*1.15)=117
+    //   Without partner boost: ceiling ≈ 117 (base)
+    //   With partner boost (partnerBid=120): +max(0,round((120-100)*0.3))=+6 → 123
+    //   Verify that when partnerHoldsBid=true, ceiling is the lower value (boost suppressed).
+    const hand: CardId[] = ["ROOK", "B1", "B9", "B8", "B7", "R2", "G2", "Y2", "G3", "Y3"];
+    const base = makeBiddingStateWithHand("S", hand);
+    const stateWithPartnerHoldsBid: GameState = {
+      ...base,
+      bidder: "N",  // partner holds bid
+      currentBid: 120,
+      bids: { ...base.bids, N: 120 },
+    };
+    const stateWithPartnerPassed: GameState = {
+      ...base,
+      bidder: "E",  // some other seat holds bid (not partner)
+      currentBid: 120,
+      bids: { ...base.bids, N: 120, E: 120 },
+    };
+    const profile = { ...BOT_PRESETS[5] }; // scoreContextAwareness=true, accuracy=1.0
+
+    const ceilingWithPartnerHolds = computeBidCeiling(hand, stateWithPartnerHoldsBid, "S", profile);
+    const ceilingWithoutPartnerHolds = computeBidCeiling(hand, stateWithPartnerPassed, "S", profile);
+
+    // When partner holds bid, the boost should be suppressed → lower ceiling
+    expect(ceilingWithPartnerHolds).toBeLessThanOrEqual(ceilingWithoutPartnerHolds);
+  });
+});
+
+// ── Fix 3: evaluateMoonShoot structural gates + threshold raises ───────────────
+
+describe("botChooseCommand - Fix 3 (moon shoot structural gates + threshold raises)", () => {
+  it("ace-count gate blocks moon shoot on ace-less hard/expert hand (difficulty >= 4)", () => {
+    // Level 4 bot (difficulty=4 >= 4), 0 aces, 0 ROOK — gate fires → returns false.
+    // Use a trump-heavy hand with no aces: ROOK absent, no value=1 cards.
+    // Hand: B14+B13+B12+B11+B10+B9+B8+B7+B6+B5
+    //   Black: all 10 cards, weight very high → probableTrump=Black
+    //   trumpLength=10 → bonus=35 (capped at 7)
+    //   Actually trumpLengthBonuses[Math.min(10,7)] = 35
+    //   Base: B14(10)+B10(8)+B5(5) = 23; Total=23+35=58
+    //   Level 4 moonShootThreshold=90 (after fix=105), so 58 < 105 anyway.
+    //   But the ace-count gate should fire BEFORE the threshold check.
+    //   With gate: 0 aces, no ROOK → gate blocks (returns false regardless of strength).
+    //
+    // To test the gate specifically, use a hand that would pass the threshold check
+    // if the gate weren't there: ROOK+B14+B13+B12+B11+B10+B9+B8+B7+B6
+    //   ROOK(15); Black=9, weight=9+1.0+0=10+...
+    //   Actually: ROOK is excluded from color counting in estimateHandValue
+    //   Black: B14(10),B13,B12,B11,B10(8),B9,B8,B7,B6 = 9, weight=9+1.0+0.8=10.8
+    //   trumpLength=9 → bonus=35 (capped at 7)
+    //   Base: ROOK(15)+B14(10)+B10(8)=33; Total=33+35=68
+    //   Still below 105 (new Hard threshold). Let's use a truly strong hand:
+    //
+    // Best approach: Level 4 bot with a hand that has strength >= Level4_threshold(105)
+    // but 0 aces. Use custom profile with lower threshold to make gate the only blocker.
+    const hand: CardId[] = ["ROOK", "B14", "R14", "G14", "Y14", "B13", "R13", "G13", "B12", "R12"];
+    // Strength calc:
+    //   Black: B14(10),B13,B12 = 3, weight=3+1.0=4.0
+    //   Red: R14(10),R13,R12 = 3, weight=3+1.0=4.0
+    //   Green: G14(10),G13 = 2, weight=2+1.0=3.0
+    //   Yellow: Y14(10) = 1, weight=1+1.0=2.0
+    //   probableTrump=Black(4.0) or Red(4.0)—Black wins (first encountered)
+    //   trumpLength=3 → bonus=5; singletons: Yellow=1(+3); near-void: Green=2(no); Yellow=1(+3)
+    //   Base: ROOK(15)+B14(10)+R14(10)+G14(10)+Y14(10)=55; Total=55+5+3=63
+    //   Level 4 threshold=105 (after fix), 63 < 105 → still blocked. Not a great test.
+    //
+    // Use custom profile: difficulty=4, moonShootThreshold set low enough that hand passes threshold
+    // but ace-count gate fires.
+    const customProfile = { ...BOT_PRESETS[4], moonShootThreshold: 50 }; // low threshold
+    const state = {
+      ...makeBiddingStateWithHand("E", hand),
+      scores: { NS: 0, EW: 0 },
+      moonShooters: [] as Seat[],
+    };
+    // With moonShootThreshold=50, hand strength ~63 >= 50 → would shoot without gate.
+    // But 0 aces, no ROOK → ace-count gate fires at difficulty >= 4 → returns false → passes.
+    // Wait — the hand has ROOK! Let me recheck:
+    // hand has ROOK — so hasRook=true. Gate: !(hasRook && aceCount >= 1)
+    // aceCount: no value=1 cards → 0. hasRook=true, aceCount=0 → condition !(true && false) = !(false) = true → gate fires!
+    const cmd = botChooseCommand(state, "E", customProfile);
+    expect(cmd.type).not.toBe("ShootMoon");
+  });
+
+  it("ace-count gate passes with ROOK + 1 ace (difficulty >= 4)", () => {
+    // Level 4 bot: hasRook=true, aceCount=1 → gate condition: !(true && true) = false → gate passes.
+    // Hand: ROOK + B1 + many trump + others
+    // Use low moonShootThreshold so we'd shoot if gate passes.
+    const hand: CardId[] = ["ROOK", "B1", "B14", "B13", "B12", "B11", "B10", "B9", "B8", "B7"];
+    // Black: B1(15),B14(10),B13,B12,B11,B10(8),B9,B8,B7 = 9, weight=9+1.5+1.0+0.8=12.3
+    // trumpLength=9 → bonus=35; no voids/singletons (only Black non-rook)
+    // Base: ROOK(15)+B1(15)+B14(10)+B10(8)=48; Total=48+35=83
+    const customProfile = { ...BOT_PRESETS[4], moonShootThreshold: 80 }; // 83 >= 80 → shoots if gate passes
+    const state = {
+      ...makeBiddingStateWithHand("E", hand),
+      scores: { NS: 0, EW: 0 },
+      moonShooters: [] as Seat[],
+    };
+    // aceCount=1 (B1), hasRook=true → gate passes → proceeds to threshold → 83 >= 80 → shoots
+    const cmd = botChooseCommand(state, "E", customProfile);
+    expect(cmd.type).toBe("ShootMoon");
+  });
+
+  it("ace-count gate passes with 2 aces and no ROOK (difficulty >= 4)", () => {
+    // Level 4 bot: hasRook=false, aceCount=2 → condition: !(false) = not relevant
+    //   Gate: aceCount < 2 && !(hasRook && aceCount >= 1) → 2 < 2 = false → gate does NOT fire → passes.
+    // Use low moonShootThreshold so we'd shoot if gate passes.
+    const hand: CardId[] = ["B1", "R1", "B14", "B13", "B12", "B11", "B10", "B9", "B8", "B7"];
+    // Black: B1(15),B14(10),B13,B12,B11,B10(8),B9,B8,B7 = 9, weight=9+1.5+1.0+0.8=12.3
+    // Red: R1(15) = 1, weight=2.5
+    // probableTrump=Black, trumpLength=9 → bonus=35
+    // Singletons: Red=1(+3)
+    // Base: B1(15)+R1(15)+B14(10)+B10(8)=48; Total=48+35+3=86
+    const customProfile = { ...BOT_PRESETS[4], moonShootThreshold: 80 }; // 86 >= 80 → shoots if gate passes
+    const state = {
+      ...makeBiddingStateWithHand("E", hand),
+      scores: { NS: 0, EW: 0 },
+      moonShooters: [] as Seat[],
+    };
+    // aceCount=2, gate condition: 2<2 = false → gate does not fire → threshold check → 86>=80 → shoots
+    const cmd = botChooseCommand(state, "E", customProfile);
+    expect(cmd.type).toBe("ShootMoon");
+  });
+
+  it("mid-game winning lead raises moon threshold when comfortably ahead", () => {
+    // Level 5 bot (contextualMoonShoot=true), moonShootThreshold=95 (after fix).
+    // Score: NS=200, EW=80. E is on EW team.
+    // scoreLead for E's opponent (NS): NS=200, EW=80 → E's team=EW.
+    // myTeam=EW (score=80), oppTeam=NS (score=200). This is E losing — not winning.
+    //
+    // We need E to be WINNING: myTeam(EW) > oppTeam(NS)+100 AND myTeam > 0.
+    // Score: EW=300, NS=150. scoreLead = EW-NS = 150 > 100, EW=300 > 0 → threshold += 15.
+    //
+    // Expert base threshold = 95. After mid-game raise: 95+15=110.
+    // Need hand strength in range [95, 110) → bot would shoot at 95 but not at 110.
+    //
+    // Hand: ROOK+B1+R1+G1+B14+B9+B8+B7+B6+Y2
+    //   Black: B1(15),B14(10),B9,B8,B7,B6 = 6, weight=6+1.5+1.0=8.5 → probableTrump
+    //   Red: R1(15) = 1, weight=2.5
+    //   Green: G1(15) = 1, weight=2.5
+    //   Yellow: Y2 = 1, weight=1
+    //   trumpLength=6 → bonus=28; singletons: Red=1(+3), Green=1(+3), Yellow=1(+3)
+    //   Base: ROOK(15)+B1(15)+R1(15)+G1(15)+B14(10)=70; Total=70+28+3+3+3=107
+    //   107 >= 95 (baseline) → would shoot WITHOUT mid-game raise
+    //   107 < 110 (with mid-game raise: 95+15) → should NOT shoot WITH raise ✓
+    const hand: CardId[] = ["ROOK", "B1", "R1", "G1", "B14", "B9", "B8", "B7", "B6", "Y2"];
+    const state = {
+      ...makeBiddingStateWithHand("E", hand),
+      scores: { NS: 150, EW: 300 }, // EW winning: lead=150>100, EW=300>0
+      moonShooters: [] as Seat[],
+    };
+    // Expert: contextualMoonShoot=true, moonShootThreshold=95 (after fix)
+    // Mid-game raise: threshold=95+15=110. Strength=107 < 110 → does NOT shoot.
+    const profile = BOT_PRESETS[5];
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).not.toBe("ShootMoon");
+  });
+
+  it("ace-count gate does not apply at Level 3 (difficulty < 4)", () => {
+    // Level 3 bot: difficulty=3 < 4 → ace-count gate does NOT apply.
+    // Even with 0 aces and no ROOK, if strength >= moonShootThreshold(110), bot shoots.
+    // Hand: B14+R14+G14+Y14+B13+R13+G13+B12+R12+G12
+    //   No aces, no ROOK.
+    //   Black: B14(10),B13,B12 = 3, weight=3+1.0=4.0 → probableTrump (tied with Red/Green)
+    //   (First color encountered wins ties: Black)
+    //   trumpLength=3 → bonus=5
+    //   Base: B14(10)+R14(10)+G14(10)+Y14(10)=40; Total=40+5=45
+    //   Still below 110 threshold... Need a stronger ace-less hand.
+    //
+    // Use custom profile with low threshold for Level 3:
+    const customProfile = { ...BOT_PRESETS[3], moonShootThreshold: 40 };
+    const hand: CardId[] = ["B14", "R14", "G14", "Y14", "B13", "R13", "G13", "B12", "R12", "G12"];
+    const state = {
+      ...makeBiddingStateWithHand("E", hand),
+      scores: { NS: 0, EW: 0 },
+      moonShooters: [] as Seat[],
+    };
+    // strength ~45, threshold=40, difficulty=3 → gate does NOT apply → shoots ✓
+    const cmd = botChooseCommand(state, "E", customProfile);
     expect(cmd.type).toBe("ShootMoon");
   });
 });

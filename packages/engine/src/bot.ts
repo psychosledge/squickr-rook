@@ -151,7 +151,8 @@ export function computeBidCeiling(
 
     // Partner bid inference: if partner already bid, raise ceiling slightly
     const partnerBid = state.bids[partnerOf(seat)];
-    if (typeof partnerBid === "number" && partnerBid > 0) {
+    const partnerHoldsBid = state.bidder === partnerOf(seat);
+    if (typeof partnerBid === "number" && partnerBid > 0 && !partnerHoldsBid) {
       ceiling += Math.max(0, Math.round((partnerBid - 100) * 0.3));
     }
   }
@@ -195,6 +196,20 @@ function evaluateMoonShoot(
   if (!profile.canShootMoon) return false;
   if (state.moonShooters.includes(seat)) return false;
 
+  // Structural gate (Hard/Expert only): require minimum ace control for moon viability.
+  // A hand without ≥2 aces (or ROOK + ≥1 ace) cannot suppress opponent side-suit winners.
+  if (profile.difficulty >= 4) {
+    const aceCount = hand.filter(c => {
+      if (c === "ROOK") return false;
+      const card = cardFromId(c);
+      return card.kind === "regular" && card.value === 1;
+    }).length;
+    const hasRook = hand.includes("ROOK");
+    if (aceCount < 2 && !(hasRook && aceCount >= 1)) {
+      return false;
+    }
+  }
+
   const strength = estimateHandValue(hand); // true strength, no noise
 
   const myTeam = SEAT_TEAM[seat];
@@ -213,6 +228,11 @@ function evaluateMoonShoot(
       state.scores[myTeam] > state.scores[oppTeam] + 150
     ) {
       threshold += 20;
+    }
+    // Mid-game winning lead: also suppress moon shoots when comfortably ahead
+    const scoreLead = state.scores[myTeam] - state.scores[oppTeam];
+    if (scoreLead > 100 && state.scores[myTeam] > 0) {
+      threshold += 15;
     }
   }
 
@@ -262,6 +282,22 @@ export function botChooseCommand(
       }
 
       // ── Level 2+ ──────────────────────────────────────────────────────────
+
+      // Guard: if partner already holds the bid, only override with a dramatically stronger hand
+      if (
+        profile.scoreContextAwareness &&
+        state.bidder !== null &&
+        state.bidder === partnerOf(seat) &&
+        state.currentBid > 0
+      ) {
+        const rawStrength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy);
+        const rawCeiling = baseBidCeiling(rawStrength);
+        const PARTNER_OVERRIDE_MARGIN = 25;
+        if (rawCeiling <= state.currentBid + PARTNER_OVERRIDE_MARGIN) {
+          return { type: "PassBid", seat };
+        }
+        // Hand is strong enough to justify taking the contract — fall through to normal bidding
+      }
 
       // ── Phase 7: Moon-shoot check (contextual for expert) ─────────────────
       if (evaluateMoonShoot(hand, state, seat, profile)) {
@@ -702,9 +738,9 @@ function chooseFollowCard(
   const myTeam = SEAT_TEAM[seat];
   const partnerIsWinning = SEAT_TEAM[currentWinnerPlay.seat] === myTeam;
 
-  // sluffStrategy + partner is winning: dump highest point card
+  // sluffStrategy + partner is winning: dump best point card (protect ROOK and trump ace)
   if (profile.sluffStrategy && partnerIsWinning) {
-    return chooseHighestPointCard(playCommands);
+    return chooseBestSluffCard(playCommands, trump);
   }
 
   // Find winning cards
@@ -743,10 +779,75 @@ function chooseFollowCard(
   return chooseLowestCard(playCommands);
 }
 
-function chooseHighestPointCard(playCommands: GameCommand[]): GameCommand {
+/**
+ * Choose the best card to sluff when partner is winning the trick.
+ * Maximises point transfer while protecting the ROOK and trump ace (value=1).
+ *
+ * Priority:
+ *   1. Off-suit point cards (highest pts first) — never sacrifice trump control for points
+ *   2. Trump point cards excluding ROOK and trump-1 (lowest rank first — keep high trump)
+ *   3. Non-point protected cards (lowest offSuitRank)
+ *   4. Fallback (only ROOK/trump-1 remain): prefer lowest point value (trump-1 over ROOK)
+ */
+function chooseBestSluffCard(
+  playCommands: GameCommand[],
+  trump: Color | null,
+): GameCommand {
+  const isTrumpCard = (cardId: CardId): boolean => {
+    if (cardId === "ROOK") return true;
+    const card = cardFromId(cardId);
+    return card.kind === "regular" && trump !== null && card.color === trump;
+  };
+
+  const isTrumpAce = (cardId: CardId): boolean => {
+    if (cardId === "ROOK") return false;
+    const card = cardFromId(cardId);
+    return card.kind === "regular" && trump !== null && card.color === trump && card.value === 1;
+  };
+
+  const isProtected = (cardId: CardId): boolean =>
+    cardId === "ROOK" || isTrumpAce(cardId);
+
+  // Tier 1: off-suit point cards (not trump, not protected, pointValue > 0)
+  const offSuitPointCards = playCommands.filter(cmd => {
+    if (cmd.type !== "PlayCard") return false;
+    return !isTrumpCard(cmd.cardId) && pointValue(cmd.cardId) > 0;
+  });
+  if (offSuitPointCards.length > 0) {
+    return offSuitPointCards.reduce((best, cmd) => {
+      if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+      return pointValue(cmd.cardId) > pointValue(best.cardId) ? cmd : best;
+    });
+  }
+
+  // Tier 2: trump point cards (not ROOK, not trump-1) — lowest rank first
+  const trumpPointCards = playCommands.filter(cmd => {
+    if (cmd.type !== "PlayCard") return false;
+    return isTrumpCard(cmd.cardId) && !isProtected(cmd.cardId) && pointValue(cmd.cardId) > 0;
+  });
+  if (trumpPointCards.length > 0) {
+    return trumpPointCards.reduce((best, cmd) => {
+      if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+      return trumpRank(cmd.cardId, trump!) < trumpRank(best.cardId, trump!) ? cmd : best;
+    });
+  }
+
+  // Tier 3: unprotected non-point cards — lowest offSuitRank
+  const unprotected = playCommands.filter(cmd => {
+    if (cmd.type !== "PlayCard") return false;
+    return !isProtected(cmd.cardId);
+  });
+  if (unprotected.length > 0) {
+    return unprotected.reduce((best, cmd) => {
+      if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+      return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
+    });
+  }
+
+  // Tier 4 fallback: only ROOK and/or trump-1 remain — prefer lowest point value
   return playCommands.reduce((best, cmd) => {
     if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-    return pointValue(cmd.cardId) > pointValue(best.cardId) ? cmd : best;
+    return pointValue(cmd.cardId) < pointValue(best.cardId) ? cmd : best;
   });
 }
 
