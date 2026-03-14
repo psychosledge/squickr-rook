@@ -384,7 +384,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
     expect(cmd.type).toBe("PassBid");
   });
 
-  it("expert bot bluff-resists 30pts above base ceiling (bluffResistance=1.0)", () => {
+  it("expert bot bluff-resists 15pts above base ceiling (bluffResistance=0.5)", () => {
     // Hand: ROOK(15)+B1(15)+R14(10)+R10(8)+G5(5)+Y5(5) = 58 base
     // Colors: Black=1, Red=3, Green=1, Yellow=1
     // Red is probable trump (weight: R14=1+1.0=2.0, R10=1+0.8=1.8, R2=1; total=4.8)
@@ -394,9 +394,9 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
     // strength = 58 + 5 + 3 + 3 + 3 = 72
     // baseBidCeiling(72): anchor [60,115]→[75,130], t=(72-60)/(75-60)=12/15=0.8; ceil=115+0.8*15=127
     // Expert aggressiveness=1.15: ceil=round(127*1.15)=146
-    // Expert bluffResistance=1.0: budget=30; snapped=floor((146+30)/5)*5=175
+    // Expert bluffResistance=0.5: budget=15; snapped=floor((146+15)/5)*5=160
     // Normal bluffResistance=0.3: budget=9; snapped=floor((146+9)/5)*5=155
-    // Set currentBid=155 so minNextBid=160: expert (175) bids, normal (155) passes
+    // Set currentBid=155 so minNextBid=160: expert (160) bids, normal (155) passes
     const hand: CardId[] = [
       "ROOK", "B1", "R14", "R10", "R2", "G5", "Y5", "B2", "B3", "B4",
     ];
@@ -407,7 +407,7 @@ describe("botChooseCommand - Phase 2 bidding (baseBidCeiling + bluff resistance)
     const expertProfile = BOT_PRESETS[5];
     const expertCmd = botChooseCommand(state, "E", expertProfile);
     expect(["PlaceBid", "PassBid"]).toContain(expertCmd.type);
-    // Expert with bluffResistance=1.0 should push harder than normal;
+    // Expert with bluffResistance=0.5 should push harder than normal;
     // both may or may not bid here due to aggressiveness/noise, but
     // if expert bids, it bids the minNextBid=160
     if (expertCmd.type === "PlaceBid") {
@@ -1469,5 +1469,138 @@ describe("botChooseCommand - Fix 3 (moon shoot structural gates + threshold rais
     // strength ~45, threshold=40, difficulty=3 → gate does NOT apply → shoots ✓
     const cmd = botChooseCommand(state, "E", customProfile);
     expect(cmd.type).toBe("ShootMoon");
+  });
+});
+
+// ── ADR-008: Partner margin + score-context threshold tests ───────────────────
+
+describe("ADR-008: partner-override margin (L4/L5 uses 45, L3 uses 25)", () => {
+  /**
+   * Hand: ROOK+B1+B14+B10+B9+B8+B7+R2+G3+Y2
+   *   Black: B1(15),B14(10),B10(8),B9,B8,B7 = 6 cards, weight=6+1.5+1.0+0.8=9.3
+   *   Red: R2 = 1, weight=1 → singleton (+3)
+   *   Green: G3 = 1, weight=1 → singleton (+3)
+   *   Yellow: Y2 = 1, weight=1 → singleton (+3)
+   *   trumpLength=6 → bonus=28
+   *   Base: ROOK(15)+B1(15)+B14(10)+B10(8)=48
+   *   Total: 48+28+3+3+3 = 85
+   *   baseBidCeiling(85): [75,130]→[90,150], t=10/15; ceil=round(130+13.33)=143
+   *
+   * Test A (L5, partner bid 115): 143 ≤ 115+45=160 → PassBid
+   * Test B (L3, partner bid 115, accuracy=1.0): 143 > 115+25=140 → falls through → PlaceBid
+   */
+  const partnerMarginHand: CardId[] = [
+    "ROOK", "B1", "B14", "B10", "B9", "B8", "B7", "R2", "G3", "Y2",
+  ];
+
+  function makePartnerBidState(botSeat: Seat, partnerBidAmount: number, hand: CardId[]): GameState {
+    const partner: Seat = botSeat === "E" ? "W" : botSeat === "W" ? "E" : botSeat === "N" ? "S" : "N";
+    const base = makeBiddingStateWithHand(botSeat, hand);
+    return {
+      ...base,
+      bidder: partner,
+      currentBid: partnerBidAmount,
+      bids: { ...base.bids, [partner]: partnerBidAmount },
+      activePlayer: botSeat,
+    };
+  }
+
+  it("Test A: L5 bot PassesBid when rawCeiling(143) ≤ partner-bid(115)+margin(45)=160", () => {
+    // L5 uses margin=45. 143 ≤ 160 → PassBid.
+    // E (EW team), partner W holds bid at 115.
+    const state = makePartnerBidState("E", 115, partnerMarginHand);
+    const profile = BOT_PRESETS[5]; // accuracy=1.0, deterministic
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PassBid");
+  });
+
+  it("Test B: L3 bot PlacesBid when rawCeiling(143) > partner-bid(115)+margin(25)=140", () => {
+    // L3 uses margin=25. 143 > 140 → falls through → normal bidding → PlaceBid.
+    // Use accuracy=1.0 to eliminate noise and isolate the margin threshold.
+    const state = makePartnerBidState("E", 115, partnerMarginHand);
+    const profile = { ...BOT_PRESETS[3], handValuationAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlaceBid");
+  });
+
+  it("Test C: L5 bot with strong hand overrides partner (rawCeiling > partner-bid+45)", () => {
+    // Strong hand: ROOK+B1+R1+G1+B14+B9+B8+B7+B6+Y5
+    //   Black: B1(15),B14(10),B9,B8,B7,B6 = 6, weight=6+1.5+1.0=8.5 → probableTrump
+    //   Red: R1(15) = 1, weight=2.5 → singleton (+3)
+    //   Green: G1(15) = 1, weight=2.5 → singleton (+3)
+    //   Yellow: Y5(5) = 1, weight=1.5 → singleton (+3)
+    //   trumpLength=6 → bonus=28
+    //   Base: ROOK(15)+B1(15)+R1(15)+G1(15)+B14(10)+Y5(5)=75
+    //   Total: 75+28+3+3+3 = 112
+    //   baseBidCeiling(112): [110,175]→[130,200], t=2/20=0.1; ceil=round(175+2.5)=178
+    // At L5 (accuracy=1.0): 178 > 120+45=165 → falls through → PlaceBid ✓
+    const strongHand: CardId[] = [
+      "ROOK", "B1", "R1", "G1", "B14", "B9", "B8", "B7", "B6", "Y5",
+    ];
+    // Suppress moon shoot to stay in normal bid path
+    const state = { ...makePartnerBidState("E", 120, strongHand), moonShooters: ["E"] as Seat[] };
+    const profile = BOT_PRESETS[5]; // accuracy=1.0
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlaceBid");
+  });
+});
+
+describe("ADR-008: computeBidCeiling score-context thresholds (200/100 not 100/50)", () => {
+  /**
+   * Hand: ROOK+B1+B14+B10+B9+B8+B7+R2+G3+Y2 → strength=85 → baseBidCeiling=143
+   * Profile: scoreContextAwareness=true, bidAggressiveness=1.0, handValuationAccuracy=1.0
+   * Seat "E" → myTeam=EW, oppTeam=NS → delta = scores.NS - scores.EW
+   *
+   * AFTER change 3:  if delta>200 → +15; if delta>100 → +8
+   */
+  const scoreTestHand: CardId[] = [
+    "ROOK", "B1", "B14", "B10", "B9", "B8", "B7", "R2", "G3", "Y2",
+  ];
+  const scoreTestProfile = {
+    ...BOT_PRESETS[3],
+    handValuationAccuracy: 1.0,
+    bidAggressiveness: 1.0,
+    scoreContextAwareness: true,
+  };
+
+  function stateWithScores(ns: number, ew: number): GameState {
+    const base = makeBiddingStateWithHand("E", scoreTestHand);
+    return { ...base, scores: { NS: ns, EW: ew } };
+  }
+
+  it("Test D: +15 bonus fires when delta=201 (> 200)", () => {
+    const baselineCeiling = computeBidCeiling(scoreTestHand, stateWithScores(0, 0), "E", scoreTestProfile);
+    const highDeltaCeiling = computeBidCeiling(scoreTestHand, stateWithScores(201, 0), "E", scoreTestProfile);
+    expect(highDeltaCeiling - baselineCeiling).toBe(15);
+  });
+
+  it("Test E: +15 does NOT fire at delta=150; +8 fires (150 > 100)", () => {
+    const baselineCeiling = computeBidCeiling(scoreTestHand, stateWithScores(0, 0), "E", scoreTestProfile);
+    const delta150Ceiling = computeBidCeiling(scoreTestHand, stateWithScores(150, 0), "E", scoreTestProfile);
+    expect(delta150Ceiling - baselineCeiling).toBe(8);
+  });
+
+  it("Test F: +8 fires when delta=101 (> 100)", () => {
+    const baselineCeiling = computeBidCeiling(scoreTestHand, stateWithScores(0, 0), "E", scoreTestProfile);
+    const delta101Ceiling = computeBidCeiling(scoreTestHand, stateWithScores(101, 0), "E", scoreTestProfile);
+    expect(delta101Ceiling - baselineCeiling).toBe(8);
+  });
+
+  it("Test G: no bonus at delta=99 (not > 100 or > 200)", () => {
+    const baselineCeiling = computeBidCeiling(scoreTestHand, stateWithScores(0, 0), "E", scoreTestProfile);
+    const delta99Ceiling = computeBidCeiling(scoreTestHand, stateWithScores(99, 0), "E", scoreTestProfile);
+    expect(delta99Ceiling - baselineCeiling).toBe(0);
+  });
+
+  it("Test H: L1 and L2 bots are unaffected by any delta (scoreContextAwareness=false)", () => {
+    const state0 = stateWithScores(0, 0);
+    const state300 = stateWithScores(300, 0);
+
+    for (const level of [1, 2] as BotDifficulty[]) {
+      const profile = { ...BOT_PRESETS[level], handValuationAccuracy: 1.0 };
+      const ceiling0 = computeBidCeiling(scoreTestHand, state0, "E", profile);
+      const ceiling300 = computeBidCeiling(scoreTestHand, state300, "E", profile);
+      expect(ceiling300).toBe(ceiling0);
+    }
   });
 });

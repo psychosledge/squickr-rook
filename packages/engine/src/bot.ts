@@ -144,8 +144,8 @@ export function computeBidCeiling(
     const myTeam = SEAT_TEAM[seat];
     const oppTeam = myTeam === "NS" ? "EW" : "NS";
     const delta = state.scores[oppTeam] - state.scores[myTeam]; // positive = we are behind
-    if (delta > 100)       ceiling += 15;
-    else if (delta > 50)   ceiling += 8;
+    if (delta > 200)       ceiling += 15;
+    else if (delta > 100)  ceiling += 8;
     if (delta < -150)      ceiling -= 15;
     else if (delta < -80)  ceiling -= 8;
 
@@ -292,7 +292,9 @@ export function botChooseCommand(
       ) {
         const rawStrength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy);
         const rawCeiling = baseBidCeiling(rawStrength);
-        const PARTNER_OVERRIDE_MARGIN = 25;
+        // L4/L5: require 45pt raw-ceiling advantage over partner's current bid.
+        // L3 and below: keep existing 25pt margin.
+        const PARTNER_OVERRIDE_MARGIN = (profile.difficulty >= 4) ? 45 : 25;
         if (rawCeiling <= state.currentBid + PARTNER_OVERRIDE_MARGIN) {
           return { type: "PassBid", seat };
         }
