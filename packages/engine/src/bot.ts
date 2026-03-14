@@ -1,5 +1,5 @@
 import type { GameCommand } from "./commands.js";
-import { buildDeck, compareTrickCards, cardFromId, offSuitRank, trumpRank } from "./deck.js";
+import { compareTrickCards, cardFromId, offSuitRank, trumpRank } from "./deck.js";
 import { pointValue } from "./scoring.js";
 import { legalCommands } from "./validator.js";
 import type { BotProfile, CardId, Color, GameState, Seat } from "./types.js";
@@ -758,16 +758,16 @@ function chooseLeadCard(
         }
         const suitCards = colorGroups[longestColor];
         if (suitCards.length > 0) {
-          // ADR-011 Fix B: avoid leading aces/14s until all trump is exhausted
-          const acesAreSafe = aceIsSafe(state, trump);
+          // Fix 3: Early leads (tricks 1–3) avoid aces and 14s to preserve point-card ambush potential
+          const isEarlyLead = state.tricksPlayed <= 2; // tricks 1–3 (0-indexed)
           let leadCandidates = suitCards;
-          if (!acesAreSafe) {
-            const nonAceLeads = suitCards.filter((c) => {
+          if (isEarlyLead) {
+            const nonPointLeads = suitCards.filter((c) => {
               if (c.type !== "PlayCard") return false;
               const card = cardFromId(c.cardId);
               return card.kind === "regular" && card.value !== 1 && card.value !== 14;
             });
-            if (nonAceLeads.length > 0) leadCandidates = nonAceLeads;
+            if (nonPointLeads.length > 0) leadCandidates = nonPointLeads;
             // else fallback: all suitCards (only aces/14s available)
           }
           return leadCandidates.reduce((best, cmd) => {
@@ -817,50 +817,6 @@ function chooseLeadCard(
   });
 }
 
-/**
- * Returns true if the partner's current winning play is guaranteed to hold —
- * i.e., no opponent seat still to play could possibly hold a card that beats it.
- * Used to guard chooseBestSluffCard against premature sluffing (ADR-011 Fix A).
- */
-function partnerWinIsGuaranteed(
-  state: GameState,
-  currentWinnerPlay: { seat: Seat; cardId: CardId },
-  leadColor: Color | null,
-  trump: Color | null,
-  seat: Seat,
-): boolean {
-  const seatsInTrick = new Set(state.currentTrick.map((p) => p.seat));
-  const allSeats: Seat[] = ["N", "E", "S", "W"];
-  const remainingSeats = allSeats.filter((s) => !seatsInTrick.has(s) && s !== seat);
-  const partner = partnerOf(seat);
-  const opponentSeatsRemaining = remainingSeats.filter((s) => s !== partner);
-
-  if (opponentSeatsRemaining.length === 0) return true;
-
-  const knownCards = new Set<CardId>([
-    ...state.playedCards,
-    ...state.currentTrick.map((p) => p.cardId),
-    ...state.hands[seat],
-  ]);
-  const unknownCards = buildDeck().filter((c) => !knownCards.has(c));
-
-  const anyUnknownBeats = unknownCards.some(
-    (cardId) => compareTrickCards(cardId, currentWinnerPlay.cardId, leadColor, trump) > 0,
-  );
-
-  return !anyUnknownBeats;
-}
-
-/**
- * Returns true if it is safe to lead an ace (value=1) — i.e., all trump has been played
- * so opponents cannot ruff the ace with a void in that suit (ADR-011 Fix B).
- */
-function aceIsSafe(state: GameState, trump: Color | null): boolean {
-  if (trump === null) return true;
-  const trumpPlayed = state.playedCards.filter((c) => trumpRank(c, trump) >= 0).length;
-  return trumpPlayed >= 11;
-}
-
 function chooseFollowCard(
   playCommands: GameCommand[],
   state: GameState,
@@ -893,11 +849,7 @@ function chooseFollowCard(
   });
 
   // sluffStrategy + partner is winning: dump best point card (protect ROOK and trump ace)
-  if (
-    profile.sluffStrategy &&
-    partnerIsWinning &&
-    partnerWinIsGuaranteed(state, currentWinnerPlay, leadColor, trump, seat)
-  ) {
+  if (profile.sluffStrategy && partnerIsWinning) {
     return chooseBestSluffCard(playCommands, trump);
   }
 
@@ -911,14 +863,6 @@ function chooseFollowCard(
       return chooseLowestCard(losingOptions); // shed cheapest non-winning card
     }
     // No losing options — must win; fall through
-  }
-
-  // ADR-011 Fix C: L3 cheapest-card passivity when opponent winning and bot cannot win
-  if (profile.roleAwareness && !profile.sluffStrategy && !partnerIsWinning) {
-    if (winningCommands.length === 0) {
-      return chooseLowestCard(playCommands);
-    }
-    // Can win — fall through to normal win logic
   }
 
   // Trick-10 nest-contest aggression (L4/L5 via endgameCardAwareness >= 0.5)
