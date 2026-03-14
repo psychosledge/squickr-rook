@@ -112,6 +112,13 @@ Roxy is **read-only** — she analyses and recommends, she does not implement.
 3. Run `window.__rookLog.downloadLog()` or copy `JSON.stringify(window.__rookLog.getLog(), null, 2)` from the console
 4. Call `/analyze` and paste the JSON
 
+**Feedback loop:**
+After Roxy produces her analysis, the user reviews it and may challenge any points. Feedback is passed back to Roxy, who should respond by either:
+- **Defending her original assessment** with justification (if she believes she is correct), or
+- **Acknowledging the correction** and proposing specific changes to her own prompt
+
+The user and OpenCode then review the outcome and decide what to codify. Roxy should remember that the user is a seasoned player but not a Rook expert — her role is to elevate the user's game, which sometimes means respectfully holding her ground.
+
 ---
 
 ## The Development Loop
