@@ -113,9 +113,7 @@ export function OnlineGamePageView({
           onPlaceBid={onPlaceBid}
           onPass={onPassBid}
           onShootMoon={onShootMoon}
-          biddingThinkingSeat={biddingThinkingSeat}
           humanSeat={humanSeat}
-          seatNames={seatNames}
         />
       )}
 
@@ -123,7 +121,7 @@ export function OnlineGamePageView({
         <TrumpPicker onSelect={onSelectTrump} />
       )}
 
-      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} humanSeat={humanSeat} />
+      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} humanSeat={humanSeat} biddingThinkingSeat={biddingThinkingSeat} />
 
       {overlay === "nest" && mySeat !== null && (
         <NestOverlay

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import type { GameState, Seat } from "@rook/engine";
-import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./BiddingOverlay.module.css";
 
 type Props = {
@@ -8,9 +7,7 @@ type Props = {
   onPlaceBid: (amount: number) => void;
   onPass: () => void;
   onShootMoon: () => void;
-  biddingThinkingSeat?: Seat | null;
   humanSeat?: Seat;
-  seatNames?: Partial<Record<Seat, string>>;
 };
 
 // ── Pure render helper (state is passed in explicitly) ────────────────────────
@@ -19,6 +16,9 @@ export type BiddingOverlayViewProps = Props & {
   pickerAmount: number;
   onIncrement: () => void;
   onDecrement: () => void;
+  moonConfirmPending: boolean;
+  onMoonConfirmRequest: () => void;
+  onMoonConfirmCancel: () => void;
 };
 
 export function BiddingOverlayView({
@@ -29,12 +29,16 @@ export function BiddingOverlayView({
   pickerAmount,
   onIncrement,
   onDecrement,
-  biddingThinkingSeat,
   humanSeat = "N",
-  seatNames,
+  moonConfirmPending,
+  onMoonConfirmRequest,
+  onMoonConfirmCancel,
 }: BiddingOverlayViewProps) {
   const { bids, currentBid, activePlayer, rules, moonShooters } = gameState;
   const isMyTurn = activePlayer === humanSeat;
+
+  if (!isMyTurn) return null;
+
   const { minimumBid, bidIncrement, maximumBid } = rules;
 
   const minNextBid = currentBid === 0 ? minimumBid : currentBid + bidIncrement;
@@ -47,99 +51,58 @@ export function BiddingOverlayView({
   // moonAlreadyShot: once any player shoots the moon, numeric bidding is closed
   const moonAlreadyShot = moonShooters.length > 0;
 
-  const seats = ["N", "E", "S", "W"] as const;
-
-  function handleShootMoon() {
-    if (window.confirm("Shoot the Moon? You'll bid the maximum and attempt to capture all points!")) {
-      onShootMoon();
-    }
-  }
-
   return (
     <div className={styles.overlay}>
-      <div className={styles.panel} role="region" aria-label="Bidding">
-        <h2 className={styles.title} id="bidding-title">Bidding</h2>
-
-        <div className={styles.currentBid}>
-          {currentBid > 0 ? `Current bid: ${currentBid}` : "No bids yet"}
-        </div>
-
-        <table className={styles.bidTable}>
-          <tbody>
-            {seats.map((seat) => {
-              const bid = bids[seat];
-              const isActive = seat === activePlayer;
-              const isMoonShooter = moonShooters.includes(seat);
-              let display = "–";
-              if (bid === "pass") display = "PASS";
-              else if (typeof bid === "number") display = isMoonShooter ? `${bid} 🌙` : String(bid);
-              return (
-                <tr key={seat} className={isActive ? styles.activeRow : undefined}>
-                  <td className={styles.seatName}>{seatNames?.[seat] ?? getSeatLabel(seat)}</td>
-                  <td className={bid === "pass" ? styles.passed : styles.bidVal}>{display}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {isMyTurn && (
+      <div className={styles.panel} aria-label="Bidding">
+        {/* Stepper and confirm — hidden once someone has shot the moon */}
+        {!moonAlreadyShot && (
           <>
-            {/* Stepper and confirm — hidden once someone has shot the moon */}
-            {!moonAlreadyShot && (
-              <>
-                <div className={styles.picker}>
-                  <button
-                    className={styles.stepBtn}
-                    aria-label="Decrease bid"
-                    onClick={onDecrement}
-                    disabled={pickerAmount <= minNextBid}
-                  >
-                    −
-                  </button>
-                  <span className={styles.pickerAmount}>{pickerAmount}</span>
-                  <button
-                    className={styles.stepBtn}
-                    aria-label="Increase bid"
-                    onClick={onIncrement}
-                    disabled={pickerAmount >= maximumBid}
-                  >
-                    +
-                  </button>
-                </div>
-
-                <button
-                  className={styles.confirmBidBtn}
-                  aria-label={`Confirm bid of ${pickerAmount}`}
-                  onClick={() => onPlaceBid(pickerAmount)}
-                >
-                  Confirm bid: {pickerAmount}
-                </button>
-              </>
-            )}
-
-            {/* Pass button — always visible */}
-            <button className={styles.passBtn} onClick={onPass}>PASS</button>
-
-            {/* Moon button — below Pass, only when moonEligible */}
-            {moonEligible && (
-              <button className={styles.moonBtn} onClick={handleShootMoon}>
-                🌙 Shoot the Moon
+            <div className={styles.picker}>
+              <button
+                className={styles.stepBtn}
+                aria-label="Decrease bid"
+                onClick={onDecrement}
+                disabled={pickerAmount <= minNextBid}
+              >
+                −
               </button>
-            )}
+              <span className={styles.pickerAmount}>{pickerAmount}</span>
+              <button
+                className={styles.stepBtn}
+                aria-label="Increase bid"
+                onClick={onIncrement}
+                disabled={pickerAmount >= maximumBid}
+              >
+                +
+              </button>
+            </div>
+
+            <button
+              className={styles.confirmBidBtn}
+              aria-label={`Confirm bid of ${pickerAmount}`}
+              onClick={() => onPlaceBid(pickerAmount)}
+            >
+              Confirm bid: {pickerAmount}
+            </button>
           </>
         )}
 
-        {!isMyTurn && (
-          <div className={styles.waiting}>
-            <span className={biddingThinkingSeat ? styles.thinking : undefined}>
-              {biddingThinkingSeat
-                ? `${seatNames?.[biddingThinkingSeat] ?? getSeatLabel(biddingThinkingSeat)} is thinking…`
-                : activePlayer
-                ? `${seatNames?.[activePlayer] ?? getSeatLabel(activePlayer)} is bidding…`
-                : ""}
-            </span>
-          </div>
+        {/* Pass button — always visible */}
+        <button className={styles.passBtn} onClick={onPass}>PASS</button>
+
+        {/* Moon button or inline confirm */}
+        {moonEligible && (
+          moonConfirmPending ? (
+            <div className={styles.moonConfirm}>
+              <span className={styles.moonConfirmText}>Shoot the Moon?</span>
+              <button className={styles.moonConfirmYes} onClick={onShootMoon}>Yes, shoot!</button>
+              <button className={styles.moonConfirmNo} onClick={onMoonConfirmCancel}>Cancel</button>
+            </div>
+          ) : (
+            <button className={styles.moonBtn} onClick={onMoonConfirmRequest}>
+              🌙 Shoot the Moon
+            </button>
+          )
         )}
       </div>
     </div>
@@ -147,11 +110,12 @@ export function BiddingOverlayView({
 }
 
 // ── Stateful wrapper (the actual exported default) ────────────────────────────
-export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, biddingThinkingSeat, humanSeat = "N", seatNames }: Props) {
+export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootMoon, humanSeat = "N" }: Props) {
   const { currentBid, rules } = gameState;
   const minNextBid = currentBid === 0 ? rules.minimumBid : currentBid + rules.bidIncrement;
 
   const [pickerAmount, setPickerAmount] = useState(minNextBid);
+  const [moonConfirmPending, setMoonConfirmPending] = useState(false);
 
   // Reset pickerAmount when the legal minimum advances (another player outbid us).
   // We only react to the derived minNextBid value, not its constituent rule inputs,
@@ -169,18 +133,24 @@ export default function BiddingOverlay({ gameState, onPlaceBid, onPass, onShootM
     setPickerAmount((a) => Math.max(a - rules.bidIncrement, minNextBid));
   }
 
+  function handleShootMoon() {
+    setMoonConfirmPending(false);
+    onShootMoon();
+  }
+
   return (
     <BiddingOverlayView
       gameState={gameState}
       onPlaceBid={onPlaceBid}
       onPass={onPass}
-      onShootMoon={onShootMoon}
+      onShootMoon={handleShootMoon}
       pickerAmount={pickerAmount}
       onIncrement={increment}
       onDecrement={decrement}
-      biddingThinkingSeat={biddingThinkingSeat}
       humanSeat={humanSeat}
-      seatNames={seatNames}
+      moonConfirmPending={moonConfirmPending}
+      onMoonConfirmRequest={() => setMoonConfirmPending(true)}
+      onMoonConfirmCancel={() => setMoonConfirmPending(false)}
     />
   );
 }

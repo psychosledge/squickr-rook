@@ -18,6 +18,7 @@ vi.mock("./PlayerSeat.module.css", () => ({
     bidBadge: "bidBadge",
     dealerBadge: "dealerBadge",
     diffBadge: "diffBadge",
+    bidDisplay: "bidDisplay",
     handWrap: "handWrap",
   },
 }));
@@ -509,6 +510,64 @@ describe("PlayerSeat", () => {
       });
       expect(cardHandEls).toHaveLength(1);
       expect((cardHandEls[0].props as Record<string, unknown>).size).toBe("normal");
+    });
+  });
+
+  describe("bidDisplay prop", () => {
+    it("renders a bidDisplay chip when bidDisplay is provided", () => {
+      const element = PlayerSeat({ ...baseProps, bidDisplay: "115" });
+      const elements = flattenElements(element);
+      const chips = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "span" && typeof p.className === "string" && p.className.includes("bidDisplay");
+      });
+      expect(chips).toHaveLength(1);
+      expect((chips[0].props as Record<string, unknown>).children).toBe("115");
+    });
+
+    it("does NOT render a bidDisplay chip when bidDisplay is undefined", () => {
+      const element = PlayerSeat(baseProps);
+      const elements = flattenElements(element);
+      const chips = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "span" && typeof p.className === "string" && p.className.includes("bidDisplay");
+      });
+      expect(chips).toHaveLength(0);
+    });
+
+    it("sets data-passed='true' when bidDisplay='PASS'", () => {
+      const element = PlayerSeat({ ...baseProps, bidDisplay: "PASS" });
+      const elements = flattenElements(element);
+      const chips = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "span" && typeof p.className === "string" && p.className.includes("bidDisplay");
+      });
+      expect(chips).toHaveLength(1);
+      expect((chips[0].props as Record<string, unknown>)["data-passed"]).toBe("true");
+    });
+
+    it("sets data-thinking='true' when bidDisplay='…'", () => {
+      const element = PlayerSeat({ ...baseProps, bidDisplay: "…" });
+      const elements = flattenElements(element);
+      const chips = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "span" && typeof p.className === "string" && p.className.includes("bidDisplay");
+      });
+      expect(chips).toHaveLength(1);
+      expect((chips[0].props as Record<string, unknown>)["data-thinking"]).toBe("true");
+    });
+
+    it("does NOT set data-passed or data-thinking for a numeric bid", () => {
+      const element = PlayerSeat({ ...baseProps, bidDisplay: "115" });
+      const elements = flattenElements(element);
+      const chips = elements.filter((el) => {
+        const p = el.props as Record<string, unknown>;
+        return el.type === "span" && typeof p.className === "string" && p.className.includes("bidDisplay");
+      });
+      expect(chips).toHaveLength(1);
+      const p = chips[0].props as Record<string, unknown>;
+      expect(p["data-passed"]).toBeUndefined();
+      expect(p["data-thinking"]).toBeUndefined();
     });
   });
 

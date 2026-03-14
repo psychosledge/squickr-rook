@@ -67,6 +67,48 @@
   padding: 0 3px;
 }
 
+@keyframes bidPop {
+  0%   { transform: scale(0.7); opacity: 0; }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.bidDisplay {
+  color: #f0c040;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(240, 192, 64, 0.15);
+  border: 1px solid rgba(240, 192, 64, 0.35);
+  border-radius: 3px;
+  padding: 0 4px;
+  animation: bidPop 0.2s ease-out both;
+}
+
+.bidDisplay[data-passed="true"] {
+  color: #888;
+  background: rgba(128, 128, 128, 0.10);
+  border-color: rgba(128, 128, 128, 0.2);
+}
+
+@keyframes thinkingPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.bidDisplay[data-thinking="true"] {
+  animation: thinkingPulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bidDisplay {
+    animation: none;
+  }
+  .bidDisplay[data-thinking="true"] {
+    animation: none;
+  }
+}
+
 /* Real block box so overflow-x: auto on .hand actually works.
    min-width: 0 prevents flex/grid min-width: auto expansion that blocks scroll. */
 .handWrap {

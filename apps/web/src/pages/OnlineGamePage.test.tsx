@@ -373,14 +373,14 @@ describe("OnlineGamePageView", () => {
     expect(p.hand).toEqual(wHand);
   });
 
-  it("21. BiddingOverlay receives seatNames prop when overlay='bidding'", () => {
+  it("21. BiddingOverlay does NOT receive seatNames prop (moved to GameTable)", () => {
     const seatNames = { N: "Alice", E: "Bob" };
     const tree = OnlineGamePageView(makeProps({ overlay: "bidding", seatNames }));
     const all = flattenElements(tree);
     const overlays = findByType(all, BiddingOverlay);
     expect(overlays).toHaveLength(1);
     const p = overlays[0].props as Record<string, unknown>;
-    expect(p.seatNames).toEqual(seatNames);
+    expect(p.seatNames).toBeUndefined();
   });
 
   it("22. GameTable receives humanSeat=mySeat when mySeat is non-null", () => {

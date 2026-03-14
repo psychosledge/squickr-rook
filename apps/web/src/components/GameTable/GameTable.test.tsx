@@ -258,4 +258,76 @@ describe("GameTable", () => {
       expect(p.gameState).toBe(gameState);
     }
   });
+
+  describe("bidDisplay forwarding", () => {
+    it("passes bidDisplay='…' to the thinking seat during bidding phase", () => {
+      const gameState = makeGameState({ phase: "bidding", activePlayer: "E" });
+      const tree = GameTable({ gameState, onPlayCard, biddingThinkingSeat: "E" as Seat });
+      const leftSeat = getSeatByPosition(tree, "left"); // E is left when human=N
+      const p = leftSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBe("…");
+    });
+
+    it("passes bidDisplay='PASS' to a seat that has passed", () => {
+      const gameState = makeGameState({
+        phase: "bidding",
+        bids: { N: null, E: "pass", S: null, W: null },
+      });
+      const tree = GameTable({ gameState, onPlayCard });
+      const leftSeat = getSeatByPosition(tree, "left"); // E is left when human=N
+      const p = leftSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBe("PASS");
+    });
+
+    it("passes bidDisplay='100' to a seat with a numeric bid", () => {
+      const gameState = makeGameState({
+        phase: "bidding",
+        bids: { N: null, E: 100, S: null, W: null },
+      });
+      const tree = GameTable({ gameState, onPlayCard });
+      const leftSeat = getSeatByPosition(tree, "left"); // E is left
+      const p = leftSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBe("100");
+    });
+
+    it("passes bidDisplay=undefined when no bid and not thinking", () => {
+      const gameState = makeGameState({ phase: "bidding" });
+      const tree = GameTable({ gameState, onPlayCard });
+      const leftSeat = getSeatByPosition(tree, "left");
+      const p = leftSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBeUndefined();
+    });
+
+    it("does NOT show '…' for biddingThinkingSeat when phase is not 'bidding'", () => {
+      const gameState = makeGameState({ phase: "playing", activePlayer: "E" });
+      const tree = GameTable({ gameState, onPlayCard, biddingThinkingSeat: "E" as Seat });
+      const leftSeat = getSeatByPosition(tree, "left");
+      const p = leftSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBeUndefined();
+    });
+
+    it("passes bidDisplay='115 🌙' to a moon-shooter seat", () => {
+      const gameState = makeGameState({
+        phase: "bidding",
+        bids: { N: null, E: 115, S: null, W: null },
+        moonShooters: ["E" as Seat],
+      });
+      const tree = GameTable({ gameState, onPlayCard });
+      const leftSeat = getSeatByPosition(tree, "left"); // E is left when human=N
+      const p = leftSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBe("115 🌙");
+    });
+
+    it("bid chips persist after bidding phase ends (intentional reminder UX)", () => {
+      // bids remain in gameState; chips should still show during playing phase
+      const gameState = makeGameState({
+        phase: "playing",
+        bids: { N: 115, E: "pass", S: "pass", W: "pass" },
+      });
+      const tree = GameTable({ gameState, onPlayCard });
+      const bottomSeat = getSeatByPosition(tree, "bottom"); // N is bottom (human)
+      const p = bottomSeat!.props as Record<string, unknown>;
+      expect(p.bidDisplay).toBe("115");
+    });
+  });
 });

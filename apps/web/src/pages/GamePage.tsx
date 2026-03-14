@@ -72,13 +72,13 @@ export default function GamePage() {
         />
       )}
 
+      {/* humanSeat omitted — BiddingOverlay defaults to "N", which is always correct in solo play */}
       {overlay === "bidding" && (
         <BiddingOverlay
           gameState={gameState}
           onPlaceBid={humanPlaceBid}
           onPass={humanPassBid}
           onShootMoon={humanShootMoon}
-          biddingThinkingSeat={biddingThinkingSeat}
         />
       )}
 
@@ -86,7 +86,7 @@ export default function GamePage() {
         <TrumpPicker onSelect={humanSelectTrump} />
       )}
 
-      <GameTable gameState={gameState} onPlayCard={humanPlayCard} difficultyLabels={difficultyLabels} />
+      <GameTable gameState={gameState} onPlayCard={humanPlayCard} difficultyLabels={difficultyLabels} biddingThinkingSeat={biddingThinkingSeat} />
 
       {overlay === "nest" && (
         <NestOverlay

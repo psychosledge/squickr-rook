@@ -10,22 +10,16 @@ vi.mock("./BiddingOverlay.module.css", () => ({
   default: {
     overlay: "overlay",
     panel: "panel",
-    title: "title",
-    currentBid: "currentBid",
-    bidTable: "bidTable",
-    bidTableRow: "bidTableRow",
-    seatName: "seatName",
-    bidVal: "bidVal",
-    passed: "passed",
-    activeRow: "activeRow",
     picker: "picker",
     stepBtn: "stepBtn",
     pickerAmount: "pickerAmount",
     confirmBidBtn: "confirmBidBtn",
     passBtn: "passBtn",
     moonBtn: "moonBtn",
-    waiting: "waiting",
-    thinking: "thinking",
+    moonConfirm: "moonConfirm",
+    moonConfirmText: "moonConfirmText",
+    moonConfirmYes: "moonConfirmYes",
+    moonConfirmNo: "moonConfirmNo",
   },
 }));
 
@@ -153,6 +147,9 @@ function makeViewProps(
     pickerAmount: minNextBid,
     onIncrement: vi.fn(),
     onDecrement: vi.fn(),
+    moonConfirmPending: false,
+    onMoonConfirmRequest: vi.fn(),
+    onMoonConfirmCancel: vi.fn(),
     ...viewOverrides,
   };
 }
@@ -167,7 +164,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("1. stepper shows the correct initial amount (minNextBid = 100) when no bids have been placed", () => {
     const props = makeViewProps(); // currentBid=0 → minNextBid=100, pickerAmount=100
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     // No quick-bid button
     expect(findButtons(all, "quickBidBtn")).toHaveLength(0);
@@ -183,7 +180,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("2. stepper (+/− and confirm button) is always visible when it's the human's turn", () => {
     const props = makeViewProps(); // human's turn, minNextBid=100
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     // Picker (stepper row) should always be visible — exact class match avoids "pickerAmount" false positive
     const pickerDivs = findByClass(all, "picker", true);
@@ -205,7 +202,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("3. stepper shows the correct initial amount (minNextBid)", () => {
     const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const amountEls = findByClass(all, "pickerAmount");
     expect(amountEls).toHaveLength(1);
@@ -217,7 +214,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("4. '+' stepBtn is enabled when pickerAmount < maximumBid", () => {
     const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
     const stepBtns = findButtons(all, "stepBtn");
     expect(stepBtns.length).toBeGreaterThanOrEqual(2);
 
@@ -232,7 +229,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("5. '−' stepBtn is disabled when pickerAmount === minNextBid (100)", () => {
     const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
     const stepBtns = findButtons(all, "stepBtn");
     expect(stepBtns.length).toBeGreaterThanOrEqual(2);
 
@@ -245,7 +242,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("6. '+' stepBtn is disabled when pickerAmount === maximumBid (200)", () => {
     const props = makeViewProps({}, { pickerAmount: 200 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
     const stepBtns = findButtons(all, "stepBtn");
 
     const plusBtn = stepBtns[1];
@@ -257,7 +254,7 @@ describe("BiddingOverlay — Stepper UX", () => {
   it("7. stepper and confirm button are visible; no quick-bid button", () => {
     const props = makeViewProps({}, { pickerAmount: 100 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     // No "Bid more…" / "← Back" toggle at all
     const bidMoreLinks = findButtons(all, "bidMoreLink");
@@ -281,7 +278,7 @@ describe("BiddingOverlay — Stepper UX", () => {
     const onPlaceBid = vi.fn();
     const props = makeViewProps({}, { pickerAmount: 115, onPlaceBid });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const confirmBtns = findButtons(all, "confirmBidBtn");
     expect(confirmBtns).toHaveLength(1);
@@ -299,7 +296,7 @@ describe("BiddingOverlay — Stepper UX", () => {
     const onPlaceBid = vi.fn();
     const props = makeViewProps({}, { onPlaceBid }); // pickerAmount defaults to minNextBid=100
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     // No quick-bid button present
     expect(findButtons(all, "quickBidBtn")).toHaveLength(0);
@@ -318,7 +315,7 @@ describe("BiddingOverlay — Stepper UX", () => {
     const onPass = vi.fn();
     const props = makeViewProps({}, { onPass });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const passBtns = findButtons(all, "passBtn");
     expect(passBtns).toHaveLength(1);
@@ -335,7 +332,7 @@ describe("BiddingOverlay — Stepper UX", () => {
       moonShooters: [],
     });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const moonBtns = findButtons(all, "moonBtn");
     expect(moonBtns).toHaveLength(1);
@@ -349,7 +346,7 @@ describe("BiddingOverlay — Stepper UX", () => {
       moonShooters: [],
     });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const moonBtns = findButtons(all, "moonBtn");
     expect(moonBtns).toHaveLength(0);
@@ -362,153 +359,80 @@ describe("BiddingOverlay — Stepper UX", () => {
       moonShooters: [HUMAN],
     });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const moonBtns = findButtons(all, "moonBtn");
     expect(moonBtns).toHaveLength(0);
   });
 });
 
-describe("BiddingOverlay — thinking / waiting messages", () => {
-  // ── Test 14 ──────────────────────────────────────────────────────────────
-  it("14. When biddingThinkingSeat is null and !isMyTurn, shows '<Label> is bidding…'", () => {
-    const props = makeViewProps(
-      { activePlayer: "E" as const },
-      { biddingThinkingSeat: null },
-    );
+describe("BiddingOverlay — !isMyTurn returns null", () => {
+  it("returns null when !isMyTurn", () => {
+    const props = makeViewProps({ activePlayer: "E" as const });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    const waitingEls = findByClass(all, "waiting");
-    expect(waitingEls).toHaveLength(1);
-
-    const text = flattenStrings(waitingEls[0]).join("");
-    expect(text).toBe("Label-E is bidding…");
-  });
-
-  // ── Test 15 ──────────────────────────────────────────────────────────────
-  it("15. When biddingThinkingSeat='E' and !isMyTurn, shows 'Label-E is thinking…' with .thinking class", () => {
-    const props = makeViewProps(
-      { activePlayer: "E" as const },
-      { biddingThinkingSeat: "E" as const },
-    );
-    const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    const waitingEls = findByClass(all, "waiting");
-    expect(waitingEls).toHaveLength(1);
-
-    // Find the span with .thinking class inside the waiting div
-    const thinkingSpans = flattenElements(waitingEls[0]).filter((el) => {
-      const p = el.props as Record<string, unknown>;
-      return typeof p.className === "string" && p.className.includes("thinking");
-    });
-    expect(thinkingSpans).toHaveLength(1);
-
-    const text = flattenStrings(waitingEls[0]).join("");
-    expect(text).toContain("Label-E is thinking…");
-  });
-
-  // ── Test 16 ──────────────────────────────────────────────────────────────
-  it("16. When biddingThinkingSeat='E' and isMyTurn, human controls are still shown", () => {
-    // Edge case: biddingThinkingSeat set but it's actually human's turn
-    const props = makeViewProps(
-      { activePlayer: "N" as const },
-      { biddingThinkingSeat: "E" as const },
-    );
-    const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    // Human controls should be visible
-    const confirmBtns = findButtons(all, "confirmBidBtn");
-    expect(confirmBtns).toHaveLength(1);
-
-    const passBtns = findButtons(all, "passBtn");
-    expect(passBtns).toHaveLength(1);
-
-    // Waiting div should NOT be shown when isMyTurn
-    const waitingEls = findByClass(all, "waiting");
-    expect(waitingEls).toHaveLength(0);
-  });
-
-  // ── Test 17 ──────────────────────────────────────────────────────────────
-  it("17. When biddingThinkingSeat is null and isMyTurn, the .waiting div is NOT rendered", () => {
-    const props = makeViewProps(
-      { activePlayer: "N" as const },
-      { biddingThinkingSeat: null },
-    );
-    const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    const waitingEls = findByClass(all, "waiting");
-    expect(waitingEls).toHaveLength(0);
+    expect(element).toBeNull();
   });
 });
 
-describe("BiddingOverlay — seatNames override", () => {
-  // ── Test 18 ──────────────────────────────────────────────────────────────
-  it("18. bid table uses seatNames display name when provided for a seat", () => {
-    const seatNames = { N: "Alice", E: "Bob", S: "Carol", W: "Dave" };
-    const props = makeViewProps({}, { seatNames });
+describe("BiddingOverlay — inline moon confirm", () => {
+  it("moon button shows when moonConfirmPending=false", () => {
+    const props = makeViewProps({}, {
+      moonConfirmPending: false,
+      onMoonConfirmRequest: vi.fn(),
+      onMoonConfirmCancel: vi.fn(),
+    });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    // Find all seatName cells
-    const seatCells = findByClass(all, "seatName");
-    const texts = seatCells.map((el) => flattenStrings(el).join(""));
-    expect(texts).toContain("Alice");
-    expect(texts).toContain("Bob");
-    expect(texts).toContain("Carol");
-    expect(texts).toContain("Dave");
-    // Should NOT use the getSeatLabel fallback for those seats
-    expect(texts).not.toContain("Label-N");
-    expect(texts).not.toContain("Label-E");
+    const all = flattenElements(element!);
+    // moon button present
+    expect(findButtons(all, "moonBtn")).toHaveLength(1);
+    // confirm UI NOT present
+    expect(findByClass(all, "moonConfirm")).toHaveLength(0);
   });
 
-  // ── Test 19 ──────────────────────────────────────────────────────────────
-  it("19. bid table falls back to getSeatLabel when seatNames not provided", () => {
-    const props = makeViewProps();
+  it("shows inline confirm UI when moonConfirmPending=true", () => {
+    const props = makeViewProps({}, {
+      moonConfirmPending: true,
+      onMoonConfirmRequest: vi.fn(),
+      onMoonConfirmCancel: vi.fn(),
+    });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    const seatCells = findByClass(all, "seatName");
-    const texts = seatCells.map((el) => flattenStrings(el).join(""));
-    expect(texts).toContain("Label-N");
-    expect(texts).toContain("Label-E");
-    expect(texts).toContain("Label-S");
-    expect(texts).toContain("Label-W");
+    const all = flattenElements(element!);
+    // moon button NOT present
+    expect(findButtons(all, "moonBtn")).toHaveLength(0);
+    // confirm div IS present
+    expect(findByClass(all, "moonConfirm", true)).toHaveLength(1);
+    // yes and no buttons present
+    expect(findButtons(all, "moonConfirmYes")).toHaveLength(1);
+    expect(findButtons(all, "moonConfirmNo")).toHaveLength(1);
   });
 
-  // ── Test 20 ──────────────────────────────────────────────────────────────
-  it("20. waiting message uses seatNames when biddingThinkingSeat is set", () => {
-    const seatNames = { E: "Bob" };
-    const props = makeViewProps(
-      { activePlayer: "E" as const },
-      { biddingThinkingSeat: "E" as const, seatNames },
-    );
+  it("yes button calls onShootMoon", () => {
+    const onShootMoon = vi.fn();
+    const props = makeViewProps({}, {
+      moonConfirmPending: true,
+      onMoonConfirmRequest: vi.fn(),
+      onMoonConfirmCancel: vi.fn(),
+      onShootMoon,
+    });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    const waitingEls = findByClass(all, "waiting");
-    const text = flattenStrings(waitingEls[0]).join("");
-    expect(text).toContain("Bob is thinking…");
-    expect(text).not.toContain("Label-E");
+    const all = flattenElements(element!);
+    const yesBtn = findButtons(all, "moonConfirmYes")[0];
+    ((yesBtn.props as Record<string, unknown>).onClick as (() => void) | undefined)?.();
+    expect(onShootMoon).toHaveBeenCalledOnce();
   });
 
-  // ── Test 21 ──────────────────────────────────────────────────────────────
-  it("21. waiting message uses seatNames when activePlayer is bidding (no thinking seat)", () => {
-    const seatNames = { S: "Carol" };
-    const props = makeViewProps(
-      { activePlayer: "S" as const },
-      { biddingThinkingSeat: null, seatNames },
-    );
+  it("no button calls onMoonConfirmCancel", () => {
+    const onMoonConfirmCancel = vi.fn();
+    const props = makeViewProps({}, {
+      moonConfirmPending: true,
+      onMoonConfirmRequest: vi.fn(),
+      onMoonConfirmCancel,
+    });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
-
-    const waitingEls = findByClass(all, "waiting");
-    const text = flattenStrings(waitingEls[0]).join("");
-    expect(text).toContain("Carol is bidding…");
-    expect(text).not.toContain("Label-S");
+    const all = flattenElements(element!);
+    const noBtn = findButtons(all, "moonConfirmNo")[0];
+    ((noBtn.props as Record<string, unknown>).onClick as (() => void) | undefined)?.();
+    expect(onMoonConfirmCancel).toHaveBeenCalledOnce();
   });
 });
 
@@ -527,7 +451,7 @@ describe("BiddingOverlay — moon lockout (once someone has shot the moon)", () 
   it("22. numeric stepper (picker div) is NOT rendered when moonShooters.length > 0", () => {
     const props = makeViewProps(makeMoonShotState(), { pickerAmount: 200 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const pickerDivs = findByClass(all, "picker", true);
     expect(pickerDivs).toHaveLength(0);
@@ -537,7 +461,7 @@ describe("BiddingOverlay — moon lockout (once someone has shot the moon)", () 
   it("23. 'Confirm bid' button is NOT rendered when moonShooters.length > 0", () => {
     const props = makeViewProps(makeMoonShotState(), { pickerAmount: 200 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const confirmBtns = findButtons(all, "confirmBidBtn");
     expect(confirmBtns).toHaveLength(0);
@@ -547,7 +471,7 @@ describe("BiddingOverlay — moon lockout (once someone has shot the moon)", () 
   it("24. PASS button IS still rendered when moonShooters.length > 0", () => {
     const props = makeViewProps(makeMoonShotState(), { pickerAmount: 200 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const passBtns = findButtons(all, "passBtn");
     expect(passBtns).toHaveLength(1);
@@ -558,7 +482,7 @@ describe("BiddingOverlay — moon lockout (once someone has shot the moon)", () 
     // Human has null bid, E already shot moon — human is still moonEligible
     const props = makeViewProps(makeMoonShotState(null), { pickerAmount: 200 });
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const moonBtns = findButtons(all, "moonBtn");
     expect(moonBtns).toHaveLength(1);
@@ -576,7 +500,7 @@ describe("BiddingOverlay — moon lockout (once someone has shot the moon)", () 
       { pickerAmount: 200 },
     );
     const element = BiddingOverlayView(props);
-    const all = flattenElements(element);
+    const all = flattenElements(element!);
 
     const moonBtns = findButtons(all, "moonBtn");
     expect(moonBtns).toHaveLength(0);
