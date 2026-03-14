@@ -92,6 +92,28 @@ Sam follows **TDD Red-Green-Refactor** strictly:
 
 ---
 
+### Coach Roxy
+**Command:** `/analyze [paste game log JSON here]`
+**File:** `.opencode/agents/roxy.md`
+
+Use when:
+- Reviewing a game log to evaluate bot decision quality
+- Identifying systematic bidding, discard, or play errors
+- Getting specific parameter tuning recommendations for Expert (L5) or other difficulty levels
+- Fine-tuning bot realism before a release
+
+Roxy parses `HandLogEntry[]` JSON (from `window.__rookLog.getLog()`) and provides hand-by-hand analysis plus prioritised improvement recommendations.
+
+Roxy is **read-only** — she analyses and recommends, she does not implement.
+
+**Workflow:**
+1. Open the game in the browser (dev mode)
+2. Play several hands
+3. Run `window.__rookLog.downloadLog()` or copy `JSON.stringify(window.__rookLog.getLog(), null, 2)` from the console
+4. Call `/analyze` and paste the JSON
+
+---
+
 ## The Development Loop
 
 ### Phase 1: Planning (start of session)

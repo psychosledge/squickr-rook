@@ -123,6 +123,8 @@ export type HandLogEntry = {
   moonMade: boolean;
   nestCards: CardId[];
   discardedCards: CardId[];
+  bidWinnerDiscards: CardId[];  // clearer alias for discardedCards
+  startingHands: Record<Seat, CardId[]>;
   discardAnnotations: DiscardAnnotation[];
   trumpAnnotation: TrumpAnnotation | null;
   tricks: TrickLog[];
@@ -149,10 +151,18 @@ export class GameLogger {
   private log: HandLogEntry[] = [];
   private pendingAnnotations: BotDecisionAnnotation[] = [];
   private handStartedAt: number = Date.now();
+  private startingHands: Record<Seat, CardId[]> = { N: [], E: [], S: [], W: [] };
 
-  onHandStart(timestamp: number): void {
+  onHandStart(timestamp: number, gameState: GameState): void {
     this.handStartedAt = timestamp;
     this.pendingAnnotations = [];
+    // Deep-copy all 4 players' starting hands at deal time
+    this.startingHands = {
+      N: [...(gameState.hands.N ?? [])],
+      E: [...(gameState.hands.E ?? [])],
+      S: [...(gameState.hands.S ?? [])],
+      W: [...(gameState.hands.W ?? [])],
+    };
   }
 
   onBotDecision(annotation: BotDecisionAnnotation): void {
@@ -272,6 +282,8 @@ export class GameLogger {
       moonMade: score.shotMoon && !score.moonShooterWentSet,
       nestCards: score.nestCards,
       discardedCards: score.discarded,
+      bidWinnerDiscards: score.discarded,
+      startingHands: { ...this.startingHands },
       discardAnnotations,
       trumpAnnotation,
       tricks,
@@ -361,6 +373,15 @@ export class GameLogger {
     );
     console.log(`  Bidding:  ${bidParts.join("  |  ")}`);
     console.log(`            → ${entry.finalBidder} bid ${entry.finalBidAmount}${entry.moonAttempted ? " (MOON)" : ""}`);
+
+    // Starting hands section
+    const startingHandsLines = SEAT_ORDER.map((seat) => {
+      const cards = entry.startingHands[seat] ?? [];
+      const handStr = cards.map(formatCard).join(" ");
+      return `    ${seat}: ${handStr}`;
+    }).join("\n");
+    console.log(`\n  Starting Hands:\n${startingHandsLines}`);
+
     console.log(`\n  Nest: ${nestStr}    Discarded: ${discardStr}`);
     console.log(`  ${trumpLine}`);
     console.log(`\n  Tricks:`);
@@ -385,7 +406,7 @@ export function registerLogger(): void {
   useGameStore.getState()._setLoggerCallbacks({
     onBotDecision: (a) => gameLogger.onBotDecision(a),
     onHandComplete: (gs) => gameLogger.onHandComplete(gs),
-    onHandStart: (ts) => gameLogger.onHandStart(ts),
+    onHandStart: (ts, gs) => gameLogger.onHandStart(ts, gs),
   });
   (window as Window & { __rookLog?: RookLogAPI }).__rookLog = {
     getLog: () => gameLogger.getLog(),

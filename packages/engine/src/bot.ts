@@ -7,6 +7,94 @@ import { DEFAULT_RULES, SEAT_TEAM } from "./types.js";
 
 const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
 
+// ── ADR-009: Natural opening bids + jump raises ───────────────────────────────
+
+interface OpeningParams {
+  fractionCenter: number;
+  fractionSpread: number;
+  fishingProbability: number;
+}
+
+const OPENING_PARAMS: Record<number, OpeningParams> = {
+  // L1/L2 entries are structurally present but never reached — chooseBidAmount short-circuits to minNextBid for diff <= 2
+  1: { fractionCenter: 0, fractionSpread: 0, fishingProbability: 1 },
+  2: { fractionCenter: 0, fractionSpread: 0, fishingProbability: 1 },
+  3: { fractionCenter: 0.45, fractionSpread: 0.20, fishingProbability: 0.20 },
+  4: { fractionCenter: 0.70, fractionSpread: 0.15, fishingProbability: 0.15 },
+  5: { fractionCenter: 0.85, fractionSpread: 0.10, fishingProbability: 0.10 },
+};
+
+interface RaiseParams {
+  jumpThreshold: number;
+  jumpFractionCenter: number;
+  jumpFractionSpread: number;
+  jumpProbability: number;
+}
+
+const RAISE_PARAMS: Record<number, RaiseParams> = {
+  1: { jumpThreshold: 999, jumpFractionCenter: 0, jumpFractionSpread: 0, jumpProbability: 0 },
+  2: { jumpThreshold: 999, jumpFractionCenter: 0, jumpFractionSpread: 0, jumpProbability: 0 },
+  3: { jumpThreshold: 25, jumpFractionCenter: 0.35, jumpFractionSpread: 0.15, jumpProbability: 0.40 },
+  4: { jumpThreshold: 20, jumpFractionCenter: 0.55, jumpFractionSpread: 0.15, jumpProbability: 0.65 },
+  5: { jumpThreshold: 15, jumpFractionCenter: 0.75, jumpFractionSpread: 0.15, jumpProbability: 0.80 },
+};
+
+/**
+ * Choose the actual bid amount for a bot.
+ * - On opening (isOpening=true, minNextBid=minimumBid): uses fraction-based natural open (L3–L5)
+ *   or minimum (L1–L2). Includes fishing mechanic.
+ * - On raise (isOpening=false): may jump toward ceiling (L3–L5) or just raise minimum (L1–L2).
+ * Always returns a value that is:
+ *   - A multiple of rules.bidIncrement
+ *   - In [minNextBid, ceiling]
+ *   - Present in the legal PlaceBid commands (fallback to minNextBid if not)
+ */
+function chooseBidAmount(
+  minNextBid: number,
+  ceiling: number,
+  profile: BotProfile,
+  isOpening: boolean,
+  legal: GameCommand[],
+  rules: { minimumBid: number; bidIncrement: number },
+): number {
+  const diff = profile.difficulty;
+
+  if (isOpening) {
+    const params = OPENING_PARAMS[diff] ?? OPENING_PARAMS[1]!;
+    // L1/L2: always minimum
+    if (diff <= 2) return minNextBid;
+    // Fishing mechanic: pretend to be weak
+    if (Math.random() < params.fishingProbability) return minNextBid;
+    // Fraction-based open
+    const fraction = params.fractionCenter + (Math.random() * 2 - 1) * params.fractionSpread;
+    const rawBid = minNextBid + fraction * (ceiling - minNextBid);
+    const snapped = Math.round(rawBid / rules.bidIncrement) * rules.bidIncrement;
+    const amount = Math.max(minNextBid, Math.min(snapped, ceiling));
+    // Snap to legal bid
+    const legalCmd = legal.find(c => c.type === "PlaceBid" && c.amount === amount);
+    if (legalCmd) return amount;
+    // Fallback: find nearest legal bid
+    const bids = legal.filter(c => c.type === "PlaceBid").map(c => (c as { type: "PlaceBid"; amount: number }).amount);
+    if (bids.length === 0) return minNextBid;
+    return bids.reduce((best, b) => Math.abs(b - amount) < Math.abs(best - amount) ? b : best);
+  }
+
+  // Raise path
+  const params = RAISE_PARAMS[diff] ?? RAISE_PARAMS[1]!;
+  if (diff <= 2) return minNextBid;
+  const gap = ceiling - minNextBid;
+  if (gap < params.jumpThreshold) return minNextBid;
+  if (Math.random() >= params.jumpProbability) return minNextBid;
+  // Jump!
+  const fraction = params.jumpFractionCenter + (Math.random() * 2 - 1) * params.jumpFractionSpread;
+  const rawJump = Math.round((gap * fraction) / rules.bidIncrement) * rules.bidIncrement;
+  const amount = Math.max(minNextBid, Math.min(minNextBid + rawJump, ceiling));
+  // Verify in legal commands; fallback to minNextBid
+  const legalCmd = legal.find(c => c.type === "PlaceBid" && c.amount === amount);
+  if (legalCmd) return amount;
+  return minNextBid;
+}
+
 /** Returns the partner seat (opposite in N↔S, E↔W). */
 function partnerOf(seat: Seat): Seat {
   switch (seat) {
@@ -310,7 +398,10 @@ export function botChooseCommand(
       // Compute ceiling and decide whether to bid
       const ceiling = computeBidCeiling(hand, state, seat, profile);
       if (shouldBid(minNextBid, ceiling, profile, state)) {
-        const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === minNextBid);
+        const rules = state.rules ?? DEFAULT_RULES;
+        const isOpening = state.currentBid === 0;
+        const bidAmount = chooseBidAmount(minNextBid, ceiling, profile, isOpening, legal, rules);
+        const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === bidAmount);
         if (bidCmd) return bidCmd;
       }
       return { type: "PassBid", seat };

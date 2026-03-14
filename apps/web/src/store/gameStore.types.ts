@@ -17,7 +17,7 @@ export type AppState = {
   biddingThinkingSeat: Seat | null;
   _devOnBotDecision: ((annotation: BotDecisionAnnotation) => void) | undefined;
   _devOnHandComplete: ((gameState: GameState) => void) | undefined;
-  _devOnHandStart: ((timestamp: number) => void) | undefined;
+  _devOnHandStart: ((timestamp: number, gameState: GameState) => void) | undefined;
 };
 
 export type AppActions = {
@@ -42,7 +42,7 @@ export type AppActions = {
   _setLoggerCallbacks: (callbacks: {
     onBotDecision: (annotation: BotDecisionAnnotation) => void;
     onHandComplete: (gameState: GameState) => void;
-    onHandStart: (timestamp: number) => void;
+    onHandStart: (timestamp: number, gameState: GameState) => void;
   }) => void;
 };
 

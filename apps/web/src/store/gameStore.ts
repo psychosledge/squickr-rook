@@ -314,7 +314,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
       for (const ev of events) {
         gs = applyEvent(gs, ev);
         if (ev.type === "HandStarted") {
-          s._devOnHandStart?.(ev.timestamp);
+          s._devOnHandStart?.(ev.timestamp, gs);
         }
         if (ev.type === "HandScored") {
           pendingHandScore = ev.score;
