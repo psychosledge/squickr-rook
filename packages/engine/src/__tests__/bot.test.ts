@@ -1817,8 +1817,394 @@ describe("ADR-008: computeBidCeiling score-context thresholds (200/100 not 100/5
     for (const level of [1, 2] as BotDifficulty[]) {
       const profile = { ...BOT_PRESETS[level], handValuationAccuracy: 1.0 };
       const ceiling0 = computeBidCeiling(scoreTestHand, state0, "E", profile);
-      const ceiling300 = computeBidCeiling(scoreTestHand, state300, "E", profile);
+       const ceiling300 = computeBidCeiling(scoreTestHand, state300, "E", profile);
       expect(ceiling300).toBe(ceiling0);
+    }
+  });
+});
+
+// ── ADR-010 Fix 1B: Misfire Sluff Detection (L3 partner-aware non-interference) ──
+
+describe("ADR-010 Fix 1B: L3 partner-aware non-interference (chooseFollowCard)", () => {
+  /**
+   * Build a following-play state where the bot's partner is currently winning
+   * the trick, and the bot has the given hand.
+   *
+   * Setup:
+   *   trump=Black, N is bidder (NS team).
+   *   Trick in progress: N led G9 (Green off-suit, non-trump), N is winning.
+   *   Bot seat = S (NS team, partner of N → partnerIsWinning=true).
+   *   S has NO Green cards → void in lead suit → ALL cards in hand are legal.
+   */
+  function makeL3FollowStatePartnerWinning(hand: CardId[]): GameState {
+    const baseState = makePlayingState({
+      activePlayer: "S",
+      bidder: "N",    // N is bidder, NS team; S is also NS team → partner
+      trump: "Black",
+      tricksPlayed: 0,
+      playedCards: [],
+      hands: {
+        N: [],
+        E: [],
+        S: hand, // no Green cards → void in Green (lead suit)
+        W: [],
+      },
+    });
+    // Inject a trick: N led G9 (Green off-suit) — N is currently winning
+    return {
+      ...baseState,
+      currentTrick: [{ seat: "N" as Seat, cardId: "G9" as CardId }],
+    };
+  }
+
+  it("L3 bot sheds cheapest losing card when partner is winning and losing options exist", () => {
+    // S (NS team, partner of N) holds: Y3 (0pts, losing), R5 (5pts, losing), B9 (trump — wins).
+    // N led G9 and is winning. S is void in Green → all cards legal.
+    // Y3 and R5 both lose to G9 (non-trump vs trump lead color / off-suit).
+    // B9 is trump → wins. L3 (roleAwareness=true, sluffStrategy=false) should shed cheapest
+    // losing card = Y3 (lowest offSuitRank among non-winners).
+    const state = makeL3FollowStatePartnerWinning(["B9", "R5", "Y3"]);
+    // L3 profile: roleAwareness=true, sluffStrategy=false
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should shed Y3 (cheapest non-winner), NOT trump B9
+      expect(cmd.cardId).toBe("Y3");
+      expect(cmd.cardId).not.toBe("B9");
+    }
+  });
+
+  it("L3 bot falls through (plays a winning card) when ALL cards win and partner is winning", () => {
+    // S holds only trump cards when partner is winning — no losing options.
+    // Should fall through and play a card (no crash), and since all win, plays something.
+    // S hand: B9 (trump), B8 (trump) — both beat G9 since trump > Green.
+    const state = makeL3FollowStatePartnerWinning(["B9", "B8"]);
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // Should not throw; must play a legal trump card (the cheapest winning one)
+    if (cmd.type === "PlayCard") {
+      expect(["B9", "B8"]).toContain(cmd.cardId);
+    }
+  });
+
+  it("L4/L5 bot still uses full sluff strategy when partner winning (existing behavior)", () => {
+    // L4/L5 have sluffStrategy=true → chooseBestSluffCard fires (existing behavior).
+    // S holds: ROOK (20pts, trump), Y10 (10pts, off-suit point card).
+    // sluffStrategy picks Y10 (Tier 1: off-suit point card) NOT ROOK.
+    const state = makeL3FollowStatePartnerWinning(["ROOK", "Y10"]);
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Full sluff strategy fires, not the L3 lightweight path
+      expect(cmd.cardId).toBe("Y10");
+    }
+  });
+
+  it("L1/L2 bot is unaffected by Fix 1B (roleAwareness=false → random play)", () => {
+    // L1/L2 bots reach the random play path (chooseBestPlay short-circuits to pickRandom).
+    // Should not throw and return a legal card.
+    const state = makeL3FollowStatePartnerWinning(["B9", "R5", "Y3"]);
+    const profile = { ...BOT_PRESETS[2], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // L2 profile has difficulty=2, so it plays randomly — just verify it's legal
+    if (cmd.type === "PlayCard") {
+      expect(["B9", "R5", "Y3"]).toContain(cmd.cardId);
+    }
+  });
+});
+
+// ── ADR-010 Fix 2: Defending Team Contests Trick 10 ──────────────────────────
+
+describe("ADR-010 Fix 2: trick-10 nest-contest aggression (chooseFollowCard)", () => {
+  /**
+   * Build a following-play state for trick 10 where an opponent is winning.
+   *
+   * Setup:
+   *   trump=Black, N is bidder (NS team).
+   *   Trick in progress: N (NS team, opponent of W) led and is winning.
+   *   Bot seat = W (EW team, defending).
+   *   W is void in Green → all cards in hand are legal to play.
+   *   tricksPlayed=9 (trick 10), nestValue > 15.
+   */
+  function makeTrick10FollowStateOpponentWinning(
+    hand: CardId[],
+    nestCards: CardId[] = ["B1", "R14", "G10", "Y5", "B10"],
+  ): GameState {
+    const baseState = makePlayingState({
+      activePlayer: "W",
+      bidder: "N",   // N is bidder (NS team) → W is defending (EW)
+      trump: "Black",
+      tricksPlayed: 9, // trick 10
+      playedCards: [],
+      originalNest: nestCards, // 15+10+10+5+10=50pts > 15
+      hands: {
+        N: [],
+        E: [],
+        S: [],
+        W: hand,
+      },
+    });
+    // Inject trick: N led G9 (Green), is currently winning (as lead play)
+    return {
+      ...baseState,
+      currentTrick: [{ seat: "N" as Seat, cardId: "G9" as CardId }],
+    };
+  }
+
+  it("L4 bot following on trick 10 with high-value nest and opponent winning plays best winning card", () => {
+    // W (EW, defending) holds: R5 (5pts, losing vs G9), B5 (trump 5pts, wins), B14 (trump 10pts, wins).
+    // Trick 10, nest value=50pts > 15, opponent (N) winning.
+    // Fix 2: endgameCardAwareness=0.5, trick 10, nest > 15, opponent winning → play best winning card.
+    // trumpWins: B5, B14. B14 has higher point value (10 > 5), so plays B14.
+    const state = makeTrick10FollowStateOpponentWinning(["R5", "B5", "B14"]);
+    const profile = { ...BOT_PRESETS[4], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should play best trump win (B14=10pts > B5=5pts), NOT R5 (loses)
+      expect(cmd.cardId).toBe("B14");
+    }
+  });
+
+  it("L4 bot on trick 10 falls back to winningCommands when no trump winners available", () => {
+    // When W must follow the lead suit and has no trump cards, trumpWins is empty.
+    // Fix 2 falls back to candidates = winningCommands (non-trump winners).
+    // W (EW, defending) follows Green (N led G9). Hand: ["G12", "G14", "G3"] — all Green, no Black trump.
+    // winningCommands = [G12 (0pts), G14 (10pts)] (both beat G9); G3 loses.
+    // trumpWins = [] → candidates = winningCommands.
+    // Fix 2 reduce: G14 has pointValue=10, G12 has pointValue=0 → picks G14.
+    const baseState = makePlayingState({
+      activePlayer: "W",
+      bidder: "N",   // NS team → W defending (EW)
+      trump: "Black",
+      tricksPlayed: 9,
+      playedCards: [],
+      originalNest: ["B1", "R14", "G10", "Y5", "B10"], // 50pts > 15
+      hands: {
+        N: [],
+        E: [],
+        S: [],
+        W: ["G12", "G14", "G3"] as CardId[],
+      },
+    });
+    const state = {
+      ...baseState,
+      currentTrick: [{ seat: "N" as Seat, cardId: "G9" as CardId }],
+    };
+    const profile = { ...BOT_PRESETS[4], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // trumpWins=[] → candidates=winningCommands=[G12,G14]; G14(10pts) > G12(0pts) → plays G14
+      expect(cmd.cardId).toBe("G14");
+    }
+  });
+
+  it("L3 bot on trick 10 (endgameCardAwareness=0.0) is NOT affected by Fix 2", () => {
+    // L3 profile: endgameCardAwareness=0.0 < 0.5 → Fix 2 does not fire.
+    // Falls through to normal logic (chooseLowestWinningCard).
+    // W holds: R5 (losing), B5 (5pts trump wins), B14 (10pts trump wins).
+    // Normal logic: chooseLowestWinningCard → picks cheapest winning card.
+    const state = makeTrick10FollowStateOpponentWinning(["R5", "B5", "B14"]);
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 }; // endgameCardAwareness=0.0
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Normal logic: NOT B14 (best) — plays lowest winning card (B5 cheaper than B14 by trumpRank)
+      // Actually we just verify Fix 2 did NOT override: i.e., it didn't play B14 specifically because of Fix 2
+      // L3 doesn't have Fix 2 active, so it falls to normal path (chooseLowestWinningCard)
+      // B5 trumpRank < B14 trumpRank → chooseLowestWinningCard picks B5
+      expect(cmd.cardId).not.toBe("B14"); // Fix 2 would pick B14 but L3 doesn't have Fix 2
+    }
+  });
+
+  it("L4 bot on trick 10 with nest value ≤ 15 is NOT triggered, plays normally", () => {
+    // nestCards total only 10pts → nestPointValue = 10 ≤ 15 → Fix 2 not triggered.
+    // Falls through to normal logic.
+    const lowValueNest: CardId[] = ["B2", "R3", "G4", "Y2", "B3"]; // 0pts nest
+    const state = makeTrick10FollowStateOpponentWinning(["R5", "B5", "B14"], lowValueNest);
+    const profile = { ...BOT_PRESETS[4], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Normal logic fires (not Fix 2): chooseLowestWinningCard → B5 (not B14)
+      expect(cmd.cardId).not.toBe("B14");
+    }
+  });
+
+  it("ordering: trick 10 + partner winning → Fix 1B fires (L3), NOT Fix 2", () => {
+    // L3 bot, trick 10, partner (E) is winning the trick.
+    // Fix 1B should fire (partner winning → shed cheapest losing card).
+    // Fix 2 should NOT fire (Fix 1B fires first since partner is winning).
+    const baseState = makePlayingState({
+      activePlayer: "W",
+      bidder: "N",   // NS team → W is defending (EW), partner of W = E
+      trump: "Black",
+      tricksPlayed: 9,
+      playedCards: [],
+      originalNest: ["B1", "R14", "G10", "Y5", "B10"], // 50pts
+      hands: {
+        N: [],
+        E: [],
+        S: [],
+        W: ["R5", "B5", "Y3"], // B5 is trump (wins), R5 and Y3 lose to G9
+      },
+    });
+    // E (W's partner, EW team) is winning the trick with a high card
+    // N led G9, E played a higher card... Let's set up: N led G9, E played G12 (winning)
+    const state = {
+      ...baseState,
+      currentTrick: [
+        { seat: "N" as Seat, cardId: "G9" as CardId },
+        { seat: "E" as Seat, cardId: "G12" as CardId }, // E (W's partner) is winning
+      ],
+    };
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Fix 1B fires: partner (E) is winning → shed cheapest losing card = Y3
+      // NOT Fix 2 (which would pick B5 as best winner)
+      expect(cmd.cardId).toBe("Y3");
+      expect(cmd.cardId).not.toBe("B5");
+    }
+  });
+});
+
+// ── ADR-010 Fix 3: Defending Team Opening Lead Avoids Aces/14s ───────────────
+
+describe("ADR-010 Fix 3: defending lead avoids aces/14s on early tricks", () => {
+  /**
+   * Build a leading-play state for the defending team.
+   * trump=Black, N is bidder (NS team). Active player = W (EW, defending).
+   */
+  function makeDefendingLeadState(
+    hand: CardId[],
+    tricksPlayed: number,
+  ): GameState {
+    return makePlayingState({
+      activePlayer: "W",
+      bidder: "N",   // NS team → W is defending (EW)
+      trump: "Black",
+      tricksPlayed,
+      playedCards: [],
+      hands: {
+        N: [],
+        E: [],
+        S: [],
+        W: hand,
+      },
+    });
+  }
+
+  it("L3+ defending bot leads trick 1, avoids ace, leads non-ace from longest suit", () => {
+    // W (EW, defending) holds: R1 (ace, 15pts), R9 (non-ace, 0pts), R8 (non-ace).
+    // All Red (off-suit). tricksPlayed=0 (trick 1 = early lead ≤ 2).
+    // Fix 3: nonPointLeads = [R9, R8] (neither is ace nor 14). Picks highest offSuitRank among them.
+    // offSuitRank: R9 > R8 → picks R9.
+    const state = makeDefendingLeadState(["R1", "R9", "R8"], 0);
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should avoid R1 (ace), pick among non-ace/non-14
+      expect(cmd.cardId).not.toBe("R1");
+      expect(["R9", "R8"]).toContain(cmd.cardId);
+    }
+  });
+
+  it("L3+ defending bot leads trick 1, avoids 14-point card, leads non-14 from longest suit", () => {
+    // W holds: R14 (14-point card, 10pts), R9, R8 — all Red (off-suit, longest suit).
+    // tricksPlayed=0. Fix 3: R14 is excluded (value=14). nonPointLeads=[R9,R8].
+    // Picks highest offSuitRank: R9 > R8 → R9.
+    const state = makeDefendingLeadState(["R14", "R9", "R8"], 0);
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should avoid R14, picks R9 (highest non-ace/non-14)
+      expect(cmd.cardId).not.toBe("R14");
+      expect(cmd.cardId).toBe("R9");
+    }
+  });
+
+  it("L3+ defending bot leads trick 1 with only aces/14s → fallback, leads from available (no crash)", () => {
+    // W holds: R1 (ace), R14 (14-point card) — both are excluded by Fix 3.
+    // nonPointLeads is empty → fallback: leadCandidates = suitCards → picks highest offSuitRank.
+    // R1 or R14 — offSuitRank: R14=14, R1=1 → R14 wins.
+    const state = makeDefendingLeadState(["R1", "R14"], 0);
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // Must not crash and must play a legal card
+    if (cmd.type === "PlayCard") {
+      expect(["R1", "R14"]).toContain(cmd.cardId);
+    }
+  });
+
+  it("L3+ defending bot leads trick 4+ allows aces (not early lead)", () => {
+    // tricksPlayed=3 → isEarlyLead=false (tricks 0–2 are early, trick 3+ is not).
+    // Fix 3 does NOT restrict cards. Normal logic applies → picks highest offSuitRank.
+    // W holds: R1 (ace), R9, R8. Normal logic: highest offSuitRank = R9 (rank 9 > 1 > 8? 
+    // Actually offSuitRank(R9)=9, offSuitRank(R1)=1 in the rank system? Let's check...
+    // offSuitRank uses the card's value. R1 has value=1; R9 has value=9.
+    // So offSuitRank(R9)=9 > offSuitRank(R1)=1 → normal logic picks R9.
+    // But WITHOUT Fix 3, normal logic already picks R9 (highest offSuitRank).
+    // So we need a case where ace has highest rank: trick 4+ with R14 (offSuitRank=14 highest).
+    // W holds: R14 (value=14, offSuitRank=14), R9 (rank=9), R8 (rank=8).
+    // trick 4+: Fix 3 inactive → picks R14 (highest offSuitRank=14).
+    const state = makeDefendingLeadState(["R14", "R9", "R8"], 3);
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Normal logic (no Fix 3): leads highest offSuitRank → R14
+      expect(cmd.cardId).toBe("R14");
+    }
+  });
+
+  it("bidding team bot path is unaffected by Fix 3", () => {
+    // Bidding team (W=EW team, bidder=W) — isBiddingTeam=true → Fix 3 not in bidding team path.
+    // W (bidder, NS... wait: use W as bidder for EW team).
+    // Actually: bidder=W → SEAT_TEAM[W]=EW → isBiddingTeam for W=true.
+    const state = makePlayingState({
+      activePlayer: "W",
+      bidder: "W",   // W is bidder (EW team) → W is bidding team
+      trump: "Black",
+      tricksPlayed: 0,
+      playedCards: [],
+      hands: {
+        N: [],
+        E: [],
+        S: [],
+        W: ["R1", "R9", "R8"], // Red non-trump
+      },
+    });
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // Bidding team path not affected by Fix 3 — it pulls trump instead
+    if (cmd.type === "PlayCard") {
+      // Bidding team leads trump (but W has only Red cards, no trump)
+      // Falls through to off-suit highest: R9 (rank=9) or R1 (rank=1)...
+      // Bidding team leads highest off-suit = R9
+      expect(isLegalCommand(state, "W", cmd)).toBe(true);
+    }
+  });
+
+  it("L1/L2 bot is unaffected by Fix 3 (difficulty<=2 → random play)", () => {
+    // L1/L2 reach pickRandom path (chooseBestPlay short-circuits for difficulty <= 2).
+    // Should not crash and return a legal card.
+    const state = makeDefendingLeadState(["R1", "R9", "R8"], 0);
+    const profile = { ...BOT_PRESETS[2], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(["R1", "R9", "R8"]).toContain(cmd.cardId);
     }
   });
 });

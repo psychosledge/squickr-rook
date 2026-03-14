@@ -758,8 +758,19 @@ function chooseLeadCard(
         }
         const suitCards = colorGroups[longestColor];
         if (suitCards.length > 0) {
-          // Lead lowest in suit to exhaust (or highest — lead a strong card)
-          return suitCards.reduce((best, cmd) => {
+          // Fix 3: Early leads (tricks 1–3) avoid aces and 14s to preserve point-card ambush potential
+          const isEarlyLead = state.tricksPlayed <= 2; // tricks 1–3 (0-indexed)
+          let leadCandidates = suitCards;
+          if (isEarlyLead) {
+            const nonPointLeads = suitCards.filter((c) => {
+              if (c.type !== "PlayCard") return false;
+              const card = cardFromId(c.cardId);
+              return card.kind === "regular" && card.value !== 1 && card.value !== 14;
+            });
+            if (nonPointLeads.length > 0) leadCandidates = nonPointLeads;
+            // else fallback: all suitCards (only aces/14s available)
+          }
+          return leadCandidates.reduce((best, cmd) => {
             if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
             return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
           });
@@ -831,16 +842,48 @@ function chooseFollowCard(
   const myTeam = SEAT_TEAM[seat];
   const partnerIsWinning = SEAT_TEAM[currentWinnerPlay.seat] === myTeam;
 
+  // Find winning cards (hoisted here so Fix 1B and Fix 2 can both use it)
+  const winningCommands = playCommands.filter((c) => {
+    if (c.type !== "PlayCard") return false;
+    return compareTrickCards(c.cardId, currentWinnerPlay.cardId, leadColor, trump) > 0;
+  });
+
   // sluffStrategy + partner is winning: dump best point card (protect ROOK and trump ace)
   if (profile.sluffStrategy && partnerIsWinning) {
     return chooseBestSluffCard(playCommands, trump);
   }
 
-  // Find winning cards
-  const winningCommands = playCommands.filter((c) => {
-    if (c.type !== "PlayCard") return false;
-    return compareTrickCards(c.cardId, currentWinnerPlay.cardId, leadColor, trump) > 0;
-  });
+  // Lightweight partner-aware non-interference (L3: roleAwareness=true, sluffStrategy=false)
+  if (profile.roleAwareness && !profile.sluffStrategy && partnerIsWinning) {
+    const losingOptions = playCommands.filter((c) => {
+      if (c.type !== "PlayCard") return false;
+      return compareTrickCards(c.cardId, currentWinnerPlay.cardId, leadColor, trump) <= 0;
+    });
+    if (losingOptions.length > 0) {
+      return chooseLowestCard(losingOptions); // shed cheapest non-winning card
+    }
+    // No losing options — must win; fall through
+  }
+
+  // Trick-10 nest-contest aggression (L4/L5 via endgameCardAwareness >= 0.5)
+  if (
+    profile.endgameCardAwareness >= 0.5 &&
+    state.tricksPlayed === 9 &&
+    nestPointValue(state) > 15 &&
+    winningCommands.length > 0
+  ) {
+    const trumpWins = winningCommands.filter((c) => {
+      if (c.type !== "PlayCard") return false;
+      return trump !== null && trumpRank(c.cardId, trump) >= 0;
+    });
+    const candidates = trumpWins.length > 0 ? trumpWins : winningCommands;
+    return candidates.reduce((best, cmd) => {
+      if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+      const cmpPts = pointValue(cmd.cardId) - pointValue(best.cardId);
+      if (cmpPts !== 0) return cmpPts > 0 ? cmd : best;
+      return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+    });
+  }
 
   // ── Phase 4: ROOK burning avoidance (defending team, early game) ──────────
   if (profile.roleAwareness && profile.trumpManagement >= 0.7 && winningCommands.length > 0) {
