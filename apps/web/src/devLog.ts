@@ -110,26 +110,40 @@ export type BidSequenceEntry = {
   annotation: BiddingAnnotation | null;
 };
 
+export type BidAction = "place" | "pass" | "moon" | "forced";
+
+export type BidEvent = {
+  seat: Seat;
+  isHuman: boolean;
+  action: BidAction;
+  amount: number | null;        // null for pass/forced-pass
+  standingBid: number;          // the current high bid at the moment this action is recorded
+  round: number;                // 1-based: increments when we wrap back to the dealer's seat
+  annotation: BiddingAnnotation | null;  // null for human and forced bids
+};
+
 export type HandLogEntry = {
   handNumber: number;
   timestamp: string;
   dealer: Seat;
   trump: Color;
   botDifficulties: Partial<Record<Seat, BotDifficulty>>;
-  bidSequence: BidSequenceEntry[];
+  auctionEvents: BidEvent[];         // chronological real-time events
+  auctionRounds: number;             // derived from auctionEvents
+  bidSummary: BidSequenceEntry[];    // renamed from bidSequence
   finalBidder: Seat;
   finalBidAmount: number;
   moonAttempted: boolean;
   moonMade: boolean;
   nestCards: CardId[];
-  discardedCards: CardId[];
-  bidWinnerDiscards: CardId[];  // clearer alias for discardedCards
+  bidWinnerDiscards: CardId[];
   startingHands: Record<Seat, CardId[]>;
   discardAnnotations: DiscardAnnotation[];
   trumpAnnotation: TrumpAnnotation | null;
   tricks: TrickLog[];
   score: import("@rook/engine").HandScore;
   scoresAfter: { NS: number; EW: number };
+  scoresBefore: { NS: number; EW: number };  // cumulative scores at hand start
   durationMs: number;
 };
 
@@ -152,10 +166,18 @@ export class GameLogger {
   private pendingAnnotations: BotDecisionAnnotation[] = [];
   private handStartedAt: number = Date.now();
   private startingHands: Record<Seat, CardId[]> = { N: [], E: [], S: [], W: [] };
+  private pendingBidEvents: BidEvent[] = [];
+  private scoresBefore: { NS: number; EW: number } = { NS: 0, EW: 0 };
+  private bidRound: number = 1;
+  private firstBidderThisRound: Seat | null = null;
 
   onHandStart(timestamp: number, gameState: GameState): void {
     this.handStartedAt = timestamp;
     this.pendingAnnotations = [];
+    this.pendingBidEvents = [];
+    this.bidRound = 1;
+    this.firstBidderThisRound = null;
+    this.scoresBefore = { NS: gameState.scores.NS, EW: gameState.scores.EW };
     // Deep-copy all 4 players' starting hands at deal time
     this.startingHands = {
       N: [...(gameState.hands.N ?? [])],
@@ -169,11 +191,24 @@ export class GameLogger {
     this.pendingAnnotations.push(annotation);
   }
 
+  onBidEvent(event: BidEvent): void {
+    // Round tracking: increment when the first bidder's seat repeats
+    if (this.firstBidderThisRound === null) {
+      this.firstBidderThisRound = event.seat;
+    } else if (event.seat === this.firstBidderThisRound) {
+      this.bidRound++;
+    }
+    // Override round on the event before pushing
+    const withRound: BidEvent = { ...event, round: this.bidRound };
+    this.pendingBidEvents.push(withRound);
+  }
+
   onHandComplete(gameState: GameState): void {
     const entry = this._buildHandLogEntry(gameState);
     this._printHandSummary(entry);
     this.log.push(entry);
     this.pendingAnnotations = [];
+    this.pendingBidEvents = [];
   }
 
   getLog(): HandLogEntry[] {
@@ -183,6 +218,9 @@ export class GameLogger {
   clearLog(): void {
     this.log = [];
     this.pendingAnnotations = [];
+    this.pendingBidEvents = [];
+    this.bidRound = 1;
+    this.firstBidderThisRound = null;
   }
 
   downloadLog(): void {
@@ -231,8 +269,8 @@ export class GameLogger {
       };
     });
 
-    // Build bid sequence
-    const bidSequence: BidSequenceEntry[] = [];
+    // Build bid summary
+    const bidSummary: BidSequenceEntry[] = [];
     for (const seat of SEAT_ORDER) {
       const bid = gameState.bids[seat];
       if (bid === null) continue;
@@ -243,7 +281,7 @@ export class GameLogger {
       const annotation = this.pendingAnnotations.find(
         (a): a is BiddingAnnotation => a.phase === "bidding" && a.seat === seat,
       ) ?? null;
-      bidSequence.push({
+      bidSummary.push({
         seat,
         bid: bidValue,
         isHuman: isHuman ?? false,
@@ -275,13 +313,16 @@ export class GameLogger {
       dealer: gameState.dealer,
       trump: gameState.trump ?? "Black",
       botDifficulties,
-      bidSequence,
+      auctionEvents: this.pendingBidEvents,
+      auctionRounds: this.pendingBidEvents.length > 0
+        ? Math.max(...this.pendingBidEvents.map((e) => e.round))
+        : 0,
+      bidSummary,
       finalBidder: score.bidder,
       finalBidAmount: score.bidAmount,
       moonAttempted: score.shotMoon,
       moonMade: score.shotMoon && !score.moonShooterWentSet,
       nestCards: score.nestCards,
-      discardedCards: score.discarded,
       bidWinnerDiscards: score.discarded,
       startingHands: { ...this.startingHands },
       discardAnnotations,
@@ -289,12 +330,13 @@ export class GameLogger {
       tricks,
       score,
       scoresAfter: { NS: gameState.scores.NS, EW: gameState.scores.EW },
+      scoresBefore: { ...this.scoresBefore },
       durationMs,
     };
   }
 
   private _printHandSummary(entry: HandLogEntry): void {
-    const { handNumber, dealer, trump, bidSequence, tricks, score, scoresAfter, durationMs } = entry;
+    const { handNumber, dealer, trump, bidSummary, tricks, score, scoresAfter, durationMs } = entry;
 
     const isTrumpCard = (cardId: CardId): boolean => {
       if (cardId === "ROOK") return true;
@@ -310,20 +352,20 @@ export class GameLogger {
     };
 
     // Bidding line
-    const bidParts = bidSequence.map((entry) => {
-      const seatLabel = `${entry.seat}`;
-      const diffLabel = entry.isHuman
+    const bidParts = bidSummary.map((bidEntry) => {
+      const seatLabel = `${bidEntry.seat}`;
+      const diffLabel = bidEntry.isHuman
         ? ""
-        : entry.annotation
-          ? `(${DIFFICULTY_LABELS[entry.annotation.difficulty]})`
+        : bidEntry.annotation
+          ? `(${DIFFICULTY_LABELS[bidEntry.annotation.difficulty]})`
           : "";
-      const label = entry.isHuman ? `${seatLabel}(you)` : `${seatLabel}${diffLabel}`;
-      const bidStr = entry.bid === "moon" ? "MOON" : entry.bid === "pass" ? "pass" : String(entry.bid);
+      const label = bidEntry.isHuman ? `${seatLabel}(you)` : `${seatLabel}${diffLabel}`;
+      const bidStr = bidEntry.bid === "moon" ? "MOON" : bidEntry.bid === "pass" ? "pass" : String(bidEntry.bid);
 
-      if (entry.isHuman || !entry.annotation) {
+      if (bidEntry.isHuman || !bidEntry.annotation) {
         return `${label}: ${bidStr}`;
       }
-      const ann = entry.annotation;
+      const ann = bidEntry.annotation;
       const bonusStr = ann.partnerCeilingBonus > 0 ? ` +${ann.partnerCeilingBonus}` : " +0";
       return `${label}: ${bidStr} [est:${Math.round(ann.estimatedHandValue)} ceil:${ann.ceiling}${bonusStr}]`;
     });
@@ -335,7 +377,7 @@ export class GameLogger {
 
     // Nest/discard line
     const nestStr = entry.nestCards.join(" ");
-    const discardStr = entry.discardedCards.join(" ");
+    const discardStr = entry.bidWinnerDiscards.join(" ");
 
     // Tricks lines
     const trickLines = tricks.map((trick) => {
@@ -351,8 +393,8 @@ export class GameLogger {
     });
 
     // Score lines
-    const nsWasScore = scoresAfter.NS - score.nsDelta;
-    const ewWasScore = scoresAfter.EW - score.ewDelta;
+    const nsWasScore = entry.scoresBefore.NS;
+    const ewWasScore = entry.scoresBefore.EW;
     const nsSet = score.nsDelta < 0;
     const ewSet = score.ewDelta < 0;
     const nsDeltaStr = nsSet
@@ -373,6 +415,8 @@ export class GameLogger {
     );
     console.log(`  Bidding:  ${bidParts.join("  |  ")}`);
     console.log(`            → ${entry.finalBidder} bid ${entry.finalBidAmount}${entry.moonAttempted ? " (MOON)" : ""}`);
+    console.log(`  Auction: ${entry.auctionRounds} round(s), ${entry.auctionEvents.length} actions`);
+    console.log(`  Scores before: NS ${entry.scoresBefore.NS}  EW ${entry.scoresBefore.EW}`);
 
     // Starting hands section
     const startingHandsLines = SEAT_ORDER.map((seat) => {
@@ -407,6 +451,7 @@ export function registerLogger(): void {
     onBotDecision: (a) => gameLogger.onBotDecision(a),
     onHandComplete: (gs) => gameLogger.onHandComplete(gs),
     onHandStart: (ts, gs) => gameLogger.onHandStart(ts, gs),
+    onBidEvent: (e) => gameLogger.onBidEvent(e),
   });
   (window as Window & { __rookLog?: RookLogAPI }).__rookLog = {
     getLog: () => gameLogger.getLog(),

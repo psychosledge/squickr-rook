@@ -15,7 +15,7 @@ import {
   cardFromId,
 } from "@rook/engine";
 import type { GameCommand, GameEvent, GameState, GameRules, Seat, BotProfile, CardId } from "@rook/engine";
-import type { BotDecisionAnnotation, BiddingAnnotation, DiscardAnnotation, TrumpAnnotation, PlayAnnotation, PlayReason } from "../devLog";
+import type { BotDecisionAnnotation, BiddingAnnotation, DiscardAnnotation, TrumpAnnotation, PlayAnnotation, PlayReason, BidAction, BidEvent } from "../devLog";
 import { getSeatLabel } from "@/utils/seatLabel";
 
 const HUMAN_SEAT: Seat = "N";
@@ -221,10 +221,30 @@ function _botChooseCommandWithLog(
 ): GameCommand {
   const command = botChooseCommand(state, seat, profile);
   const cb = storeState._devOnBotDecision;
-  if (!cb) return command;
 
   const annotation = _buildAnnotation(state, seat, profile, command);
-  if (annotation) cb(annotation);
+  if (cb && annotation) cb(annotation);
+
+  // Fire bid event for bidding-phase commands
+  const bidCb = storeState._devOnBidEvent;
+  if (bidCb && state.phase === "bidding") {
+    const action: BidAction =
+      command.type === "PlaceBid" ? "place"
+      : command.type === "ShootMoon" ? "moon"
+      : "pass";
+    const amount = command.type === "PlaceBid" ? command.amount : null;
+    const bidEvent: BidEvent = {
+      seat,
+      isHuman: false,
+      action,
+      amount,
+      standingBid: state.currentBid,
+      round: 1, // placeholder — GameLogger.onBidEvent will override
+      annotation: annotation?.phase === "bidding" ? annotation : null,
+    };
+    bidCb(bidEvent);
+  }
+
   return command;
 }
 
@@ -246,6 +266,7 @@ export const useGameStore = create<AppStore>((set, get) => ({
   _devOnBotDecision: undefined,
   _devOnHandComplete: undefined,
   _devOnHandStart: undefined,
+  _devOnBidEvent: undefined,
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -319,6 +340,18 @@ export const useGameStore = create<AppStore>((set, get) => ({
         if (ev.type === "HandScored") {
           pendingHandScore = ev.score;
           s._devOnHandComplete?.(gs);
+        }
+        if (ev.type === "BiddingComplete" && ev.forced && s._devOnBidEvent) {
+          const forcedBidEvent: BidEvent = {
+            seat: ev.winner,
+            isHuman: gs.players.find((p) => p.seat === ev.winner)?.kind === "human",
+            action: "forced",
+            amount: ev.amount,
+            standingBid: ev.amount,
+            round: 1, // placeholder — GameLogger.onBidEvent will override
+            annotation: null,
+          };
+          s._devOnBidEvent(forcedBidEvent);
         }
         if (ev.type === "GameFinished") gameOverReason = ev.reason;
         const next = buildAnnouncementFromEvent(ev, gs.rules);
@@ -518,6 +551,19 @@ export const useGameStore = create<AppStore>((set, get) => ({
       console.warn("Illegal PlaceBid:", result.error);
       return;
     }
+    const bidCb = get()._devOnBidEvent;
+    if (bidCb) {
+      const bidEvent: BidEvent = {
+        seat: HUMAN_SEAT,
+        isHuman: true,
+        action: "place",
+        amount,
+        standingBid: gameState.currentBid,
+        round: 1, // placeholder — GameLogger.onBidEvent will override
+        annotation: null,
+      };
+      bidCb(bidEvent);
+    }
     get()._applyEvents(result.events);
     set({ biddingThinkingSeat: null });
     get()._scheduleNextTurn();
@@ -535,6 +581,19 @@ export const useGameStore = create<AppStore>((set, get) => ({
       console.warn("Illegal PassBid:", result.error);
       return;
     }
+    const bidCb = get()._devOnBidEvent;
+    if (bidCb) {
+      const bidEvent: BidEvent = {
+        seat: HUMAN_SEAT,
+        isHuman: true,
+        action: "pass",
+        amount: null,
+        standingBid: gameState.currentBid,
+        round: 1, // placeholder — GameLogger.onBidEvent will override
+        annotation: null,
+      };
+      bidCb(bidEvent);
+    }
     get()._applyEvents(result.events);
     set({ biddingThinkingSeat: null });
     get()._scheduleNextTurn();
@@ -551,6 +610,19 @@ export const useGameStore = create<AppStore>((set, get) => ({
     if (!result.ok) {
       console.warn("Illegal ShootMoon:", result.error);
       return;
+    }
+    const bidCb = get()._devOnBidEvent;
+    if (bidCb) {
+      const bidEvent: BidEvent = {
+        seat: HUMAN_SEAT,
+        isHuman: true,
+        action: "moon",
+        amount: null,
+        standingBid: gameState.currentBid,
+        round: 1, // placeholder — GameLogger.onBidEvent will override
+        annotation: null,
+      };
+      bidCb(bidEvent);
     }
     get()._applyEvents(result.events);
     set({ biddingThinkingSeat: null });
@@ -650,5 +722,6 @@ export const useGameStore = create<AppStore>((set, get) => ({
     _devOnBotDecision: callbacks.onBotDecision,
     _devOnHandComplete: callbacks.onHandComplete,
     _devOnHandStart: callbacks.onHandStart,
+    _devOnBidEvent: callbacks.onBidEvent,
   }),
 }));

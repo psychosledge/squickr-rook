@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { GameLogger } from "./devLog";
+import type { BidEvent } from "./devLog";
 import type { GameState, Seat, CardId } from "@rook/engine";
 import { DEFAULT_RULES, BOT_PRESETS } from "@rook/engine";
 
@@ -148,5 +149,232 @@ describe("GameLogger — startingHands", () => {
     logger.onHandComplete(completedGs);
     const log = logger.getLog();
     expect(log).toHaveLength(1);
+  });
+});
+
+describe("GameLogger — bidSummary (renamed from bidSequence)", () => {
+  it("bidSummary is present on HandLogEntry", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    expect(entry.bidSummary).toBeDefined();
+    expect(Array.isArray(entry.bidSummary)).toBe(true);
+  });
+
+  it("bidSummary contains entries for seats with non-null bids", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    // N=100, E="pass", S="pass", W="pass" — all 4 bids are non-null
+    expect(entry.bidSummary.length).toBe(4);
+    const nEntry = entry.bidSummary.find((b) => b.seat === "N");
+    expect(nEntry).toBeDefined();
+    expect(nEntry!.bid).toBe(100);
+  });
+});
+
+describe("GameLogger — auctionEvents", () => {
+  it("auctionEvents is empty array when no onBidEvent calls", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    expect(entry.auctionEvents).toEqual([]);
+    expect(entry.auctionRounds).toBe(0);
+  });
+
+  it("onBidEvent appends to auctionEvents", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+    const event: BidEvent = {
+      seat: "N",
+      isHuman: true,
+      action: "place",
+      amount: 100,
+      standingBid: 95,
+      round: 1,
+      annotation: null,
+    };
+    logger.onBidEvent(event);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    expect(entry.auctionEvents).toHaveLength(1);
+    expect(entry.auctionEvents[0]!.seat).toBe("N");
+    expect(entry.auctionEvents[0]!.action).toBe("place");
+    expect(entry.auctionEvents[0]!.amount).toBe(100);
+  });
+
+  it("onBidEvent round tracking increments on seat wrap", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+
+    // Emit N(round 1), E(round 1), S(round 1), W(round 1), then N again → should be round 2
+    const makeEvent = (seat: Seat): BidEvent => ({
+      seat,
+      isHuman: false,
+      action: "place",
+      amount: 100,
+      standingBid: 95,
+      round: 1, // placeholder — will be overridden
+      annotation: null,
+    });
+
+    logger.onBidEvent(makeEvent("N"));
+    logger.onBidEvent(makeEvent("E"));
+    logger.onBidEvent(makeEvent("S"));
+    logger.onBidEvent(makeEvent("W"));
+    logger.onBidEvent(makeEvent("N")); // wraps back → round 2
+
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+
+    expect(entry.auctionEvents).toHaveLength(5);
+    // First 4 events should be round 1
+    expect(entry.auctionEvents[0]!.round).toBe(1);
+    expect(entry.auctionEvents[1]!.round).toBe(1);
+    expect(entry.auctionEvents[2]!.round).toBe(1);
+    expect(entry.auctionEvents[3]!.round).toBe(1);
+    // 5th event (N again) should be round 2
+    expect(entry.auctionEvents[4]!.round).toBe(2);
+    expect(entry.auctionRounds).toBe(2);
+  });
+
+  it("auctionRounds is derived as max round from auctionEvents", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+
+    // 3 full rounds: N,E,S,W,N,E,S,W,N,E,S,W
+    const makeEvent = (seat: Seat): BidEvent => ({
+      seat,
+      isHuman: false,
+      action: "pass",
+      amount: null,
+      standingBid: 100,
+      round: 1,
+      annotation: null,
+    });
+    for (let i = 0; i < 3; i++) {
+      logger.onBidEvent(makeEvent("N"));
+      logger.onBidEvent(makeEvent("E"));
+      logger.onBidEvent(makeEvent("S"));
+      logger.onBidEvent(makeEvent("W"));
+    }
+
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    expect(entry.auctionRounds).toBe(3);
+  });
+
+  it("round tracking is correct when auction starts at W (non-N dealer)", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+
+    const makeEvent = (seat: Seat): BidEvent => ({
+      seat,
+      isHuman: false,
+      action: "pass",
+      amount: null,
+      standingBid: 100,
+      round: 1, // placeholder — will be overridden
+      annotation: null,
+    });
+
+    // W → N → E → S → W (second time) = round 2 for the second W
+    logger.onBidEvent(makeEvent("W")); // round 1 (first bidder)
+    logger.onBidEvent(makeEvent("N")); // round 1
+    logger.onBidEvent(makeEvent("E")); // round 1
+    logger.onBidEvent(makeEvent("S")); // round 1
+    logger.onBidEvent(makeEvent("W")); // round 2 (first bidder seen again)
+
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+
+    expect(entry.auctionEvents[0]!.round).toBe(1); // W
+    expect(entry.auctionEvents[1]!.round).toBe(1); // N
+    expect(entry.auctionEvents[2]!.round).toBe(1); // E
+    expect(entry.auctionEvents[3]!.round).toBe(1); // S
+    expect(entry.auctionEvents[4]!.round).toBe(2); // W again = new round
+    expect(entry.auctionRounds).toBe(2);
+  });
+});
+
+describe("GameLogger — scoresBefore", () => {
+  it("scoresBefore is captured from onHandStart gameState", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState({ scores: { NS: 150, EW: -50 } });
+    logger.onHandStart(1000, gs);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    expect(entry.scoresBefore).toEqual({ NS: 150, EW: -50 });
+  });
+
+  it("scoresBefore defaults to NS:0 EW:0 when scores are zero", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState({ scores: { NS: 0, EW: 0 } });
+    logger.onHandStart(1000, gs);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    expect(entry.scoresBefore).toEqual({ NS: 0, EW: 0 });
+  });
+});
+
+describe("GameLogger — discardedCards removed", () => {
+  it("discardedCards is not present on HandLogEntry", () => {
+    const logger = new GameLogger();
+    const gs = makeMinimalState();
+    logger.onHandStart(1000, gs);
+    const completedGs = makeStateWithHandHistory();
+    logger.onHandComplete(completedGs);
+    const entry = logger.getLog()[0]!;
+    // @ts-expect-error — discardedCards should not exist on HandLogEntry
+    expect(entry.discardedCards).toBeUndefined();
+  });
+});
+
+describe("GameLogger — pendingBidEvents reset between hands", () => {
+  it("auctionEvents from previous hand do not bleed into next hand", () => {
+    const logger = new GameLogger();
+
+    // First hand with a bid event
+    const gs1 = makeMinimalState();
+    logger.onHandStart(1000, gs1);
+    logger.onBidEvent({
+      seat: "N",
+      isHuman: true,
+      action: "place",
+      amount: 100,
+      standingBid: 95,
+      round: 1,
+      annotation: null,
+    });
+    logger.onHandComplete(makeStateWithHandHistory());
+
+    // Second hand — no bid events
+    const gs2 = makeMinimalState({ handNumber: 2 });
+    logger.onHandStart(2000, gs2);
+    logger.onHandComplete(makeStateWithHandHistory());
+
+    const log = logger.getLog();
+    expect(log).toHaveLength(2);
+    expect(log[0]!.auctionEvents).toHaveLength(1);
+    expect(log[1]!.auctionEvents).toHaveLength(0);
   });
 });

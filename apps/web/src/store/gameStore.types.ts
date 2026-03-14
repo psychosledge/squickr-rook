@@ -1,5 +1,5 @@
 import type { GameState, GameEvent, CardId, Color, BotDifficulty, HandScore, Seat } from "@rook/engine";
-import type { BotDecisionAnnotation } from "../devLog";
+import type { BotDecisionAnnotation, BidEvent } from "../devLog";
 
 export type OverlayKind = "none" | "bidding" | "nest" | "trump" | "hand-result" | "game-over";
 
@@ -18,6 +18,7 @@ export type AppState = {
   _devOnBotDecision: ((annotation: BotDecisionAnnotation) => void) | undefined;
   _devOnHandComplete: ((gameState: GameState) => void) | undefined;
   _devOnHandStart: ((timestamp: number, gameState: GameState) => void) | undefined;
+  _devOnBidEvent: ((event: BidEvent) => void) | undefined;
 };
 
 export type AppActions = {
@@ -43,6 +44,7 @@ export type AppActions = {
     onBotDecision: (annotation: BotDecisionAnnotation) => void;
     onHandComplete: (gameState: GameState) => void;
     onHandStart: (timestamp: number, gameState: GameState) => void;
+    onBidEvent: (event: BidEvent) => void;
   }) => void;
 };
 
