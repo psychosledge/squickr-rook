@@ -290,11 +290,12 @@ export const useGameStore = create<AppStore>((set, get) => ({
       timestamp: Date.now(),
     };
 
-    const newState = applyEvent(INITIAL_STATE, gameStartedEvent);
-
+    // Reset all non-gameState fields first. gameState is set to null so that
+    // _applyEvents picks up INITIAL_STATE as its base (via the ?? fallback).
+    // eventLog is cleared here so _applyEvents doesn't append to stale history.
     set({
-      gameState: newState,
-      eventLog: [gameStartedEvent],
+      gameState: null,
+      eventLog: [],
       overlay: "none",
       pendingDiscards: [],
       pendingHandScore: null,
@@ -305,6 +306,10 @@ export const useGameStore = create<AppStore>((set, get) => ({
       historyModalOpen: false,
       biddingThinkingSeat: null,
     });
+
+    // Route through _applyEvents so all dev callbacks (including _devOnHandStart
+    // for Hand 0) fire via the same path as every subsequent hand.
+    get()._applyEvents([gameStartedEvent]);
 
     get()._scheduleNextTurn();
   },
@@ -334,6 +339,9 @@ export const useGameStore = create<AppStore>((set, get) => ({
       let gameOverReason = s.gameOverReason;
       for (const ev of events) {
         gs = applyEvent(gs, ev);
+        if (ev.type === "GameStarted") {
+          s._devOnHandStart?.(ev.timestamp, gs);
+        }
         if (ev.type === "HandStarted") {
           s._devOnHandStart?.(ev.timestamp, gs);
         }
