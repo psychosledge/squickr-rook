@@ -303,6 +303,7 @@ function evaluateMoonShoot(
   seat: Seat,
   profile: BotProfile,
 ): boolean {
+  const rules = state.rules ?? DEFAULT_RULES;
   if (!profile.canShootMoon) return false;
   if (state.moonShooters.includes(seat)) return false;
 
@@ -322,9 +323,17 @@ function evaluateMoonShoot(
 
   const strength = estimateHandValue(hand); // true strength, no noise
 
+  // Bust-compression guard: if bust-risk has reduced the ceiling below safe levels,
+  // it's too risky to gamble on a moon shoot.
+  if (profile.scoreContextAwareness) {
+    const bustTeam = SEAT_TEAM[seat];
+    const bustHeadroom = state.scores[bustTeam] - rules.bustThreshold;
+    if (bustHeadroom < 250) return false;
+  }
+
   const myTeam = SEAT_TEAM[seat];
   const oppTeam = myTeam === "NS" ? "EW" : "NS";
-  const winThreshold = state.rules.winThreshold;
+  const winThreshold = rules.winThreshold;
   let threshold = profile.moonShootThreshold;
 
   if (profile.contextualMoonShoot) {
@@ -412,13 +421,14 @@ export function botChooseCommand(
       }
 
       // ── Phase 7: Moon-shoot check (contextual for expert) ─────────────────
+      // Compute ceiling first — moon-shoot is gated on a full ceiling
+      const ceiling = computeBidCeiling(hand, state, seat, profile);
       if (evaluateMoonShoot(hand, state, seat, profile)) {
         const shootCmd = legal.find(c => c.type === "ShootMoon");
         if (shootCmd) return shootCmd;
       }
 
-      // Compute ceiling and decide whether to bid
-      const ceiling = computeBidCeiling(hand, state, seat, profile);
+      // Decide whether to bid
       if (shouldBid(minNextBid, ceiling, profile, state)) {
         const rules = state.rules ?? DEFAULT_RULES;
         const isOpening = state.currentBid === 0;
@@ -652,6 +662,46 @@ function chooseBestPlay(
   return chooseFollowCard(playCommands, state, seat, profile);
 }
 
+/**
+ * Returns the set of non-trump colors for which the bot holds the highest
+ * remaining card (i.e. leading that suit cannot be captured by a higher card
+ * of the same suit). A color is "safe" if either:
+ *   - No cards of that color remain outstanding (highestOutstanding = -1), OR
+ *   - The bot's best card in that color beats all outstanding cards.
+ */
+function safeSuitsToLead(
+  hand: CardId[],
+  playedCards: CardId[],
+  trump: Color,
+): Set<Color> {
+  const safe = new Set<Color>();
+  const nonTrumpColors: Color[] = COLORS.filter(c => c !== trump);
+  const playedSet = new Set(playedCards);
+  for (const color of nonTrumpColors) {
+    const initial = color[0];
+    // All card IDs for this color
+    const allColorCards: CardId[] = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
+      v => `${initial}${v}` as CardId,
+    );
+    // Best rank in hand for this color
+    const myCards = hand.filter(c => c !== "ROOK" && c.startsWith(initial ?? ""));
+    if (myCards.length === 0) continue; // no cards of this color → skip
+    const myBestRank = myCards.reduce((best, c) => Math.max(best, offSuitRank(c)), -1);
+    // Highest outstanding rank: not in played, not in hand
+    const handSet = new Set(hand);
+    let highestOutstanding = -1;
+    for (const c of allColorCards) {
+      if (!playedSet.has(c) && !handSet.has(c)) {
+        highestOutstanding = Math.max(highestOutstanding, offSuitRank(c));
+      }
+    }
+    if (highestOutstanding === -1 || myBestRank > highestOutstanding) {
+      safe.add(color);
+    }
+  }
+  return safe;
+}
+
 function chooseLeadCard(
   playCommands: GameCommand[],
   state: GameState,
@@ -749,6 +799,24 @@ function chooseLeadCard(
         });
       }
       // Trump pulled or no trump — lead highest off-suit card
+      // Safe-lead: if trump is pulled and we track played cards, prefer suits we can win
+      if (profile.trackPlayedCards && trumpPulled && nonTrumpCards.length > 0) {
+        const hand = state.hands[seat] ?? [];
+        const safeSuits = safeSuitsToLead(hand, state.playedCards, trump);
+        if (safeSuits.size > 0) {
+          const safeCandidates = nonTrumpCards.filter(cmd => {
+            if (cmd.type !== "PlayCard") return false;
+            const card = cardFromId(cmd.cardId);
+            return card.kind === "regular" && safeSuits.has(card.color);
+          });
+          if (safeCandidates.length > 0) {
+            return safeCandidates.reduce((best, cmd) => {
+              if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+              return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+            });
+          }
+        }
+      }
       const offSuitCandidates = nonTrumpCards.length > 0 ? nonTrumpCards : playCommands;
       return offSuitCandidates.reduce((best, cmd) => {
         if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;

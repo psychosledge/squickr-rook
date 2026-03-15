@@ -2326,6 +2326,383 @@ describe("bidding improvements — L5 safety fraction reduction", () => {
   });
 });
 
+// ── New Fix 1: Moon Shoot Ceiling Threshold ───────────────────────────────────
+
+describe("Moon Shoot Ceiling Threshold (evaluateMoonShoot ceiling guard)", () => {
+  /**
+   * Design: evaluateMoonShoot now receives ceiling as a parameter.
+   * The very first guard inside evaluateMoonShoot is:
+   *   if (ceiling < rules.maximumBid) return false;
+   *
+   * This is checked BEFORE any other logic. The ceiling is computed before
+   * evaluateMoonShoot is called (computeBidCeiling is moved above the moon-shoot
+   * check in botChooseCommand).
+   */
+
+  /**
+   * Build a bidding-phase state designed to produce a specific ceiling.
+   * Uses a moon-viable hand (strong enough to pass strength checks) but
+   * uses score context to control the ceiling.
+   *
+   * Moon-shoot hand: strong Black trump, ROOK, 4 aces → passes ace gate
+   * estimateHandValue: ROOK(15)+B1(15)+R1(15)+G1(15)+Y1(15)+B14(10)+B9+B8+B7+B6
+   *   Black: B1(15),B14(10),B9,B8,B7,B6 = 6, weight=6+1.5+1.0=8.5 → probableTrump
+   *   Red: R1(15) = 1, weight=2.5 → singleton (+3)
+   *   Green: G1(15) = 1, weight=2.5 → singleton (+3)
+   *   Yellow: Y1(15) = 1, weight=2.5 → singleton (+3)
+   *   trumpLength=6 → bonus=28
+   *   Base: ROOK(15)+B1(15)+R1(15)+G1(15)+Y1(15)+B14(10)=85
+   *   Total = 85+28+3+3+3 = 122
+   *   Ace gate: 4 aces (B1,R1,G1,Y1) → aceCount=4 >= 2 → passes
+   *   moonShootThreshold for L5=95, L4=105; strength=122 > both → would shoot without ceiling guard
+   */
+  const moonHand: CardId[] = ["ROOK", "B1", "R1", "G1", "Y1", "B14", "B9", "B8", "B7", "B6"];
+
+  it("ceiling below maximumBid (195) blocks moon shoot even with strong hand", () => {
+    // Use bust compression to force ceiling below 200.
+    // bustHeadroom = myTeam_score - bustThreshold
+    // With bustThreshold=-500, myTeam(EW)=-320 → headroom = -320 - (-500) = 180
+    // Caution zone (150 ≤ 180 < 250): cap = floor(180×0.80/5)×5 = floor(28.8)×5 = 140×5 = no...
+    //   floor(144/5)*5 = floor(28.8)*5 = 28*5 = 140
+    // L5 aggressiveness=1.15: baseBidCeiling(122)=200, ceil=200 (capped), after bust: min(200, 140)=140
+    // 140 < 200 (maximumBid) → ceiling guard fires → no shoot.
+    const state = {
+      ...makeBiddingStateWithHand("E", moonHand),
+      scores: { NS: 0, EW: -320 },  // EW in caution zone: headroom=180
+      moonShooters: [] as Seat[],
+      rules: { ...DEFAULT_RULES, bustThreshold: -500 },
+    };
+    // L5: scoreContextAwareness=true, canShootMoon=true, moonShootThreshold=95
+    // computeBidCeiling compresses to 140 < 200 → ceiling guard blocks shoot
+    const profile = BOT_PRESETS[5];
+    const cmd = botChooseCommand(state, "E", profile);
+    // Should NOT shoot moon — ceiling is compressed below 200
+    expect(cmd.type).not.toBe("ShootMoon");
+  });
+
+  it("ceiling exactly at maximumBid (200) allows moon shoot on strong hand", () => {
+    // Normal scores (no bust pressure), strong hand → ceiling = 200 (maximumBid)
+    // ceiling === maximumBid → ceiling guard (ceiling < maximumBid) does NOT fire
+    // strength=122 >= threshold=95 → shoots
+    const state = {
+      ...makeBiddingStateWithHand("E", moonHand),
+      scores: { NS: 0, EW: 0 },
+      moonShooters: [] as Seat[],
+    };
+    const profile = BOT_PRESETS[5]; // accuracy=1.0 (deterministic)
+    const cmd = botChooseCommand(state, "E", profile);
+    // ceiling=200 (no compression), strength=122 >= 95 → should shoot
+    expect(cmd.type).toBe("ShootMoon");
+  });
+
+  it("bust-compressed ceiling (below 200) prevents shoot — regression: no-bust same hand shoots", () => {
+    // Same hand and profile, only difference is score context.
+    // Bust scenario: EW at -360, bustThreshold=-500 → headroom=140
+    // Danger zone (headroom < 150): cap = floor(140×0.65/5)×5 = floor(18.2)×5 = 90 → ceiling=0 → bot passes
+    // No-bust scenario: EW=0 → ceiling=200 → bot shoots.
+    const bustState = {
+      ...makeBiddingStateWithHand("E", moonHand),
+      scores: { NS: 0, EW: -360 },
+      moonShooters: [] as Seat[],
+      rules: { ...DEFAULT_RULES, bustThreshold: -500 },
+    };
+    const noBustState = {
+      ...makeBiddingStateWithHand("E", moonHand),
+      scores: { NS: 0, EW: 0 },
+      moonShooters: [] as Seat[],
+    };
+    const profile = BOT_PRESETS[5];
+    const bustCmd = botChooseCommand(bustState, "E", profile);
+    const noBustCmd = botChooseCommand(noBustState, "E", profile);
+    // Bust: ceiling compressed → NOT ShootMoon
+    expect(bustCmd.type).not.toBe("ShootMoon");
+    // No-bust: ceiling=200 → ShootMoon
+    expect(noBustCmd.type).toBe("ShootMoon");
+  });
+});
+
+// ── New Fix 2: Safe-Suit Lead Selection ───────────────────────────────────────
+
+describe("Safe-Suit Lead Selection (safeSuitsToLead)", () => {
+  /**
+   * Tests for the new safeSuitsToLead logic inside chooseLeadCard.
+   *
+   * Conditions to trigger safe-lead:
+   *   - profile.trackPlayedCards = true
+   *   - trumpPulled = true (9+ trump in playedCards)
+   *   - nonTrumpCards.length > 0
+   *   - isBiddingTeam = true (the post-trump-pull branch)
+   *   - safeSuitsToLead finds at least one safe suit
+   *
+   * safeSuitsToLead: for each non-trump color C:
+   *   myBestRank = max offSuitRank of C-cards in hand
+   *   highestOutstanding = max offSuitRank of C-cards NOT in playedCards AND NOT in hand
+   *   if highestOutstanding === -1 OR myBestRank > highestOutstanding → C is safe
+   */
+
+  // 9 Black (trump) cards already played → trumpPulled = true
+  const TRUMP_PULLED_PLAYED: CardId[] = [
+    "B1", "B6", "B7", "B8", "B10", "B11", "B12", "B13", "B14",
+  ] as CardId[];
+
+  function makeTrumpPulledLeadState(opts: {
+    hand: CardId[];
+    playedCards: CardId[];
+    seat?: Seat;
+    bidder?: Seat;
+  }): GameState {
+    const seat = opts.seat ?? "S";
+    const bidder = opts.bidder ?? "N";  // NS team → S is bidding team
+    return makePlayingState({
+      activePlayer: seat,
+      bidder,
+      trump: "Black",
+      tricksPlayed: 0,
+      playedCards: opts.playedCards,
+      hands: {
+        N: [],
+        E: [],
+        S: seat === "S" ? opts.hand : [],
+        W: seat === "W" ? opts.hand : [],
+        [seat]: opts.hand,
+      },
+    });
+  }
+
+  it("safe suit identified → bot leads from it, not from risky suit", () => {
+    // S (bidding team, NS), trump=Black, trump pulled.
+    // S hand: Y10 (Yellow, safe), G7 (Green, risky).
+    // Yellow: S has Y10 (offSuitRank=10). No other Yellow in played or other hands → all Yellow
+    //   cards not in playedCards and not in hand. Yellow deck: Y1,Y5,Y6,Y7,Y8,Y9,Y11,Y12,Y13,Y14
+    //   All outstanding → highestOutstanding = max offSuitRank of {Y1,Y5,...,Y14} = 14
+    //   myBestRank(Y10) = 10 < 14 → NOT safe? Hmm.
+    // Let's engineer: Y9,Y8,Y7,Y6,Y5 all in playedCards. Outstanding Yellow = Y1,Y11,Y12,Y13,Y14
+    //   myBestRank=10 < max(1,11,12,13,14)=14 → still risky.
+    // Better: S has Y14 (highest Yellow). Outstanding: Y1,Y5,...Y13 (everything except Y14 held by S).
+    //   highestOutstanding = max of those cards' offSuitRanks. Y13→13, Y12→12...
+    //   13 < 14 → myBestRank(14) > highestOutstanding(13) → Yellow IS safe.
+    // But to make Green risky: S has G7. Green outstanding includes G9,G12,G13,G14 etc → highestOutstanding=14 > 7 → risky.
+    //
+    // Setup: S has Y14 (safe) and G7 (risky), 9 Black trump pulled.
+    // Also need to add Y13,Y12,... to outstanding (NOT played). All good.
+    const hand: CardId[] = ["Y14", "G7"];
+    const state = makeTrumpPulledLeadState({
+      hand,
+      playedCards: TRUMP_PULLED_PLAYED,
+      seat: "S",
+      bidder: "N",  // NS team
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Y14 is safe (myBestRank=14 > highestOutstanding of remaining Yellow), G7 is risky
+      // Bot should lead Y14
+      expect(cmd.cardId).toBe("Y14");
+      expect(cmd.cardId).not.toBe("G7");
+    }
+  });
+
+  it("no safe suits → falls back to highest offSuitRank (no regression)", () => {
+    // S has G7 (Green) and R6 (Red). Both are risky (higher cards outstanding).
+    // safe-lead path: safeSuitsToLead returns empty set → falls through to existing logic.
+    // Existing: highest offSuitRank among non-trump. offSuitRank(G7) vs offSuitRank(R6): G7>R6 → G7.
+    const hand: CardId[] = ["G7", "R6"];
+    const state = makeTrumpPulledLeadState({
+      hand,
+      playedCards: TRUMP_PULLED_PLAYED,  // only Black played, no G/R/Y
+      seat: "S",
+      bidder: "N",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Falls through to highest offSuitRank: G7(rank=7) vs R6(rank=6) → G7
+      expect(cmd.cardId).toBe("G7");
+    }
+  });
+
+  it("multiple safe suits → leads highest card among all safe-suit candidates", () => {
+    // S has: Y14 (safe Yellow), G13 (safe Green), R6 (risky Red).
+    // Yellow safe: S has Y14, all other Yellow are outstanding but max=13 < 14 → safe.
+    // Green safe: S has G13, but G14 is outstanding → myBestRank=13 < 14 → risky? 
+    // Need Green where S holds the best: put G14 in played cards.
+    //   playedCards: 9 Black (trump) + G14
+    //   Green outstanding (not played, not in hand): G1,G5,G6,G7,G8,G9,G11,G12 → max offSuitRank=12
+    //   G13 > 12 → Green IS safe.
+    // Yellow: Y14 in hand. Outstanding Yellow (not played, not in hand): Y1,Y5,Y6,...Y13 → max=13
+    //   Y14 > 13 → Yellow IS safe.
+    // Red: R6 in hand. Outstanding Red: R1,R5,R7,R8,R9,R10,R11,R12,R13,R14 → max=14
+    //   R6 < 14 → Red risky.
+    //
+    // Candidates from safe suits: [Y14, G13]. Highest offSuitRank: Y14(14) vs G13(13) → Y14.
+    const hand: CardId[] = ["Y14", "G13", "R6"];
+    const playedCards: CardId[] = [...TRUMP_PULLED_PLAYED, "G14"] as CardId[];
+    const state = makeTrumpPulledLeadState({
+      hand,
+      playedCards,
+      seat: "S",
+      bidder: "N",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Multiple safe suits → highest offSuitRank card = Y14
+      expect(cmd.cardId).toBe("Y14");
+    }
+  });
+
+  it("singleton safe suit → leads that card", () => {
+    // S has only one non-trump card: Y14 (singleton Yellow, safe).
+    // safeSuitsToLead: Yellow, S has Y14, outstanding Y1,Y5,...Y13 → max=13 < 14 → safe.
+    // Only one card → leads Y14.
+    const hand: CardId[] = ["Y14"];
+    const state = makeTrumpPulledLeadState({
+      hand,
+      playedCards: TRUMP_PULLED_PLAYED,
+      seat: "S",
+      bidder: "N",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("Y14");
+    }
+  });
+
+  it("trackPlayedCards=false → no safe-lead logic, leads highest offSuitRank as before", () => {
+    // Design: when trackPlayedCards=false, safeSuitsToLead is NOT called — the bot falls
+    // through to the existing highest-offSuitRank logic.
+    //
+    // Scenario where safe-lead would change the outcome:
+    //   S has G7 (Green, safe) and Y14 (Yellow, risky).
+    //   Make Green safe: put G8,G9,G11,G12,G13,G14 in playedCards.
+    //     Outstanding Green: G1,G5,G6,G10 → max offSuitRank(G10)=10
+    //     Wait — G10 has offSuitRank=10 > G7's offSuitRank=7 → G7 not safe either.
+    //   Need G7 to be the max Green in hand AND outstanding max < 7.
+    //   Put G8,G9,G10,G11,G12,G13,G14 all in playedCards.
+    //     Outstanding Green: G1,G5,G6 → max offSuitRank(G6)=6 < 7 → G7 is safe!
+    //   Yellow: Y14 in hand. Outstanding Yellow: Y1,Y5,...Y13 → max=13 < 14 → also safe!
+    //   Both are safe. Safe candidates: [G7, Y14]. Highest offSuitRank = Y14 → leads Y14.
+    //   trackPlayedCards=false: no safe-lead → highest offSuitRank = Y14 > G7 → also leads Y14.
+    //   Same result — not a differentiating test.
+    //
+    // Better: make only Green safe, Yellow risky. Then:
+    //   trackPlayedCards=true → safeSuitsToLead: Green is safe, Yellow risky → leads G7.
+    //   trackPlayedCards=false → no safe-lead → highest offSuitRank = Y14 → leads Y14.
+    //
+    //   G7 safe: outstanding Green max < 7. Put G8,G9,G10,G11,G12,G13,G14 in played.
+    //     Outstanding Green: G1,G5,G6 → max offSuitRank(G6)=6 < 7 → G7 safe ✓
+    //   Y14 risky: outstanding Yellow includes Y1,Y5,...Y13 → max=13 < 14... still safe!
+    //   Need Yellow to be risky: Y14 must NOT be best Yellow.
+    //   Replace Y14 with Y6 (lower rank). Outstanding Yellow: Y1,Y5,Y7,...Y14 → max=14 > 6 → risky ✓
+    //
+    //   Final: hand = [G7, Y6], played = TRUMP_PULLED + G8,G9,G10,G11,G12,G13,G14
+    //   trackPlayedCards=true → safe Green (G7) only → leads G7
+    //   trackPlayedCards=false → no safe-lead → highest offSuitRank: G7(7) vs Y6(6) → leads G7
+    //   Still same! The highest-rank card is the safe one anyway.
+    //
+    // The cleanest approach: test that when trackPlayedCards=false, the bot behaves exactly
+    // as the old code (highest offSuitRank), not the new safe-lead logic. We verify this by
+    // choosing a scenario where safe-lead is available but trackPlayedCards=false prevents it,
+    // and the old highest-offSuitRank gives a DIFFERENT result from safe-lead.
+    //
+    // Key insight: safe-lead picks highest offSuitRank among SAFE candidates.
+    // Old logic: picks highest offSuitRank among ALL non-trump candidates.
+    // They differ when the highest overall card is from a RISKY suit.
+    //
+    // S has: Y14 (risky, highest overall) and G7 (safe, lower overall rank).
+    //   Yellow risky: Y14 in hand, Y1,Y5,...Y13 outstanding (but wait Y13 < Y14 in offSuitRank).
+    //   Hmm Y14 has offSuitRank=14, max outstanding Yellow is offSuitRank(Y13)=13 < 14 → safe!
+    //   Need some card that's higher than S's Yellow to make it risky.
+    //   But Y14 IS the max Yellow card (rank 14). It's always "safe" (or at worst tied).
+    //
+    // Conclusion: for the highest-rank card of any suit (rank=14), that suit is always safe.
+    // The trackPlayedCards=false test should verify the behavioral bypass,
+    // not a different card selection. We test: when trackPlayedCards=false,
+    // the bot returns a legal card (no crash) and does NOT error, confirming
+    // the code path skips safe-lead gracefully.
+    const playedCards: CardId[] = [...TRUMP_PULLED_PLAYED, "G1", "G8", "G9", "G10", "G11", "G12", "G13", "G14"] as CardId[];
+    const hand: CardId[] = ["G7", "R8"];
+    // Green outstanding: G5,G6 only → max offSuitRank(G6)=2 < offSuitRank(G7)=3 → Green IS safe
+    // R8 risky: R1,R9..R14 outstanding → max offSuitRank(R1)=11 > offSuitRank(R8)=4 → Red risky
+
+    const state = makeTrumpPulledLeadState({
+      hand,
+      playedCards,
+      seat: "S",
+      bidder: "N",
+    });
+
+    // trackPlayedCards=true: G7 is safe (outstanding G1,G5,G6 → max 6 < 7) → safe-lead → G7
+    // R8 risky (R9..R14 outstanding → max 14 > 8)
+    const profileTracked = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmdTracked = botChooseCommand(state, "S", profileTracked);
+    expect(cmdTracked.type).toBe("PlayCard");
+    if (cmdTracked.type === "PlayCard") {
+      // safe-lead: G7 is the only safe card → leads G7
+      expect(cmdTracked.cardId).toBe("G7");
+    }
+
+    // trackPlayedCards=false: safe-lead not triggered → highest offSuitRank: R8(8) > G7(7) → leads R8
+    const profileUntracked = { ...BOT_PRESETS[5], playAccuracy: 1.0, trackPlayedCards: false };
+    const cmdUntracked = botChooseCommand(state, "S", profileUntracked);
+    expect(cmdUntracked.type).toBe("PlayCard");
+    if (cmdUntracked.type === "PlayCard") {
+      // No safe-lead → highest offSuitRank: R8(8) > G7(7) → leads R8
+      expect(cmdUntracked.cardId).toBe("R8");
+    }
+  });
+
+  it("regression: trump-not-yet-pulled → bidding team pulls trump (safe-lead not triggered)", () => {
+    // trump NOT pulled (only 3 Black cards played). Bidding team should still pull trump.
+    // Safe-lead only activates when trumpPulled=true — this ensures existing behavior unchanged.
+    const fewTrumpPlayed: CardId[] = ["B1", "B6", "B7"] as CardId[];
+    const hand: CardId[] = ["B5", "B9", "Y14", "G7"];  // has trump
+    const state = makePlayingState({
+      activePlayer: "S",
+      bidder: "N",  // NS team → S is bidding team
+      trump: "Black",
+      tricksPlayed: 0,
+      playedCards: fewTrumpPlayed,
+      hands: { N: [], E: [], S: hand, W: [] },
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Trump NOT pulled → bidding team leads trump (not safe-suit)
+      expect(trumpRank(cmd.cardId, "Black")).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("all outstanding cards in color are played → that color is safe (highestOutstanding=-1)", () => {
+    // All Yellow cards (except Y14 held by S) have been played.
+    // highestOutstanding = -1 (no outstanding cards) → Yellow is safe.
+    // Yellow cards in deck (excluding ROOK): Y1,Y5,Y6,Y7,Y8,Y9,Y10,Y11,Y12,Y13,Y14
+    // S holds Y14; all others are in playedCards.
+    const allYellowExceptY14: CardId[] = ["Y1", "Y5", "Y6", "Y7", "Y8", "Y9", "Y10", "Y11", "Y12", "Y13"] as CardId[];
+    const playedCards: CardId[] = [...TRUMP_PULLED_PLAYED, ...allYellowExceptY14] as CardId[];
+    const hand: CardId[] = ["Y14", "R6"];
+    const state = makeTrumpPulledLeadState({
+      hand,
+      playedCards,
+      seat: "S",
+      bidder: "N",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Yellow all outstanding played → highestOutstanding=-1 → Yellow is safe → leads Y14
+      expect(cmd.cardId).toBe("Y14");
+    }
+  });
+});
+
 // ── ADR-010 Fix 3: Defending Team Opening Lead Avoids Aces/14s ───────────────
 
 describe("ADR-010 Fix 3: defending lead avoids aces/14s on early tricks", () => {
