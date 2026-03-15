@@ -73,27 +73,35 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* Bid display chip — shown below the player name, large enough to read at a glance */
+.bidDisplayRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 1px;
+}
+
 .bidDisplay {
-  color: #f0c040;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  background: rgba(240, 192, 64, 0.15);
-  border: 1px solid rgba(240, 192, 64, 0.35);
-  border-radius: 3px;
-  padding: 0 4px;
+  color: #ffe066;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  background: rgba(240, 192, 64, 0.28);
+  border: 1px solid rgba(240, 192, 64, 0.6);
+  border-radius: 4px;
+  padding: 1px 6px;
   animation: bidPop 0.2s ease-out both;
+  line-height: 1.4;
 }
 
 .bidDisplay[data-passed="true"] {
-  color: #888;
-  background: rgba(128, 128, 128, 0.10);
-  border-color: rgba(128, 128, 128, 0.2);
+  color: #aaa;
+  background: rgba(128, 128, 128, 0.18);
+  border-color: rgba(128, 128, 128, 0.4);
 }
 
 @keyframes thinkingPulse {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  50%       { opacity: 0.35; }
 }
 
 .bidDisplay[data-thinking="true"] {

@@ -40,7 +40,10 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
         {isDealer && <span className={styles.dealerBadge} aria-label="Dealer">D</span>}
         {showBidBadge && <span className={styles.bidBadge} aria-label="Bidder">★ BID</span>}
         {showDiffBadge && <span className={styles.diffBadge}>{difficultyLabel}</span>}
-        {bidDisplay !== undefined && (
+        {isActive && <span className={styles.indicator}>●</span>}
+      </div>
+      {bidDisplay !== undefined && (
+        <div className={styles.bidDisplayRow}>
           <span
             className={styles.bidDisplay}
             data-passed={bidDisplay === "PASS" ? "true" : undefined}
@@ -48,9 +51,8 @@ export default function PlayerSeat({ seat, cards, faceDown, isActive, isBidder, 
           >
             {bidDisplay}
           </span>
-        )}
-        {isActive && <span className={styles.indicator}>●</span>}
-      </div>
+        </div>
+      )}
       <div className={styles.handWrap}>
         <CardHand
           cards={cards}

@@ -18,6 +18,7 @@ vi.mock("./PlayerSeat.module.css", () => ({
     bidBadge: "bidBadge",
     dealerBadge: "dealerBadge",
     diffBadge: "diffBadge",
+    bidDisplayRow: "bidDisplayRow",
     bidDisplay: "bidDisplay",
     handWrap: "handWrap",
   },
