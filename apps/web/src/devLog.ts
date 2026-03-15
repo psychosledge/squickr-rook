@@ -20,6 +20,8 @@ import type {
 } from "@rook/engine";
 import { pointValue, cardFromId } from "@rook/engine";
 import { useGameStore } from "./store/gameStore";
+import { buildCoachingLog } from "./coachingLog";
+import type { CoachingLog } from "./coachingLog";
 
 // ── Annotation types ──────────────────────────────────────────────────────────
 
@@ -213,6 +215,10 @@ export class GameLogger {
 
   getLog(): HandLogEntry[] {
     return JSON.parse(JSON.stringify(this.log)) as HandLogEntry[];
+  }
+
+  getCoachingLog(): CoachingLog {
+    return buildCoachingLog(this.getLog());
   }
 
   clearLog(): void {
@@ -442,6 +448,7 @@ export const gameLogger = new GameLogger();
 
 type RookLogAPI = {
   getLog(): HandLogEntry[];
+  getCoachingLog(): CoachingLog;
   clearLog(): void;
   downloadLog(): void;
 };
@@ -455,12 +462,13 @@ export function registerLogger(): void {
   });
   (window as Window & { __rookLog?: RookLogAPI }).__rookLog = {
     getLog: () => gameLogger.getLog(),
+    getCoachingLog: () => gameLogger.getCoachingLog(),
     clearLog: () => gameLogger.clearLog(),
     downloadLog: () => gameLogger.downloadLog(),
   };
   console.info(
     "%c[rookLog] registered",
     "color: #34d399",
-    "→ window.__rookLog  { getLog(), clearLog(), downloadLog() }",
+    "→ window.__rookLog  { getLog(), getCoachingLog(), clearLog(), downloadLog() }",
   );
 }
