@@ -19,9 +19,9 @@ const OPENING_PARAMS: Record<number, OpeningParams> = {
   // L1/L2 entries are structurally present but never reached — chooseBidAmount short-circuits to minNextBid for diff <= 2
   1: { fractionCenter: 0, fractionSpread: 0, fishingProbability: 1 },
   2: { fractionCenter: 0, fractionSpread: 0, fishingProbability: 1 },
-  3: { fractionCenter: 0.45, fractionSpread: 0.20, fishingProbability: 0.20 },
-  4: { fractionCenter: 0.70, fractionSpread: 0.15, fishingProbability: 0.15 },
-  5: { fractionCenter: 0.85, fractionSpread: 0.10, fishingProbability: 0.10 },
+  3: { fractionCenter: 0.55, fractionSpread: 0.20, fishingProbability: 0.20 },
+  4: { fractionCenter: 0.68, fractionSpread: 0.15, fishingProbability: 0.15 },
+  5: { fractionCenter: 0.72, fractionSpread: 0.08, fishingProbability: 0.10 },
 };
 
 interface RaiseParams {
@@ -36,7 +36,7 @@ const RAISE_PARAMS: Record<number, RaiseParams> = {
   2: { jumpThreshold: 999, jumpFractionCenter: 0, jumpFractionSpread: 0, jumpProbability: 0 },
   3: { jumpThreshold: 25, jumpFractionCenter: 0.35, jumpFractionSpread: 0.15, jumpProbability: 0.40 },
   4: { jumpThreshold: 20, jumpFractionCenter: 0.55, jumpFractionSpread: 0.15, jumpProbability: 0.65 },
-  5: { jumpThreshold: 15, jumpFractionCenter: 0.75, jumpFractionSpread: 0.15, jumpProbability: 0.80 },
+  5: { jumpThreshold: 15, jumpFractionCenter: 0.65, jumpFractionSpread: 0.10, jumpProbability: 0.80 },
 };
 
 /**
@@ -84,6 +84,7 @@ function chooseBidAmount(
   if (diff <= 2) return minNextBid;
   const gap = ceiling - minNextBid;
   if (gap < params.jumpThreshold) return minNextBid;
+
   if (Math.random() >= params.jumpProbability) return minNextBid;
   // Jump!
   const fraction = params.jumpFractionCenter + (Math.random() * 2 - 1) * params.jumpFractionSpread;
@@ -241,11 +242,32 @@ export function computeBidCeiling(
     const partnerBid = state.bids[partnerOf(seat)];
     const partnerHoldsBid = state.bidder === partnerOf(seat);
     if (typeof partnerBid === "number" && partnerBid > 0 && !partnerHoldsBid) {
-      ceiling += Math.max(0, Math.round((partnerBid - 100) * 0.3));
+      const PARTNER_BONUS_MULTIPLIER = 0.15;
+      const PARTNER_BONUS_HARD_CAP = 15;
+      const bonus = Math.min(
+        Math.max(0, Math.round((partnerBid - 100) * PARTNER_BONUS_MULTIPLIER)),
+        PARTNER_BONUS_HARD_CAP,
+      );
+      ceiling += bonus;
+    }
+
+    // Bust-headroom zone compression (prevent overbidding near bust threshold)
+    const bustHeadroom = state.scores[myTeam] - rules.bustThreshold;
+    if (bustHeadroom < 250) {
+      let cap: number;
+      if (bustHeadroom >= 150) {
+        // Caution zone (150 ≤ headroom < 250)
+        cap = Math.floor((bustHeadroom * 0.80) / rules.bidIncrement) * rules.bidIncrement;
+      } else {
+        // Danger zone (headroom < 150)
+        cap = Math.floor((bustHeadroom * 0.65) / rules.bidIncrement) * rules.bidIncrement;
+      }
+      ceiling = Math.min(ceiling, cap);
     }
   }
 
-  return Math.max(rules.minimumBid, Math.min(ceiling, rules.maximumBid));
+  const clamped = Math.min(ceiling, rules.maximumBid);
+  return clamped < rules.minimumBid ? 0 : clamped;
 }
 
 // ── Phase 2: Bluff resistance ─────────────────────────────────────────────────
