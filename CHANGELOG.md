@@ -4,6 +4,16 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.2.0] — 2026-03-15
+
+### Bot Improvements
+- **Bid ceiling hard cap** — bots no longer bid above their computed ceiling in competitive auctions; previously bluff resistance could push bids 5–9 pts over ceiling causing unnecessary sets
+- **Trump pull sequencing** — bidding team now leads lowest non-ROOK trump when pulling (probe cheaply rather than leading the ace into an opponent's higher trump)
+- **ROOK preservation** — bot no longer burns the ROOK (20 pts) on a trick it could win with a cheaper trump card
+- **Trick-10 defensive awareness** — defending team at tricks 7–8 now preserves ROOK as a trick-10 contest weapon; when only trump/aces remain, leads lowest non-ROOK trump instead of the ROOK
+
+---
+
 ## [v1.1.0] — 2026-03-07
 
 ### New Features
