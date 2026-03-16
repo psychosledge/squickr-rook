@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import type { SeatInfo } from "@/store/onlineGameStore.types";
-import type { Seat } from "@rook/engine";
+import type { BotDifficulty, Seat } from "@rook/engine";
 import {
   NameEntryView,
   HomeView,
   ConnectingView,
   LobbyView,
+  SeatDifficultyPicker,
   shouldSkipConnect,
   shouldRedirectToGame,
 } from "./OnlineLobbyPage";
@@ -15,6 +16,7 @@ import type {
   HomeViewProps,
   ConnectingViewProps,
   LobbyViewProps,
+  SeatDifficultyPickerProps,
 } from "./OnlineLobbyPage";
 
 // Mock CSS modules
@@ -49,6 +51,9 @@ vi.mock("./OnlineLobbyPage.module.css", () => ({
     editNameBtn: "editNameBtn",
     nameEditForm: "nameEditForm",
     nameEditInput: "nameEditInput",
+    difficultyPicker: "difficultyPicker",
+    difficultyBtn: "difficultyBtn",
+    difficultyBtnActive: "difficultyBtnActive",
   },
 }));
 
@@ -194,6 +199,7 @@ function makeLobbyProps(overrides: Partial<LobbyViewProps> = {}): LobbyViewProps
     myDisplayName: "TestPlayer",
     onUpdateName: vi.fn(),
     gameStarted: false,
+    onSetBotDifficulty: vi.fn(),
     ...overrides,
   };
 }
@@ -734,6 +740,7 @@ describe("LobbyView — display name editing", () => {
       myDisplayName: "Alice",
       onUpdateName: vi.fn(),
       gameStarted: false,
+      onSetBotDifficulty: vi.fn(),
       ...overrides,
     };
   }
@@ -984,6 +991,134 @@ describe("shouldRedirectToGame", () => {
   it("69. returns false when roomCode is null", () => {
     const result = shouldRedirectToGame({ roomCode: null, lobbyPhase: "playing" }, "ABC123");
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SeatDifficultyPicker tests (70–76)
+// ---------------------------------------------------------------------------
+
+describe("SeatDifficultyPicker", () => {
+  function makePickerProps(overrides: Partial<SeatDifficultyPickerProps> = {}): SeatDifficultyPickerProps {
+    return {
+      currentDifficulty: 3 as BotDifficulty,
+      onSelect: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it("70. renders 5 difficulty buttons (L1–L5)", () => {
+    const tree = SeatDifficultyPicker(makePickerProps());
+    const all = flattenElements(tree);
+    const diffBtns = findButtons(all, "difficultyBtn");
+    expect(diffBtns).toHaveLength(5);
+  });
+
+  it("71. button texts include L1, L2, L3, L4, L5", () => {
+    const tree = SeatDifficultyPicker(makePickerProps());
+    const text = flattenText(tree);
+    expect(text).toContain("L1");
+    expect(text).toContain("L2");
+    expect(text).toContain("L3");
+    expect(text).toContain("L4");
+    expect(text).toContain("L5");
+  });
+
+  it("72. active button (currentDifficulty=3) has difficultyBtnActive class", () => {
+    const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 3 as BotDifficulty }));
+    const all = flattenElements(tree);
+    const activeBtns = findButtons(all, "difficultyBtnActive");
+    expect(activeBtns).toHaveLength(1);
+    expect(flattenText(activeBtns[0])).toBe("L3");
+  });
+
+  it("73. active button for difficulty=1 is L1", () => {
+    const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 1 as BotDifficulty }));
+    const all = flattenElements(tree);
+    const activeBtns = findButtons(all, "difficultyBtnActive");
+    expect(activeBtns).toHaveLength(1);
+    expect(flattenText(activeBtns[0])).toBe("L1");
+  });
+
+  it("74. clicking a button calls onSelect with the difficulty", () => {
+    const onSelect = vi.fn();
+    const tree = SeatDifficultyPicker(makePickerProps({ onSelect }));
+    const all = flattenElements(tree);
+    const diffBtns = findButtons(all, "difficultyBtn");
+    // Click the 5th button (L5, difficulty=5)
+    const p = diffBtns[4].props as Record<string, unknown>;
+    (p.onClick as () => void)();
+    expect(onSelect).toHaveBeenCalledWith(5);
+  });
+
+  it("75. clicking L1 button calls onSelect with 1", () => {
+    const onSelect = vi.fn();
+    const tree = SeatDifficultyPicker(makePickerProps({ onSelect }));
+    const all = flattenElements(tree);
+    const diffBtns = findButtons(all, "difficultyBtn");
+    const p = diffBtns[0].props as Record<string, unknown>;
+    (p.onClick as () => void)();
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LobbyView — bot seat difficulty picker tests (76–79)
+// ---------------------------------------------------------------------------
+
+describe("LobbyView — bot seat difficulty picker", () => {
+  function makeBotSeats(): SeatInfo[] {
+    return (["N", "E", "S", "W"] as Seat[]).map((seat) =>
+      makeSeatInfo({
+        seat,
+        playerId: seat === "N" ? "me" : `bot-${seat}`,
+        displayName: seat === "N" ? "Alice" : `Bot ${seat}`,
+        connected: seat === "N",
+        isBot: seat !== "N",
+        botDifficulty: 3 as BotDifficulty,
+      }),
+    );
+  }
+
+  it("76. difficulty pickers rendered for bot seats when isHost=true and gameStarted=false", () => {
+    const seats = makeBotSeats();
+    const tree = LobbyView(makeLobbyProps({ seats, mySeat: "N", isHost: true, gameStarted: false, onSetBotDifficulty: vi.fn() }));
+    const all = flattenElements(tree);
+    const pickers = findByClass(all, "difficultyPicker");
+    // 3 bot seats (E, S, W) should have pickers
+    expect(pickers.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("77. difficulty pickers NOT rendered when gameStarted=true", () => {
+    const seats = makeBotSeats();
+    const tree = LobbyView(makeLobbyProps({ seats, mySeat: "N", isHost: true, gameStarted: true, onSetBotDifficulty: vi.fn() }));
+    const all = flattenElements(tree);
+    const pickers = findByClass(all, "difficultyPicker");
+    expect(pickers).toHaveLength(0);
+  });
+
+  it("78. difficulty pickers NOT rendered when isHost=false", () => {
+    const seats = makeBotSeats();
+    const tree = LobbyView(makeLobbyProps({ seats, mySeat: "N", isHost: false, gameStarted: false, onSetBotDifficulty: vi.fn() }));
+    const all = flattenElements(tree);
+    const pickers = findByClass(all, "difficultyPicker");
+    expect(pickers).toHaveLength(0);
+  });
+
+  it("79. clicking a difficulty button calls onSetBotDifficulty with seat and difficulty", () => {
+    const onSetBotDifficulty = vi.fn();
+    const seats = makeBotSeats();
+    const tree = LobbyView(makeLobbyProps({ seats, mySeat: "N", isHost: true, gameStarted: false, onSetBotDifficulty }));
+    const all = flattenElements(tree);
+    const diffBtns = findButtons(all, "difficultyBtn");
+    // Seats are rendered in order N (human), S (bot), E (bot), W (bot).
+    // S is the first bot seat — its 5 buttons are indices 0–4.
+    // Index 4 is L5 for seat S.
+    expect(diffBtns.length).toBeGreaterThanOrEqual(5);
+    const p = diffBtns[4].props as Record<string, unknown>;
+    (p.onClick as () => void)();
+    expect(onSetBotDifficulty).toHaveBeenCalledOnce();
+    expect(onSetBotDifficulty).toHaveBeenCalledWith("S", 5);
   });
 });
 

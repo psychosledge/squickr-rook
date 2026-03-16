@@ -800,6 +800,105 @@ describe("RookRoom — reconnect race condition fixes", () => {
     });
   });
 
+  // ── SetBotDifficulty handler ──────────────────────────────────────────────
+
+  describe("handleSetBotDifficulty", () => {
+    /** Helper: send SetBotDifficulty message */
+    async function sendSetBotDifficulty(
+      rookRoom: RookRoom,
+      conn: MockConn,
+      seat: Seat,
+      difficulty: number,
+    ) {
+      await rookRoom.onMessage(
+        JSON.stringify({ type: "SetBotDifficulty", seat, difficulty }),
+        conn as any,
+      );
+    }
+
+    it("SBD-1: host can set difficulty for a bot seat, reflected in LobbyUpdated", async () => {
+      // Arrange: one human host in seat N, rest are empty (treated as bots at start)
+      const hostConn = makeMockConn("host-conn");
+      room.addConn(hostConn);
+      await sendJoinRoom(rookRoom, hostConn, "host-player", "Alice");
+      await sendClaimSeat(rookRoom, hostConn, "N");
+
+      // Clear sent messages
+      hostConn._sent.length = 0;
+
+      // Act: host sets difficulty 1 for seat E
+      await sendSetBotDifficulty(rookRoom, hostConn, "E", 1);
+
+      // Assert: a LobbyUpdated was broadcast containing seat E with botDifficulty: 1
+      const msgs = getMessages(hostConn);
+      const lobbyUpdates = msgs.filter((m) => m.type === "LobbyUpdated") as Array<{
+        type: string;
+        seats: Array<{ seat: Seat; botDifficulty?: number }>;
+      }>;
+      expect(lobbyUpdates.length).toBeGreaterThanOrEqual(1);
+      const lastUpdate = lobbyUpdates[lobbyUpdates.length - 1]!;
+      const seatE = lastUpdate.seats.find((s) => s.seat === "E");
+      expect(seatE?.botDifficulty).toBe(1);
+    });
+
+    it("SBD-2: non-host is rejected; difficulty is NOT changed", async () => {
+      // Arrange: two players — N is host, E is non-host
+      const hostConn = makeMockConn("host-conn-sbd2");
+      const nonHostConn = makeMockConn("non-host-conn-sbd2");
+      room.addConn(hostConn);
+      room.addConn(nonHostConn);
+      await sendJoinRoom(rookRoom, hostConn, "host-player-sbd2", "Alice");
+      await sendJoinRoom(rookRoom, nonHostConn, "non-host-player-sbd2", "Bob");
+      await sendClaimSeat(rookRoom, hostConn, "N");
+      await sendClaimSeat(rookRoom, nonHostConn, "E");
+
+      // Host pre-sets difficulty for seat S to 3 (default)
+      await sendSetBotDifficulty(rookRoom, hostConn, "S", 3);
+
+      // Clear sent messages
+      nonHostConn._sent.length = 0;
+      hostConn._sent.length = 0;
+
+      // Act: non-host attempts to change difficulty for seat S to 5
+      await sendSetBotDifficulty(rookRoom, nonHostConn, "S", 5);
+
+      // Assert: CommandError sent to non-host
+      const msgs = getMessages(nonHostConn);
+      const errors = msgs.filter((m) => m.type === "CommandError");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+
+      // Assert: difficulty for seat S is still 3 (not changed)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+      expect(rookInternal.botDifficulties.get("S")).toBe(3);
+    });
+
+    it("SBD-3: invalid difficulty (99) is rejected; botDifficulties map unchanged", async () => {
+      // Arrange: one human host
+      const hostConn = makeMockConn("host-conn-sbd3");
+      room.addConn(hostConn);
+      await sendJoinRoom(rookRoom, hostConn, "host-player-sbd3", "Alice");
+      await sendClaimSeat(rookRoom, hostConn, "N");
+
+      // Pre-set a known value for seat W
+      await sendSetBotDifficulty(rookRoom, hostConn, "W", 2);
+      hostConn._sent.length = 0;
+
+      // Act: host attempts to set difficulty 99 for seat W
+      await sendSetBotDifficulty(rookRoom, hostConn, "W", 99);
+
+      // Assert: CommandError sent
+      const msgs = getMessages(hostConn);
+      const errors = msgs.filter((m) => m.type === "CommandError");
+      expect(errors.length).toBeGreaterThanOrEqual(1);
+
+      // Assert: difficulty for W is still 2 (not changed to 99)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rookInternal = rookRoom as any;
+      expect(rookInternal.botDifficulties.get("W")).toBe(2);
+    });
+  });
+
   // ── Fix 4: onClose guard for null playerId (connection closed before JoinRoom) ──
 
   describe("Fix 4: onClose does not crash when connection closes before JoinRoom (state.playerId is null/undefined)", () => {

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { customAlphabet } from "nanoid";
 import { useOnlineGameStore } from "@/store/onlineGameStore";
 import type { SeatInfo } from "@/store/onlineGameStore.types";
-import type { Seat } from "@rook/engine";
+import type { BotDifficulty, Seat } from "@rook/engine";
 import { getLobbyLabel } from "@/utils/seatLabel";
 import styles from "./OnlineLobbyPage.module.css";
 
@@ -222,6 +222,35 @@ function LobbyDisplayNameRow({ myDisplayName, onUpdateName, triggerEdit }: Lobby
   );
 }
 
+// ── Sub-component: Seat Difficulty Picker ────────────────────────────────────
+
+export type SeatDifficultyPickerProps = {
+  currentDifficulty: BotDifficulty;
+  onSelect: (difficulty: BotDifficulty) => void;
+};
+
+const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5] as BotDifficulty[];
+
+export function SeatDifficultyPicker({ currentDifficulty, onSelect }: SeatDifficultyPickerProps) {
+  return (
+    <div className={styles.difficultyPicker}>
+      {DIFFICULTY_LEVELS.map((level) => (
+        <button
+          key={level}
+          className={
+            level === currentDifficulty
+              ? `${styles.difficultyBtn} ${styles.difficultyBtnActive}`
+              : styles.difficultyBtn
+          }
+          onClick={() => onSelect(level)}
+        >
+          {`L${level}`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── View: Lobby ──────────────────────────────────────────────────────────────
 
 export type LobbyViewProps = {
@@ -238,6 +267,7 @@ export type LobbyViewProps = {
   myDisplayName: string;
   onUpdateName: (name: string) => void;
   gameStarted: boolean;
+  onSetBotDifficulty: (seat: Seat, difficulty: BotDifficulty) => void;
 };
 
 export function LobbyView({
@@ -254,6 +284,7 @@ export function LobbyView({
   myDisplayName,
   onUpdateName,
   gameStarted,
+  onSetBotDifficulty,
 }: LobbyViewProps) {
   const nsPair: Seat[] = ["N", "S"];
   const ewPair: Seat[] = ["E", "W"];
@@ -270,6 +301,9 @@ export function LobbyView({
     let displayName = info?.displayName ?? null;
     if (isBot) displayName = `${displayName ?? seat} (bot)`;
     else if (isDisconnected) displayName = `${displayName ?? seat} (disconnected)`;
+
+    const currentDifficulty: BotDifficulty = info?.botDifficulty ?? 3;
+    const showDifficultyPicker = isBot && isHost && !gameStarted;
 
     return (
       <div
@@ -295,6 +329,10 @@ export function LobbyView({
             Leave
           </button>
         )}
+        {showDifficultyPicker && SeatDifficultyPicker({
+            currentDifficulty,
+            onSelect: (difficulty) => onSetBotDifficulty(seat, difficulty),
+          })}
       </div>
     );
   }
@@ -398,6 +436,7 @@ export default function OnlineLobbyPage() {
   const leaveSeat = useOnlineGameStore((s) => s.leaveSeat);
   const startGame = useOnlineGameStore((s) => s.startGame);
   const updateDisplayName = useOnlineGameStore((s) => s.updateDisplayName);
+  const setBotDifficulty = useOnlineGameStore((s) => s.setBotDifficulty);
 
   // Local state
   const [displayName, setDisplayName] = useState<string>(
@@ -511,6 +550,7 @@ export default function OnlineLobbyPage() {
       myDisplayName={myDisplayName}
       onUpdateName={updateDisplayName}
       gameStarted={lobbyPhase === "playing"}
+      onSetBotDifficulty={setBotDifficulty}
     />
   );
 }

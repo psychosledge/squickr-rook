@@ -278,6 +278,10 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
     get()._sendRaw({ type: "ReplaceWithBot", seat });
   },
 
+  setBotDifficulty: (seat, difficulty) => {
+    get()._sendRaw({ type: "SetBotDifficulty", seat, difficulty });
+  },
+
   dismissDisconnectAlert: () => {
     set({ disconnectedAlert: null, gamePaused: false });
     get()._updateOverlayAfterBatch();

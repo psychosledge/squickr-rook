@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useOnlineGameStore, INITIAL_ONLINE_STATE } from "../onlineGameStore";
 import { INITIAL_STATE, DEFAULT_RULES, applyEvent, BOT_PRESETS } from "@rook/engine";
-import type { GameEvent, GameState, Seat } from "@rook/engine";
+import type { BotDifficulty, GameEvent, GameState, Seat } from "@rook/engine";
 import type { WelcomeMsg, LobbyUpdatedMsg, EventBatchMsg, CommandErrorMsg } from "../onlineGameStore.types";
 
 function resetStore() {
@@ -1641,6 +1641,60 @@ describe("onlineGameStore", () => {
 
       // No socket, nothing sent (can't assert sent here since no mock socket)
       // Just verify it didn't crash
+      const state = useOnlineGameStore.getState();
+      expect(state._socket).toBeNull();
+    });
+  });
+
+  // ── setBotDifficulty action ───────────────────────────────────────────────
+  describe("setBotDifficulty action", () => {
+    it("sends SetBotDifficulty message with seat and difficulty", () => {
+      const { sent } = injectMockSocket();
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "lobby",
+        myPlayerId: "p1",
+        hostId: "p1",
+        _socket: useOnlineGameStore.getState()._socket,
+      });
+
+      useOnlineGameStore.getState().setBotDifficulty("E", 3 as BotDifficulty);
+
+      const messages = sent.map((s) => JSON.parse(s));
+      expect(messages).toContainEqual({ type: "SetBotDifficulty", seat: "E", difficulty: 3 });
+    });
+
+    it("sends SetBotDifficulty with difficulty 5 (Expert)", () => {
+      const { sent } = injectMockSocket();
+
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "lobby",
+        myPlayerId: "p1",
+        hostId: "p1",
+        _socket: useOnlineGameStore.getState()._socket,
+      });
+
+      useOnlineGameStore.getState().setBotDifficulty("S", 5 as BotDifficulty);
+
+      const messages = sent.map((s) => JSON.parse(s));
+      expect(messages).toContainEqual({ type: "SetBotDifficulty", seat: "S", difficulty: 5 });
+    });
+
+    it("is no-op when _socket is null", () => {
+      useOnlineGameStore.setState({
+        ...INITIAL_ONLINE_STATE,
+        lobbyPhase: "lobby",
+        myPlayerId: "p1",
+        hostId: "p1",
+        _socket: null,
+      });
+
+      expect(() => {
+        useOnlineGameStore.getState().setBotDifficulty("E", 3 as BotDifficulty);
+      }).not.toThrow();
+
       const state = useOnlineGameStore.getState();
       expect(state._socket).toBeNull();
     });

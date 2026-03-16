@@ -1,4 +1,4 @@
-import type { GameState, GameEvent, CardId, Color, HandScore, Seat, GameCommand } from "@rook/engine";
+import type { GameState, GameEvent, CardId, Color, HandScore, Seat, GameCommand, BotDifficulty } from "@rook/engine";
 import type { OverlayKind } from "./gameStore.types";
 
 export type SeatInfo = {
@@ -7,6 +7,7 @@ export type SeatInfo = {
   displayName: string | null;
   connected: boolean;
   isBot: boolean;
+  botDifficulty?: BotDifficulty;
 };
 
 export type WelcomeMsg = {
@@ -55,7 +56,8 @@ export type ClientStartGame   = { type: "StartGame" };
 export type ClientSendCommand = { type: "SendCommand"; command: GameCommand };
 export type ClientUpdateName  = { type: "UpdateName"; displayName: string };
 export type ClientReplaceWithBot = { type: "ReplaceWithBot"; seat: Seat };
-export type ClientMessage = ClientJoinRoom | ClientClaimSeat | ClientLeaveSeat | ClientStartGame | ClientSendCommand | ClientUpdateName | ClientReplaceWithBot;
+export type ClientSetBotDifficulty = { type: "SetBotDifficulty"; seat: Seat; difficulty: BotDifficulty };
+export type ClientMessage = ClientJoinRoom | ClientClaimSeat | ClientLeaveSeat | ClientStartGame | ClientSendCommand | ClientUpdateName | ClientReplaceWithBot | ClientSetBotDifficulty;
 
 export type OnlineStoreState = {
   myPlayerId: string;
@@ -101,6 +103,7 @@ export type OnlineStoreActions = {
   openHistoryModal: () => void;
   closeHistoryModal: () => void;
   replaceWithBot: (seat: Seat) => void;
+  setBotDifficulty: (seat: Seat, difficulty: BotDifficulty) => void;
   dismissDisconnectAlert: () => void;
   _handleMessage: (msg: ServerMessage) => void;
   _applyIncomingEvents: (events: GameEvent[]) => void;

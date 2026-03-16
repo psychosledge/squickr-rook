@@ -11,6 +11,7 @@ import {
   validateCommand,
 } from "@rook/engine";
 import type {
+  BotDifficulty,
   GameCommand,
   GameEvent,
   GameState,
@@ -55,7 +56,13 @@ type ReplaceWithBot = {
   seat: Seat;
 };
 
-type ClientMessage = JoinRoom | ClaimSeat | LeaveSeat | StartGame | SendCommand | UpdateName | ReplaceWithBot;
+type SetBotDifficulty = {
+  type: "SetBotDifficulty";
+  seat: Seat;
+  difficulty: BotDifficulty;
+};
+
+type ClientMessage = JoinRoom | ClaimSeat | LeaveSeat | StartGame | SendCommand | UpdateName | ReplaceWithBot | SetBotDifficulty;
 
 // ── Server → Client message types ────────────────────────────────────────────
 
@@ -65,6 +72,7 @@ type SeatInfo = {
   displayName: string | null;
   connected: boolean;
   isBot: boolean;
+  botDifficulty?: BotDifficulty;
 };
 
 type ConnectionState = {
@@ -134,6 +142,7 @@ export default class RookRoom implements Party.Server {
   private gameState: GameState | null = null;
   private disconnectedSeats: Map<Seat, { playerId: string; displayName: string }> = new Map();
   private gamePaused = false;
+  private botDifficulties: Map<Seat, BotDifficulty> = new Map();
 
   constructor(readonly room: Party.Room) {}
 
@@ -171,6 +180,9 @@ export default class RookRoom implements Party.Server {
         break;
       case "ReplaceWithBot":
         await this.handleReplaceWithBot(msg, sender);
+        break;
+      case "SetBotDifficulty":
+        await this.handleSetBotDifficulty(msg, sender);
         break;
       default: {
         const _exhaustive: never = msg;
@@ -476,7 +488,8 @@ export default class RookRoom implements Party.Server {
       if (human !== undefined) {
         return { seat, name: human.displayName, kind: "human" };
       }
-      return { seat, name: "Bot", kind: "bot", botProfile: BOT_PRESETS[3] };
+      const difficulty = this.botDifficulties.get(seat) ?? 3;
+      return { seat, name: "Bot", kind: "bot", botProfile: BOT_PRESETS[difficulty] };
     });
 
     const seed = Math.floor(Math.random() * 2 ** 31);
@@ -566,6 +579,7 @@ export default class RookRoom implements Party.Server {
     if (!this.disconnectedSeats.has(msg.seat)) return;
 
     // Convert the disconnected seat to a bot in the engine's players array
+    const difficulty = this.botDifficulties.get(msg.seat) ?? 3;
     this.gameState = {
       ...this.gameState,
       players: this.gameState.players.map((p): PlayerInfo => {
@@ -574,7 +588,7 @@ export default class RookRoom implements Party.Server {
             seat: msg.seat,
             name: p.name,
             kind: "bot",
-            botProfile: BOT_PRESETS[3],
+            botProfile: BOT_PRESETS[difficulty],
           };
         }
         return p;
@@ -585,6 +599,27 @@ export default class RookRoom implements Party.Server {
     this.gamePaused = false;
     this.broadcastLobbyUpdated();
     await this.processBotTurns();
+  }
+
+  private async handleSetBotDifficulty(msg: SetBotDifficulty, conn: Party.Connection): Promise<void> {
+    if (this.phase !== "lobby") {
+      this.sendError(conn, "Cannot change bot difficulty: game already started");
+      return;
+    }
+
+    const state = getState(conn);
+    if (state?.playerId !== this.getHostPlayerId()) {
+      this.sendError(conn, "Only the host can set bot difficulty");
+      return;
+    }
+
+    if (![1, 2, 3, 4, 5].includes(msg.difficulty as number)) {
+      this.sendError(conn, "Invalid difficulty: must be 1–5");
+      return;
+    }
+
+    this.botDifficulties.set(msg.seat, msg.difficulty);
+    this.broadcastLobbyUpdated();
   }
 
   // ── Bot turns ───────────────────────────────────────────────────────────────
@@ -702,8 +737,9 @@ export default class RookRoom implements Party.Server {
             };
           }
         }
-        // Lobby empty seat
-        return { seat, playerId: null, displayName: null, connected: false, isBot: false };
+        // Lobby empty seat or lobby bot seat
+        const difficulty = this.botDifficulties.get(seat);
+        return { seat, playerId: null, displayName: null, connected: false, isBot: false, ...(difficulty !== undefined ? { botDifficulty: difficulty } : {}) };
       }
 
       // Human seated
