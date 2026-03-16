@@ -430,7 +430,9 @@ export function botChooseCommand(
 
       // Decide whether to bid
       if (shouldBid(minNextBid, ceiling, profile, state)) {
-        const rules = state.rules ?? DEFAULT_RULES;
+        // NEW: never bid above our ceiling — even with bluff budget
+        if (minNextBid > ceiling) return { type: "PassBid", seat };
+
         const isOpening = state.currentBid === 0;
         const bidAmount = chooseBidAmount(minNextBid, ceiling, profile, isOpening, legal, rules);
         const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === bidAmount);
@@ -761,6 +763,19 @@ function chooseLeadCard(
             return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
           });
         }
+        // NEW: only trump/aces remain — lead lowest non-ROOK trump to preserve ROOK for trick 10
+        const allTrumpCommands = playCommands.filter(
+          c => c.type === "PlayCard" && trump !== null && trumpRank(c.cardId, trump) >= 0
+        );
+        if (allTrumpCommands.length > 0) {
+          const nonRookTrump = allTrumpCommands.filter(c => c.type === "PlayCard" && c.cardId !== "ROOK");
+          const candidates = nonRookTrump.length > 0 ? nonRookTrump : allTrumpCommands;
+          return candidates.reduce((best, cmd) => {
+            if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+            return trumpRank(cmd.cardId, trump!) < trumpRank(best.cardId, trump!) ? cmd : best;
+          });
+        }
+        // else: only aces/14s remain — fall through to role-aware lead logic
       }
     }
   }
@@ -790,12 +805,12 @@ function chooseLeadCard(
     if (isBiddingTeam) {
       // ── Bidding team: pull trump or lead high off-suit ──────────────────
       if (!trumpPulled && trumpCards.length > 0) {
-        // Lead highest trump — but respect ROOK-management rule
+        // Lead lowest trump — but respect ROOK-management rule
         const nonRookTrump = trumpCards.filter(c => c.type === "PlayCard" && c.cardId !== "ROOK");
         const candidates = nonRookTrump.length > 0 ? nonRookTrump : trumpCards;
         return candidates.reduce((best, cmd) => {
           if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-          return trumpRank(cmd.cardId, trump) > trumpRank(best.cardId, trump) ? cmd : best;
+          return trumpRank(cmd.cardId, trump) < trumpRank(best.cardId, trump) ? cmd : best;
         });
       }
       // Trump pulled or no trump — lead highest off-suit card
@@ -1082,7 +1097,12 @@ function chooseLowestWinningCard(
   leadColor: Color | null,
   trump: Color | null,
 ): GameCommand {
-  return winningCommands.reduce((best, cmd) => {
+  const nonRookWinners = winningCommands.filter(
+    c => c.type === "PlayCard" && c.cardId !== "ROOK"
+  );
+  const candidates = nonRookWinners.length > 0 ? nonRookWinners : winningCommands;
+
+  return candidates.reduce((best, cmd) => {
     if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
     return compareTrickCards(cmd.cardId, best.cardId, leadColor, trump) < 0 ? cmd : best;
   });
