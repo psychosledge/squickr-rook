@@ -737,9 +737,9 @@ export default class RookRoom implements Party.Server {
             };
           }
         }
-        // Lobby empty seat or lobby bot seat
+        // Lobby empty seat — will be filled by a bot at game start, so isBot: true
         const difficulty = this.botDifficulties.get(seat);
-        return { seat, playerId: null, displayName: null, connected: false, isBot: false, ...(difficulty !== undefined ? { botDifficulty: difficulty } : {}) };
+        return { seat, playerId: null, displayName: null, connected: false, isBot: true, ...(difficulty !== undefined ? { botDifficulty: difficulty } : {}) };
       }
 
       // Human seated
