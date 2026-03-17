@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useGameStore } from "@/store/gameStore";
 import ScoreBar from "@/components/ScoreBar/ScoreBar";
@@ -10,6 +10,7 @@ import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay"
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
 import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+import LastTrickOverlay from "@/components/LastTrickOverlay/LastTrickOverlay";
 import { BOT_DIFFICULTY_LABELS } from "@rook/engine";
 import type { Seat } from "@rook/engine";
 import { sortHand } from "@/utils/sortHand";
@@ -39,10 +40,18 @@ export default function GamePage() {
   const announcement = useGameStore((s) => s.announcement);
   const clearAnnouncement = useGameStore((s) => s.clearAnnouncement);
 
+  const [showLastTrick, setShowLastTrick] = useState(false);
+  const handNumber = useGameStore((s) => s.gameState?.handNumber ?? 0);
+
   // Redirect to lobby if no game active
   useEffect(() => {
     if (!gameState) void navigate("/");
   }, [gameState, navigate]);
+
+  // Reset last trick overlay when a new hand begins
+  useEffect(() => {
+    setShowLastTrick(false);
+  }, [handNumber]);
 
   if (!gameState) return null;
 
@@ -54,6 +63,18 @@ export default function GamePage() {
     }
   }
 
+  // Build seat name map from player info
+  const seatNames: Partial<Record<Seat, string>> = {};
+  for (const player of gameState.players) {
+    seatNames[player.seat] = player.name;
+  }
+
+  const canShowLastTrick =
+    gameState.completedTricks.length > 0 &&
+    (gameState.phase === "playing" ||
+     gameState.phase === "scoring" ||
+     overlay === "hand-result");
+
   function handlePlayAgain() {
     resetGame();
     void navigate("/");
@@ -61,7 +82,11 @@ export default function GamePage() {
 
   return (
     <div className={styles.page}>
-      <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} />
+      <ScoreBar
+        gameState={gameState}
+        onOpenHistory={openHistoryModal}
+        onOpenLastTrick={canShowLastTrick ? () => setShowLastTrick(true) : undefined}
+      />
 
       <AnnouncementBanner announcement={announcement} clearAnnouncement={clearAnnouncement} />
 
@@ -116,6 +141,16 @@ export default function GamePage() {
           reason={gameOverReason ?? "threshold-reached"}
           onPlayAgain={handlePlayAgain}
           handHistory={gameState.handHistory}
+        />
+      )}
+
+      {showLastTrick && gameState.completedTricks.length > 0 && (
+        <LastTrickOverlay
+          lastTrick={gameState.completedTricks[gameState.completedTricks.length - 1]!}
+          trump={gameState.trump}
+          humanSeat="N"
+          seatNames={seatNames}
+          onClose={() => setShowLastTrick(false)}
         />
       )}
     </div>

@@ -2,7 +2,7 @@ import type { GameState, Seat } from "@rook/engine";
 import { getSeatLabel } from "@/utils/seatLabel";
 import styles from "./ScoreBar.module.css";
 
-type Props = { gameState: GameState; onOpenHistory?: () => void; seatNames?: Partial<Record<Seat, string>>; humanSeat?: Seat };
+type Props = { gameState: GameState; onOpenHistory?: () => void; onOpenLastTrick?: () => void; seatNames?: Partial<Record<Seat, string>>; humanSeat?: Seat };
 
 const TRUMP_COLORS: Record<string, string> = {
   Black:  "#aaaaaa",
@@ -11,7 +11,7 @@ const TRUMP_COLORS: Record<string, string> = {
   Yellow: "#f1c40f",
 };
 
-export default function ScoreBar({ gameState, onOpenHistory, seatNames, humanSeat }: Props) {
+export default function ScoreBar({ gameState, onOpenHistory, onOpenLastTrick, seatNames, humanSeat }: Props) {
   const { scores, handNumber, trump, phase, activePlayer, bidder, bidAmount, shotMoon, handHistory } = gameState;
 
   function resolveName(seat: Seat): string {
@@ -45,6 +45,16 @@ export default function ScoreBar({ gameState, onOpenHistory, seatNames, humanSea
             onClick={onOpenHistory}
           >
             📋
+          </button>
+        )}
+        {onOpenLastTrick && gameState.completedTricks.length > 0 && (
+          <button
+            type="button"
+            className={styles.historyBtn}
+            aria-label="View last trick"
+            onClick={onOpenLastTrick}
+          >
+            🃏
           </button>
         )}
       </div>

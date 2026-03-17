@@ -374,3 +374,75 @@ describe("ScoreBar — resolveName", () => {
     expect(flattenText(activeSpans2[0])).toContain("Label-S");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 🃏 Last trick button tests
+// ---------------------------------------------------------------------------
+
+const minimalCompletedTrick = {
+  plays: [
+    { seat: "N" as const, cardId: "G10" },
+    { seat: "E" as const, cardId: "R5" },
+  ],
+  winner: "N" as const,
+  leadColor: "Green" as const,
+};
+
+describe("ScoreBar — last trick button", () => {
+  it("1. not rendered when completedTricks is empty even if onOpenLastTrick is provided", () => {
+    const gs = makeGameState({ completedTricks: [] });
+    const tree = ScoreBar({ gameState: gs, onOpenLastTrick: vi.fn() });
+    const elements = flattenElements(tree);
+    const btns = elements.filter((el) => {
+      const p = el.props as Record<string, unknown>;
+      return typeof p.className === "string" && p.className.includes("historyBtn") &&
+        p["aria-label"] === "View last trick";
+    });
+    expect(btns).toHaveLength(0);
+  });
+
+  it("2. not rendered when onOpenLastTrick is not provided even if completedTricks has entries", () => {
+    const gs = makeGameState({ completedTricks: [minimalCompletedTrick] });
+    const tree = ScoreBar({ gameState: gs });
+    const elements = flattenElements(tree);
+    const btns = elements.filter((el) => {
+      const p = el.props as Record<string, unknown>;
+      return typeof p.className === "string" && p.className.includes("historyBtn") &&
+        p["aria-label"] === "View last trick";
+    });
+    expect(btns).toHaveLength(0);
+  });
+
+  it("3. rendered with aria-label='View last trick' when completedTricks.length > 0 AND onOpenLastTrick is provided", () => {
+    const gs = makeGameState({ completedTricks: [minimalCompletedTrick] });
+    const tree = ScoreBar({ gameState: gs, onOpenLastTrick: vi.fn() });
+    const elements = flattenElements(tree);
+    const btns = elements.filter((el) => {
+      const p = el.props as Record<string, unknown>;
+      return typeof p.className === "string" && p.className.includes("historyBtn") &&
+        p["aria-label"] === "View last trick";
+    });
+    expect(btns).toHaveLength(1);
+    const btn = btns[0];
+    const p = btn.props as Record<string, unknown>;
+    expect(p["aria-label"]).toBe("View last trick");
+    expect(p["type"]).toBe("button");
+    expect(flattenText(btn)).toBe("🃏");
+  });
+
+  it("4. calls onOpenLastTrick when the 🃏 button is clicked", () => {
+    const onOpenLastTrick = vi.fn();
+    const gs = makeGameState({ completedTricks: [minimalCompletedTrick] });
+    const tree = ScoreBar({ gameState: gs, onOpenLastTrick });
+    const elements = flattenElements(tree);
+    const btns = elements.filter((el) => {
+      const p = el.props as Record<string, unknown>;
+      return typeof p.className === "string" && p.className.includes("historyBtn") &&
+        p["aria-label"] === "View last trick";
+    });
+    expect(btns).toHaveLength(1);
+    const p = btns[0].props as Record<string, unknown>;
+    (p.onClick as () => void)();
+    expect(onOpenLastTrick).toHaveBeenCalledTimes(1);
+  });
+});
