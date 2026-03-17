@@ -254,10 +254,12 @@ export default function OnlineGamePage() {
   // Navigate back if no game state
   useEffect(() => {
     const storedCode = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY);
-    if (!gameState && !isReconnecting && storedCode !== code) {
+    // Only redirect if we have no game state AND we're not in a clean idle disconnect
+    // (lobbyPhase === "idle" with no storedCode means we intentionally left/disconnected)
+    if (!gameState && !isReconnecting && storedCode !== code && lobbyPhase !== "idle") {
       void navigate(code ? `/online/${code}` : "/online");
     }
-  }, [gameState, isReconnecting, code, navigate]);
+  }, [gameState, isReconnecting, code, navigate, lobbyPhase]);
 
   const hasMidGameFlag = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === code;
 
