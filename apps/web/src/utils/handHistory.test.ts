@@ -232,6 +232,106 @@ describe("buildHandHistoryRows", () => {
     expect(rows[1].handNumber).toBe(2);
   });
 
+  // ── moonOutcome tests ──────────────────────────────────────────────────────
+
+  it("moonOutcome is null for a non-moon hand", () => {
+    const history: HandScore[] = [
+      makeHandScore({
+        hand: 1,
+        bidder: "N",
+        bidAmount: 120,
+        nsTotal: 130,
+        ewTotal: 60,
+        nsDelta: 120,
+        ewDelta: 60,
+        shotMoon: false,
+      }),
+    ];
+
+    const rows = buildHandHistoryRows(history);
+    expect(rows[0].moonOutcome).toBeNull();
+  });
+
+  it("moonOutcome is 'set' when shotMoon=true and moonShooterWentSet=true", () => {
+    const history: HandScore[] = [
+      makeHandScore({
+        hand: 1,
+        bidder: "N",
+        bidAmount: 120,
+        nsTotal: 0,
+        ewTotal: 200,
+        nsDelta: -120,
+        ewDelta: 200,
+        shotMoon: true,
+        moonShooterWentSet: true,
+      }),
+    ];
+
+    const rows = buildHandHistoryRows(history);
+    expect(rows[0].moonOutcome).toBe("set");
+  });
+
+  it("moonOutcome is 'made-positive' when moon made and bidder pre-hand score >= 0", () => {
+    // Start with NS at 50 (>=0), NS bids and makes moon
+    const history: HandScore[] = [
+      makeHandScore({
+        hand: 1,
+        bidder: "N",
+        bidAmount: 120,
+        nsTotal: 200,
+        ewTotal: 0,
+        nsDelta: 200,
+        ewDelta: 0,
+        shotMoon: true,
+        moonShooterWentSet: false,
+      }),
+    ];
+
+    // startScores NS=50 means pre-hand score is 50 (>=0) → made-positive
+    const rows = buildHandHistoryRows(history, { NS: 50, EW: 100 });
+    expect(rows[0].moonOutcome).toBe("made-positive");
+  });
+
+  it("moonOutcome is 'made-in-hole' when moon made and bidder pre-hand score < 0", () => {
+    // NS bidder, pre-hand score is -50 (NS starts at -50)
+    const history: HandScore[] = [
+      makeHandScore({
+        hand: 1,
+        bidder: "N",
+        bidAmount: 120,
+        nsTotal: 200,
+        ewTotal: 0,
+        nsDelta: 45,
+        ewDelta: 0,
+        shotMoon: true,
+        moonShooterWentSet: false,
+      }),
+    ];
+
+    // startScores NS=-50 → pre-hand score is -50 (<0) → made-in-hole
+    const rows = buildHandHistoryRows(history, { NS: -50, EW: 100 });
+    expect(rows[0].moonOutcome).toBe("made-in-hole");
+  });
+
+  it("moonOutcome is 'made-positive' when moon made and bidder pre-hand score is exactly 0", () => {
+    const history: HandScore[] = [
+      makeHandScore({
+        hand: 1,
+        bidder: "N",
+        bidAmount: 120,
+        nsTotal: 200,
+        ewTotal: 0,
+        nsDelta: 200,
+        ewDelta: 0,
+        shotMoon: true,
+        moonShooterWentSet: false,
+      }),
+    ];
+    // startScores NS=0 → pre-hand = 0 → not < 0 → "made-positive"
+    const rows = buildHandHistoryRows(history, { NS: 0, EW: 0 });
+    expect(rows[0].moonOutcome).toBe("made-positive");
+  });
+
   // ── seatNames parameter ────────────────────────────────────────────────────
 
   it("bidderLabel uses seatNames display name when provided for the bidder seat", () => {

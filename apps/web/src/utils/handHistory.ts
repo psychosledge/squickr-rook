@@ -11,6 +11,7 @@ export type HandHistoryRow = {
   bidMade: boolean;
   shotMoon: boolean;
   moonShooterWentSet: boolean;
+  moonOutcome: "set" | "made-positive" | "made-in-hole" | null;
   nsDelta: number;
   ewDelta: number;
   nsCumulative: number;
@@ -38,6 +39,21 @@ export function buildHandHistoryRows(
 
     const bidMade = (shotMoon && !moonShooterWentSet) || bidderPoints >= bidAmount;
 
+    // Capture pre-hand cumulative scores BEFORE adding deltas
+    const preHandNs = nsCumulative;
+    const preHandEw = ewCumulative;
+
+    // Compute moonOutcome using pre-hand bidder score
+    let moonOutcome: HandHistoryRow["moonOutcome"] = null;
+    if (shotMoon) {
+      if (moonShooterWentSet) {
+        moonOutcome = "set";
+      } else {
+        const preHandBidderScore = bidderTeam === "NS" ? preHandNs : preHandEw;
+        moonOutcome = preHandBidderScore < 0 ? "made-in-hole" : "made-positive";
+      }
+    }
+
     nsCumulative += nsDelta;
     ewCumulative += ewDelta;
 
@@ -50,6 +66,7 @@ export function buildHandHistoryRows(
       bidMade,
       shotMoon,
       moonShooterWentSet,
+      moonOutcome,
       nsDelta,
       ewDelta,
       nsCumulative,

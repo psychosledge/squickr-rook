@@ -376,21 +376,22 @@ describe("HandResultOverlay", () => {
 
 describe("HandResultOverlay — moon hand display (hide Points/Delta columns)", () => {
   // ── Test 14 ────────────────────────────────────────────────────────────────
-  it("14. When shotMoon=true, Points column header is NOT rendered", () => {
+  it("14. When shotMoon=true, Points column header IS rendered", () => {
     const tree = HandResultOverlayView(
       makeViewProps({ score: makeHandScore({ shotMoon: true }) }),
     );
     const allText = flattenText(tree);
-    expect(allText).not.toContain("Points");
+    expect(allText).toContain("Points");
   });
 
   // ── Test 15 ────────────────────────────────────────────────────────────────
-  it("15. When shotMoon=true, Delta column header is NOT rendered", () => {
+  it("15. Delta header NOT rendered; Outcome IS rendered (for all hands including moon)", () => {
     const tree = HandResultOverlayView(
       makeViewProps({ score: makeHandScore({ shotMoon: true }) }),
     );
     const allText = flattenText(tree);
     expect(allText).not.toContain("Delta");
+    expect(allText).toContain("Outcome");
   });
 
   // ── Test 16 ────────────────────────────────────────────────────────────────
@@ -404,47 +405,72 @@ describe("HandResultOverlay — moon hand display (hide Points/Delta columns)", 
   });
 
   // ── Test 17 ────────────────────────────────────────────────────────────────
-  it("17. When shotMoon=true, individual Points cells are NOT in table", () => {
+  it("17. When shotMoon=true, data rows have exactly 4 cells each (Team + Points + Outcome + Total)", () => {
     const score = makeHandScore({ shotMoon: true, nsTotal: 120, ewTotal: 0 });
     const tree = HandResultOverlayView(makeViewProps({ score }));
     const all = flattenElements(tree);
 
     // Find the table body rows
     const trs = all.filter((el) => el.type === "tr");
-    // The data rows should have 2 cells each (Team + Total), not 4
+    // The data rows should have 4 cells each
     const dataTrs = trs.filter((tr) => {
       // tbody rows exist — filter by having td children
       const cells = flattenElements(tr).filter((el) => el.type === "td");
       return cells.length > 0;
     });
-    // Each data row should have exactly 2 tds
+    // Each data row should have exactly 4 tds
     for (const tr of dataTrs) {
       const tds = flattenElements(tr).filter((el) => el.type === "td");
-      expect(tds).toHaveLength(2);
+      expect(tds).toHaveLength(4);
     }
   });
 
   // ── Test 18 ────────────────────────────────────────────────────────────────
-  it("18. When shotMoon=true, individual Delta cells are NOT in table", () => {
-    // nsDelta=+200 would render as "+200", ewDelta=-200 as "-200"
-    // Neither should appear in the tree
-    const score = makeHandScore({ shotMoon: true, nsDelta: 200, ewDelta: -200 });
+  it("17b. When shotMoon=true, Points column shows actual captured points (nsTotal/ewTotal), not —", () => {
+    const score = makeHandScore({ shotMoon: true, nsTotal: 120, ewTotal: 80 });
+    const tree = HandResultOverlayView(makeViewProps({ score }));
+    const all = flattenElements(tree);
+    // Find the Points <th> to locate the column index
+    const ths = all.filter((el) => el.type === "th");
+    const pointsColIndex = ths.findIndex((th) => flattenText(th) === "Points");
+    expect(pointsColIndex).toBeGreaterThanOrEqual(0);
+    // Find tbody data rows and check the Points cell (column index) contains actual numbers
+    const trs = all.filter((el) => el.type === "tr");
+    const dataTrs = trs.filter((tr) => flattenElements(tr).some((el) => el.type === "td"));
+    const pointsValues = dataTrs.map((tr) => {
+      const tds = flattenElements(tr).filter((el) => el.type === "td");
+      return flattenText(tds[pointsColIndex]);
+    });
+    expect(pointsValues).toContain("120");
+    expect(pointsValues).toContain("80");
+  });
+
+  it("18. When shotMoon=true and moonShooterWentSet=true, 'Instant loss' and 'Instant win' are in tree", () => {
+    const score = makeHandScore({
+      shotMoon: true,
+      moonShooterWentSet: true,
+      bidder: "N",
+      nsDelta: -120,
+      ewDelta: 200,
+    });
     const tree = HandResultOverlayView(makeViewProps({ score }));
     const allText = flattenText(tree);
     expect(allText).not.toContain("+200");
-    expect(allText).not.toContain("-200");
+    expect(allText).toContain("Instant loss");
+    expect(allText).toContain("Instant win");
   });
 
   // ── Test 19 ────────────────────────────────────────────────────────────────
-  it("19. When shotMoon=false, all four column headers ARE rendered", () => {
+  it("19. When shotMoon=false, all four column headers ARE rendered (Outcome instead of Delta)", () => {
     const tree = HandResultOverlayView(
       makeViewProps({ score: makeHandScore({ shotMoon: false }) }),
     );
     const allText = flattenText(tree);
     expect(allText).toContain("Team");
     expect(allText).toContain("Points");
-    expect(allText).toContain("Delta");
+    expect(allText).toContain("Outcome");
     expect(allText).toContain("Total");
+    expect(allText).not.toContain("Delta");
   });
 
   // ── Test 20 ────────────────────────────────────────────────────────────────
@@ -456,5 +482,70 @@ describe("HandResultOverlay — moon hand display (hide Points/Delta columns)", 
     );
     const allText = flattenText(tree);
     expect(allText).toContain("🌙");
+  });
+
+  // ── Test 21 ────────────────────────────────────────────────────────────────
+  it("21. Moon-set: bidder team cell shows 'Instant loss', opponent shows 'Instant win'", () => {
+    // NS is bidder (N), moon set → NS gets "Instant loss", EW gets "Instant win"
+    const score = makeHandScore({
+      bidder: "N",
+      shotMoon: true,
+      moonShooterWentSet: true,
+      nsDelta: -120,
+      ewDelta: 200,
+    });
+    const tree = HandResultOverlayView(makeViewProps({ score }));
+    const allText = flattenText(tree);
+    expect(allText).toContain("Instant loss");
+    expect(allText).toContain("Instant win");
+  });
+
+  // ── Test 22 ────────────────────────────────────────────────────────────────
+  it("22. Moon-made-positive (pre-hand bidder score >= 0): bidder shows 'Instant win', opponent shows numeric delta", () => {
+    // NS bidder, pre-hand score = runningScores.NS - nsDelta = 120 - 200 = -80... 
+    // Wait, we need pre-hand score >= 0. 
+    // runningScores.NS = 250, nsDelta = 200 → pre-hand = 250 - 200 = 50 >= 0
+    const score = makeHandScore({
+      bidder: "N",
+      shotMoon: true,
+      moonShooterWentSet: false,
+      nsDelta: 200,
+      ewDelta: 0,
+    });
+    const runningScores = { NS: 250, EW: 100 }; // pre-hand NS = 250 - 200 = 50 >= 0
+    const tree = HandResultOverlayView(makeViewProps({ score, runningScores }));
+    const allText = flattenText(tree);
+    expect(allText).toContain("Instant win");
+    expect(allText).toContain("+0"); // EW numeric delta
+  });
+
+  // ── Test 23 ────────────────────────────────────────────────────────────────
+  it("23. Moon-made-in-hole (pre-hand bidder score < 0): bidder shows 'Reset to 0', opponent shows numeric delta", () => {
+    // NS bidder, nsDelta = 45, runningScores.NS = 0 → pre-hand = 0 - 45 = -45 < 0
+    const score = makeHandScore({
+      bidder: "N",
+      shotMoon: true,
+      moonShooterWentSet: false,
+      nsDelta: 45,
+      ewDelta: 0,
+    });
+    const runningScores = { NS: 0, EW: 120 }; // pre-hand NS = 0 - 45 = -45 < 0
+    const tree = HandResultOverlayView(makeViewProps({ score, runningScores }));
+    const allText = flattenText(tree);
+    expect(allText).toContain("Reset to 0");
+    expect(allText).toContain("+0"); // EW numeric delta
+  });
+
+  // ── Test 24 ────────────────────────────────────────────────────────────────
+  it("24. Non-moon hand: Outcome column shows numeric delta +120 / -120 (backward-compat)", () => {
+    const score = makeHandScore({
+      shotMoon: false,
+      nsDelta: 120,
+      ewDelta: -120,
+    });
+    const tree = HandResultOverlayView(makeViewProps({ score }));
+    const allText = flattenText(tree);
+    expect(allText).toContain("+120");
+    expect(allText).toContain("-120");
   });
 });

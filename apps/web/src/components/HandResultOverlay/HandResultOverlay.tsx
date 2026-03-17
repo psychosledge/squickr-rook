@@ -21,6 +21,55 @@ export type HandResultOverlayViewProps = Props & {
   onTabChange: (tab: "result" | "history") => void;
 };
 
+/** Returns the Outcome cell content for a given team row. */
+function renderOutcomeCell(
+  score: HandScore,
+  team: Team,
+  runningScores: Record<Team, number>,
+  styles: Record<string, string>,
+): React.ReactNode {
+  const { shotMoon, moonShooterWentSet, nsDelta, ewDelta } = score;
+  const bidderTeam: Team = SEAT_TEAM[score.bidder];
+
+  if (!shotMoon) {
+    // Normal hand — numeric delta
+    const delta = team === "NS" ? nsDelta : ewDelta;
+    return (
+      <td className={delta >= 0 ? styles.pos : styles.neg}>
+        {delta >= 0 ? "+" : ""}{delta}
+      </td>
+    );
+  }
+
+  // Moon hand
+  if (moonShooterWentSet) {
+    if (team === bidderTeam) {
+      return <td className={styles.neg}>Instant loss</td>;
+    } else {
+      return <td className={styles.pos}>Instant win</td>;
+    }
+  }
+
+  // Moon made — determine made-in-hole vs made-positive using pre-hand score
+  const teamDelta = team === "NS" ? nsDelta : ewDelta;
+  const preHandScore = runningScores[team] - teamDelta;
+
+  if (team === bidderTeam) {
+    if (preHandScore < 0) {
+      return <td className={styles.pos}>Reset to 0</td>;
+    } else {
+      return <td className={styles.pos}>Instant win</td>;
+    }
+  } else {
+    // Opponent — show numeric delta
+    return (
+      <td className={teamDelta >= 0 ? styles.pos : styles.neg}>
+        {teamDelta >= 0 ? "+" : ""}{teamDelta}
+      </td>
+    );
+  }
+}
+
 export function HandResultOverlayView({
   score,
   runningScores,
@@ -30,7 +79,7 @@ export function HandResultOverlayView({
   activeTab,
   onTabChange,
 }: HandResultOverlayViewProps) {
-  const { bidder, bidAmount, nsDelta, ewDelta, nsTotal, ewTotal, shotMoon } = score;
+  const { bidder, bidAmount, nsTotal, ewTotal } = score;
   const bidderTeam: Team = SEAT_TEAM[bidder];
   const bidderPoints = bidderTeam === "NS" ? nsTotal : ewTotal;
   const bidWon = bidderPoints >= bidAmount || (score.shotMoon && !score.moonShooterWentSet);
@@ -74,30 +123,22 @@ export function HandResultOverlayView({
               <thead>
                 <tr>
                   <th>Team</th>
-                  {!shotMoon && <th>Points</th>}
-                  {!shotMoon && <th>Delta</th>}
+                  <th>Points</th>
+                  <th>Outcome</th>
                   <th>Total</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>{teamDisplay("NS", seatNames)}</td>
-                  {!shotMoon && <td>{nsTotal}</td>}
-                  {!shotMoon && (
-                    <td className={nsDelta >= 0 ? styles.pos : styles.neg}>
-                      {nsDelta >= 0 ? "+" : ""}{nsDelta}
-                    </td>
-                  )}
+                  <td>{score.nsTotal}</td>
+                  {renderOutcomeCell(score, "NS", runningScores, styles)}
                   <td><strong>{runningScores.NS}</strong></td>
                 </tr>
                 <tr>
                   <td>{teamDisplay("EW", seatNames)}</td>
-                  {!shotMoon && <td>{ewTotal}</td>}
-                  {!shotMoon && (
-                    <td className={ewDelta >= 0 ? styles.pos : styles.neg}>
-                      {ewDelta >= 0 ? "+" : ""}{ewDelta}
-                    </td>
-                  )}
+                  <td>{score.ewTotal}</td>
+                  {renderOutcomeCell(score, "EW", runningScores, styles)}
                   <td><strong>{runningScores.EW}</strong></td>
                 </tr>
               </tbody>

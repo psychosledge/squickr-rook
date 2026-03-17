@@ -97,6 +97,7 @@ function makeRow(overrides: Partial<HandHistoryRow> = {}): HandHistoryRow {
     bidMade: true,
     shotMoon: false,
     moonShooterWentSet: false,
+    moonOutcome: null,
     nsDelta: 120,
     ewDelta: -120,
     nsCumulative: 120,
@@ -524,4 +525,93 @@ describe("HandHistoryTable", () => {
       expect(trs).toHaveLength(4); // 1 header + 3 data rows
     });
   });
+
+  // 15. Moon delta rendering in HandHistoryTable
+  describe("moon delta rendering", () => {
+    it("moon-set: NS bidder cell shows '🌙 Set', EW opponent shows numeric delta", () => {
+      const row = makeRow({
+        bidderTeam: "NS",
+        shotMoon: true,
+        moonShooterWentSet: true,
+        moonOutcome: "set",
+        bidMade: false,
+        nsDelta: -120,
+        ewDelta: 200,
+        nsCumulative: -120,
+        ewCumulative: 200,
+      });
+      const tree = HandHistoryTable({ rows: [row] });
+      const allText = flattenText(tree);
+      expect(allText).toContain("🌙 Set");
+      expect(allText).toContain("+200");
+    });
+
+    it("moon-made-positive: NS bidder cell shows '🌙 Win', EW opponent shows numeric delta", () => {
+      const row = makeRow({
+        bidderTeam: "NS",
+        shotMoon: true,
+        moonShooterWentSet: false,
+        moonOutcome: "made-positive",
+        bidMade: true,
+        nsDelta: 200,
+        ewDelta: 0,
+        nsCumulative: 200,
+        ewCumulative: 0,
+      });
+      const tree = HandHistoryTable({ rows: [row] });
+      const allText = flattenText(tree);
+      expect(allText).toContain("🌙 Win");
+    });
+
+    it("moon-made-in-hole: NS bidder cell shows '🌙 ↑0', EW opponent shows numeric delta", () => {
+      const row = makeRow({
+        bidderTeam: "NS",
+        shotMoon: true,
+        moonShooterWentSet: false,
+        moonOutcome: "made-in-hole",
+        bidMade: true,
+        nsDelta: 45,
+        ewDelta: 0,
+        nsCumulative: 0,
+        ewCumulative: 200,
+      });
+      const tree = HandHistoryTable({ rows: [row] });
+      const allText = flattenText(tree);
+      expect(allText).toContain("🌙 ↑0");
+    });
+
+    it("non-moon hand: both NS and EW show numeric deltas (backward-compat)", () => {
+      const row = makeRow({
+        shotMoon: false,
+        moonOutcome: null,
+        nsDelta: 120,
+        ewDelta: -120,
+        nsCumulative: 120,
+        ewCumulative: -120,
+      });
+      const tree = HandHistoryTable({ rows: [row] });
+      const allText = flattenText(tree);
+      expect(allText).toContain("+120");
+      expect(allText).toContain("-120");
+    });
+    it("moon-made-positive: EW bidder cell shows '🌙 Win', NS opponent shows numeric delta", () => {
+      const row = makeRow({
+        bidderTeam: "EW",
+        bidderSeat: "E",
+        shotMoon: true,
+        moonShooterWentSet: false,
+        moonOutcome: "made-positive",
+        bidMade: true,
+        nsDelta: 0,
+        ewDelta: 200,
+        nsCumulative: 0,
+        ewCumulative: 200,
+      });
+      const tree = HandHistoryTable({ rows: [row] });
+      const allText = flattenText(tree);
+      expect(allText).toContain("🌙 Win");
+      expect(allText).toContain("+0"); // NS numeric delta
+    });
+  });
 });
+

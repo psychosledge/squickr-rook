@@ -105,6 +105,7 @@ function makeRow(overrides: Partial<HandHistoryRow> = {}): HandHistoryRow {
     bidMade: true,
     shotMoon: false,
     moonShooterWentSet: false,
+    moonOutcome: null,
     nsDelta: 120,
     ewDelta: -120,
     nsCumulative: 120,

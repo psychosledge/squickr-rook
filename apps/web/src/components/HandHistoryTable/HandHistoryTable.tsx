@@ -1,4 +1,5 @@
 import type { HandHistoryRow } from "@/utils/handHistory";
+import type { Team } from "@rook/engine";
 import styles from "./HandHistoryTable.module.css";
 
 type Props = {
@@ -12,6 +13,31 @@ function formatDelta(value: number): string {
 
 function outcomeClass(row: HandHistoryRow): string {
   return row.bidMade ? styles.pos : styles.neg;
+}
+
+/**
+ * Returns moon-specific delta label and CSS class for a given team,
+ * or null if this is not a moon hand (fall through to normal delta rendering).
+ */
+function formatMoonDelta(
+  row: HandHistoryRow,
+  team: Team,
+): { text: string; className: string } | null {
+  if (row.moonOutcome === null) return null;
+
+  if (team === row.bidderTeam) {
+    // Bidder team
+    switch (row.moonOutcome) {
+      case "set":
+        return { text: "🌙 Set", className: styles.neg };
+      case "made-positive":
+        return { text: "🌙 Win", className: styles.pos };
+      case "made-in-hole":
+        return { text: "🌙 ↑0", className: styles.pos };
+    }
+  }
+  // Opponent team — render numeric delta as normal
+  return null;
 }
 
 export default function HandHistoryTable({ rows, highlightLast }: Props) {
@@ -35,6 +61,9 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
           const isLast = index === rows.length - 1;
           const rowClass = highlightLast && isLast ? styles.highlighted : undefined;
 
+          const nsMoon = formatMoonDelta(row, "NS");
+          const ewMoon = formatMoonDelta(row, "EW");
+
           return (
             <tr key={row.handNumber} className={rowClass}>
               <td className={`${outcomeClass(row)} ${styles.iconCell}`}>
@@ -45,17 +74,29 @@ export default function HandHistoryTable({ rows, highlightLast }: Props) {
               <td>
                 <div className={styles.scoreCell}>
                   <span className={styles.scoreCumulative}>{row.nsCumulative}</span>
-                  <span className={`${styles.scoreDelta} ${row.nsDelta >= 0 ? styles.pos : styles.neg}`}>
-                    {formatDelta(row.nsDelta)}
-                  </span>
+                  {nsMoon ? (
+                    <span className={`${styles.scoreDelta} ${nsMoon.className}`}>
+                      {nsMoon.text}
+                    </span>
+                  ) : (
+                    <span className={`${styles.scoreDelta} ${row.nsDelta >= 0 ? styles.pos : styles.neg}`}>
+                      {formatDelta(row.nsDelta)}
+                    </span>
+                  )}
                 </div>
               </td>
               <td>
                 <div className={styles.scoreCell}>
                   <span className={styles.scoreCumulative}>{row.ewCumulative}</span>
-                  <span className={`${styles.scoreDelta} ${row.ewDelta >= 0 ? styles.pos : styles.neg}`}>
-                    {formatDelta(row.ewDelta)}
-                  </span>
+                  {ewMoon ? (
+                    <span className={`${styles.scoreDelta} ${ewMoon.className}`}>
+                      {ewMoon.text}
+                    </span>
+                  ) : (
+                    <span className={`${styles.scoreDelta} ${row.ewDelta >= 0 ? styles.pos : styles.neg}`}>
+                      {formatDelta(row.ewDelta)}
+                    </span>
+                  )}
                 </div>
               </td>
             </tr>
