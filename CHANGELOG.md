@@ -4,6 +4,18 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.3.0] — 2026-03-16
+
+### New Features
+- **Per-seat bot difficulty** — the host can now set a different difficulty level (L1–L5) for each bot seat in the online lobby before starting a game; defaults to L3; picker appears on all empty/bot seats, host-only
+
+### Bug Fixes
+- **Play Again loop** — clicking Play Again on the online game-over screen was re-navigating back to the same finished game instead of returning to the lobby; fixed by gating the reconnect-guard effect on `lobbyPhase !== 'idle'`
+- **Empty lobby seats not marked as bot seats** — difficulty pickers were not showing because empty lobby seats were tagged `isBot: false`; they are now correctly `isBot: true` since any empty seat becomes a bot at game start
+- **Seat card layout** — cards were left-aligned on wide screens and clipped at 480–640px viewport widths; seat grid is now centered and the responsive stacking breakpoint raised to 640px
+
+---
+
 ## [v1.2.0] — 2026-03-15
 
 ### Bot Improvements
