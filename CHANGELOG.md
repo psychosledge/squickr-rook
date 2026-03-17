@@ -4,6 +4,14 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.4.0] — 2026-03-16
+
+### New Features
+- **View last trick** — a 🃏 button in the score bar lets you inspect the last completed trick at any time during the playing, scoring, or hand-result phases; shows all four cards played, the trump suit, and which player won the trick
+- **Moon shot hand result display** — when a moon shot hand ends, the Points and Outcome columns are now shown in the hand result overlay instead of being hidden; the Outcome column displays clear labels ("Instant win", "Instant loss", "Reset to 0") so the stakes of a moon bid are always visible
+
+---
+
 ## [v1.3.0] — 2026-03-16
 
 ### New Features
