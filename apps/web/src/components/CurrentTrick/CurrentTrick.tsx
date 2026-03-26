@@ -8,11 +8,12 @@ type Props = {
   trick: PlayedCard[];
   trump: Color | null;
   humanSeat?: Seat;
+  seatNames?: Partial<Record<Seat, string>>;
 };
 
 const ALL_SEATS: Seat[] = ["S", "E", "W", "N"];
 
-export default function CurrentTrick({ trick, trump: _trump, humanSeat }: Props) {
+export default function CurrentTrick({ trick, trump: _trump, humanSeat, seatNames }: Props) {
   const { bottom, top, left, right } = deriveSlots(humanSeat ?? "N");
   const seatArea: Record<Seat, string> = {
     [bottom]: "bottom",
@@ -46,7 +47,9 @@ export default function CurrentTrick({ trick, trump: _trump, humanSeat }: Props)
                   isDisplay={true}
                   style={{ width: "var(--trick-card-w)", height: "var(--trick-card-h)" }}
                 />
-                <span className={styles.seatLabel}>{getSeatLabel(seat)}</span>
+                <span className={styles.seatLabel}>
+                  {seatNames?.[seat] ?? (seat === (humanSeat ?? "N") ? "You" : getSeatLabel(seat))}
+                </span>
               </>
             ) : null}
           </div>

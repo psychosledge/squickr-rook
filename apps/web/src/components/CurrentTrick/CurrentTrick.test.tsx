@@ -398,3 +398,135 @@ describe("CurrentTrick — spatial 3×3 grid layout", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Seat label resolution tests (online multiplayer "You" label bug fix)
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: given a rendered CurrentTrick element, collect the text content of
+ * the seatLabel span for the given seat (if the seat has played a card).
+ */
+function getSeatLabelText(
+  element: React.ReactNode,
+  seat: string
+): string | undefined {
+  const { elements } = collectTree(element);
+  const slot = findSlotBySeat(elements, seat);
+  if (!slot) return undefined;
+
+  // Collect all seatLabel spans inside this slot
+  const { elements: slotEls } = collectTree(slot);
+  const labelSpan = slotEls.find((el) => {
+    const p = el.props as Record<string, unknown>;
+    return typeof p.className === "string" && p.className.includes("seatLabel");
+  });
+  if (!labelSpan) return undefined;
+  return collectText(labelSpan);
+}
+
+describe("CurrentTrick — seat label resolution (You label / online multiplayer)", () => {
+  // NOTE: getSeatLabel is mocked above to return `Label-${seat}`.
+  // So getSeatLabel("N") = "Label-N", getSeatLabel("E") = "Label-E", etc.
+  // In these tests we verify the priority logic:
+  //   seatNames?.[seat] ?? (seat === (humanSeat ?? "N") ? "You" : getSeatLabel(seat))
+
+  const allSeatsTrick: PlayedCard[] = [
+    { seat: "N", cardId: "N1" },
+    { seat: "E", cardId: "E1" },
+    { seat: "S", cardId: "S1" },
+    { seat: "W", cardId: "W1" },
+  ];
+
+  describe("1. Default solo behavior — no humanSeat, no seatNames", () => {
+    it("seat N label is 'You' (humanSeat defaults to N)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null });
+      expect(getSeatLabelText(element, "N")).toBe("You");
+    });
+
+    it("seat E label is getSeatLabel('E') = 'Label-E'", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null });
+      expect(getSeatLabelText(element, "E")).toBe("Label-E");
+    });
+
+    it("seat S label is getSeatLabel('S') = 'Label-S'", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null });
+      expect(getSeatLabelText(element, "S")).toBe("Label-S");
+    });
+
+    it("seat W label is getSeatLabel('W') = 'Label-W'", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null });
+      expect(getSeatLabelText(element, "W")).toBe("Label-W");
+    });
+  });
+
+  describe("2. Online: humanSeat='E', no seatNames", () => {
+    it("seat E label is 'You'", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E" });
+      expect(getSeatLabelText(element, "E")).toBe("You");
+    });
+
+    it("seat N label is getSeatLabel('N') = 'Label-N' (NOT 'You')", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E" });
+      expect(getSeatLabelText(element, "N")).toBe("Label-N");
+    });
+
+    it("seat S label is getSeatLabel('S') = 'Label-S'", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E" });
+      expect(getSeatLabelText(element, "S")).toBe("Label-S");
+    });
+
+    it("seat W label is getSeatLabel('W') = 'Label-W'", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E" });
+      expect(getSeatLabelText(element, "W")).toBe("Label-W");
+    });
+  });
+
+  describe("3. Online: seatNames fully provided, humanSeat='E'", () => {
+    const seatNames = { N: "Alice", E: "Bob", S: "Carol", W: "Dave" };
+
+    it("seat N shows 'Alice' (from seatNames)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E", seatNames });
+      expect(getSeatLabelText(element, "N")).toBe("Alice");
+    });
+
+    it("seat E shows 'Bob' (from seatNames, not 'You')", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E", seatNames });
+      expect(getSeatLabelText(element, "E")).toBe("Bob");
+    });
+
+    it("seat S shows 'Carol' (from seatNames)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E", seatNames });
+      expect(getSeatLabelText(element, "S")).toBe("Carol");
+    });
+
+    it("seat W shows 'Dave' (from seatNames)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "E", seatNames });
+      expect(getSeatLabelText(element, "W")).toBe("Dave");
+    });
+  });
+
+  describe("4. Online: partial seatNames, humanSeat='S'", () => {
+    const seatNames = { N: "Alice" };
+
+    it("seat N shows 'Alice' (from partial seatNames)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "S", seatNames });
+      expect(getSeatLabelText(element, "N")).toBe("Alice");
+    });
+
+    it("seat S shows 'You' (humanSeat match, not in seatNames)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "S", seatNames });
+      expect(getSeatLabelText(element, "S")).toBe("You");
+    });
+
+    it("seat E shows 'Label-E' (not in seatNames, not humanSeat)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "S", seatNames });
+      expect(getSeatLabelText(element, "E")).toBe("Label-E");
+    });
+
+    it("seat W shows 'Label-W' (not in seatNames, not humanSeat)", () => {
+      const element = CurrentTrick({ trick: allSeatsTrick, trump: null, humanSeat: "S", seatNames });
+      expect(getSeatLabelText(element, "W")).toBe("Label-W");
+    });
+  });
+});

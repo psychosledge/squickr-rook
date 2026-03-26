@@ -36,12 +36,13 @@ function partnerOf(seat: Seat): Seat {
  */
 function buildAnnouncementFromEvent(ev: GameEvent, _rules: GameRules): string | null {
   if (ev.type === "BiddingComplete") {
-    const label = getSeatLabel(ev.winner);
+    const label = ev.winner === HUMAN_SEAT ? "You" : getSeatLabel(ev.winner);
     const moon = ev.shotMoon ? " — SHOOT THE MOON!" : "";
     return `${label} won the bid at ${ev.amount}${moon}`;
   }
   if (ev.type === "TrumpSelected") {
-    return `${getSeatLabel(ev.seat)} chose ${ev.color} as trump`;
+    const label = ev.seat === HUMAN_SEAT ? "You" : getSeatLabel(ev.seat);
+    return `${label} chose ${ev.color} as trump`;
   }
   return null;
 }

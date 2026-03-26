@@ -2,7 +2,7 @@ import type { Seat, Team } from "@rook/engine";
 
 export function getSeatLabel(seat: Seat): string {
   const labels: Record<Seat, string> = {
-    N: "You",
+    N: "P1",
     E: "P2",
     S: "P3",
     W: "P4",

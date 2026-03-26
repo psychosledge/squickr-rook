@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { getSeatLabel, getLobbyLabel, getTeamLabel, teamDisplay } from "./seatLabel";
 
 describe("getSeatLabel", () => {
-  it('getSeatLabel("N") === "You"', () => {
-    expect(getSeatLabel("N")).toBe("You");
+  it('getSeatLabel("N") === "P1"', () => {
+    expect(getSeatLabel("N")).toBe("P1");
   });
 
   it('getSeatLabel("E") === "P2"', () => {

@@ -111,6 +111,7 @@ export default function GamePage() {
         <TrumpPicker onSelect={humanSelectTrump} />
       )}
 
+      {/* seatNames intentionally omitted — CurrentTrick uses humanSeat="N" default in solo mode */}
       <GameTable gameState={gameState} onPlayCard={humanPlayCard} difficultyLabels={difficultyLabels} biddingThinkingSeat={biddingThinkingSeat} />
 
       {overlay === "nest" && (

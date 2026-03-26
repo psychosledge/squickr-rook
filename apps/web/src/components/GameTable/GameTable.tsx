@@ -47,7 +47,7 @@ export default function GameTable({ gameState, onPlayCard, seatNames, difficulty
 
       {/* Center trick area */}
       <div className={styles.center}>
-        <CurrentTrick trick={currentTrick} trump={trump} humanSeat={humanSeat} />
+        <CurrentTrick trick={currentTrick} trump={trump} humanSeat={humanSeat} seatNames={seatNames} />
       </div>
 
       {/* Opponent — screen-right (previous clockwise from human) */}
