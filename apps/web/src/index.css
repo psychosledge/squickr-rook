@@ -11,6 +11,8 @@
   --color-green-card: #27ae60;
   --color-yellow-card: #f39c12;
   --color-rook-card: #6c3483;
+  /* base font-size: scales rem units fluidly from 16px (mobile) to 20px (wide desktop) */
+  font-size: clamp(16px, 1.5vw + 10.4px, 20px);
   /* mobile-first: base = mobile */
   --card-w: 48px;
   --card-h: 68px;
@@ -36,20 +38,20 @@ body {
 /* tablet */
 @media (min-width: 601px) {
   :root {
-    --card-w: 52px;
-    --card-h: 74px;
-    --card-w-sm: 31px;
-    --card-h-sm: 44px;
+    --card-w: 56px;
+    --card-h: 80px;
+    --card-w-sm: 34px;
+    --card-h-sm: 48px;
   }
 }
 
 /* desktop */
 @media (min-width: 901px) {
   :root {
-    --card-w: 56px;
-    --card-h: 80px;
-    --card-w-sm: 34px;
-    --card-h-sm: 48px;
+    --card-w: 60px;
+    --card-h: 86px;
+    --card-w-sm: 36px;
+    --card-h-sm: 52px;
   }
 }
 

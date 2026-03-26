@@ -243,7 +243,7 @@
 }
 
 .seatBtn {
-  padding: 6px 12px;
+  padding: 10px 16px;
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 6px;
@@ -253,6 +253,7 @@
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   margin-top: auto;
+  min-height: 44px;
 }
 
 @media (hover: hover) {
@@ -350,8 +351,9 @@
   margin-top: 4px;
 }
 
+/* 36px (not 44px) — compact pill selectors in a constrained seatCard; full 44px would push card height uncomfortably */
 .difficultyBtn {
-  padding: 2px 4px;
+  padding: 6px 8px;
   font-size: 0.7rem;
   font-weight: 600;
   border-radius: 4px;
@@ -361,6 +363,7 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
+  min-height: 36px;
 }
 
 @media (hover: hover) {

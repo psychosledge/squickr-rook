@@ -32,11 +32,11 @@
 }
 
 .name      { color: #ccc; }
-.indicator { color: var(--color-accent); font-size: 0.6rem; }
+.indicator { color: var(--color-accent); font-size: 0.75rem; }
 
 .bidBadge {
   color: #f0c040;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   background: rgba(240, 192, 64, 0.12);
@@ -47,7 +47,7 @@
 
 .dealerBadge {
   color: #5dade2;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   background: rgba(93, 173, 226, 0.12);
@@ -58,7 +58,7 @@
 
 .diffBadge {
   color: #888;
-  font-size: 0.60rem;
+  font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.02em;
   background: rgba(128, 128, 128, 0.10);

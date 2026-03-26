@@ -30,7 +30,7 @@
 }
 
 .seatLabel {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: #888;
   letter-spacing: 0.02em;
 }
@@ -42,9 +42,5 @@
     gap: 6px;
     --trick-card-w: calc(var(--card-w) * 1.2);
     --trick-card-h: calc(var(--card-h) * 1.2);
-  }
-
-  .seatLabel {
-    font-size: 0.7rem;
   }
 }
