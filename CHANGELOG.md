@@ -4,6 +4,20 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.5.0] — 2026-03-25
+
+### Improvements
+- **Larger text on tablets and phones** — font sizes now scale fluidly from 16px on mobile up to 20px on iPad and desktop via `clamp()`, making the game significantly more readable for older users and on smaller screens
+- **Bigger touch targets** — bid step buttons (−/+) enlarged from 36→44px; all bidding overlay buttons, the score bar history button, and online lobby seat buttons now meet the 44px touch-target minimum
+- **Larger card sizes on tablet** — cards on iPad-sized screens bumped from 52×74px to 56×80px (matching the previous desktop size); desktop cards bumped to 60×86px
+- **Larger badge text** — dealer, bid, and difficulty badges bumped from ~10px to 12–15px depending on screen size
+
+### Bug Fixes
+- **"You" label in online multiplayer** — when playing online and seated in any position other than P1, the trick area was incorrectly labelling the P1 bot's played card as "You"; the label now correctly follows whichever seat the human player occupies
+- **Dark bidding overlay on mobile** — the full-screen scrim behind the bidding panel was `rgba(0,0,0,0.55)`, obscuring opponent bids visible on the game table; reduced to `rgba(0,0,0,0.25)` so the table remains legible while the panel still feels elevated
+
+---
+
 ## [v1.4.0] — 2026-03-16
 
 ### New Features
