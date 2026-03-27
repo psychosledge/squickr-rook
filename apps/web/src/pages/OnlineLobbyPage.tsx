@@ -286,8 +286,6 @@ export function LobbyView({
   gameStarted,
   onSetBotDifficulty,
 }: LobbyViewProps) {
-  const nsPair: Seat[] = ["N", "S"];
-  const ewPair: Seat[] = ["E", "W"];
   // Plain ref object (no React hook) — LobbyDisplayNameRow sets .current
   // so the inline ✏️ button can trigger edit state in the sub-component.
   const triggerEdit: React.MutableRefObject<() => void> = { current: () => {} };
@@ -363,13 +361,34 @@ export function LobbyView({
         <span className={styles.shareUrl}>{shareUrl}</span>
       </div>
 
-      <div className={styles.seatGrid}>
-        <div className={styles.seatPair}>
-          {nsPair.map(renderSeatCard)}
+      {/* Cardinal seat grid — mirrors in-game table positions */}
+      <div className={styles.lobbyGrid}>
+        {/* P2 = S = top-center (partner of P1) */}
+        <div className={styles.lobbyTop}>
+          {renderSeatCard("S")}
         </div>
-        <div className={styles.seatDivider} />
-        <div className={styles.seatPair}>
-          {ewPair.map(renderSeatCard)}
+
+        {/* P3 = E = screen-left */}
+        <div className={styles.lobbyLeft}>
+          {renderSeatCard("E")}
+        </div>
+
+        {/* Center: room code table badge */}
+        <div className={styles.lobbyCenter}>
+          <div className={styles.tableBadge}>
+            <span className={styles.tableBadgeCode}>{roomCode}</span>
+            <span className={styles.tableBadgeLabel}>room</span>
+          </div>
+        </div>
+
+        {/* P4 = W = screen-right */}
+        <div className={styles.lobbyRight}>
+          {renderSeatCard("W")}
+        </div>
+
+        {/* P1 = N = bottom-center (where you sit in-game) */}
+        <div className={styles.lobbyBottom}>
+          {renderSeatCard("N")}
         </div>
       </div>
 

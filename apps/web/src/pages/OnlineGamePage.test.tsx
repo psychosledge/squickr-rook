@@ -47,6 +47,11 @@ vi.mock("@/components/HandHistoryModal/HandHistoryModal", () => ({
   default: (_props: unknown) => null,
 }));
 
+vi.mock("@/components/LastTrickOverlay/LastTrickOverlay", () => ({
+  default: (_props: unknown) =>
+    React.createElement("div", { "data-testid": "last-trick-overlay" }),
+}));
+
 vi.mock("@/components/DisconnectAlert/DisconnectAlert", () => ({
   DisconnectAlert: (_props: unknown) => null,
 }));
@@ -72,6 +77,7 @@ import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay"
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import GameTable from "@/components/GameTable/GameTable";
 import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+import LastTrickOverlay from "@/components/LastTrickOverlay/LastTrickOverlay";
 import { DisconnectAlert } from "@/components/DisconnectAlert/DisconnectAlert";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +187,9 @@ function makeProps(overrides: Partial<OnlineGamePageViewProps> = {}): OnlineGame
     humanTeam: "NS",
     disconnectedAlert: null,
     isHost: false,
+    showLastTrick: false,
+    onOpenLastTrick: undefined,
+    onCloseLastTrick: vi.fn(),
     onReplaceWithBot: vi.fn(),
     onDismissDisconnectAlert: vi.fn(),
     onPlayCard: vi.fn(),
@@ -195,6 +204,7 @@ function makeProps(overrides: Partial<OnlineGamePageViewProps> = {}): OnlineGame
     openHistoryModal: vi.fn(),
     closeHistoryModal: vi.fn(),
     onPlayAgain: vi.fn(),
+    difficultyLabels: {},
     ...overrides,
   };
 }
@@ -425,6 +435,47 @@ describe("OnlineGamePageView", () => {
     expect(p.humanTeam).toBe("NS");
   });
 
+  it("26. renders LastTrickOverlay when showLastTrick is true and completedTricks is non-empty", () => {
+    const completedTrick: import("@rook/engine").CompletedTrick = {
+      plays: [
+        { seat: "N", cardId: "Y1" as import("@rook/engine").CardId },
+        { seat: "E", cardId: "Y5" as import("@rook/engine").CardId },
+        { seat: "S", cardId: "Y10" as import("@rook/engine").CardId },
+        { seat: "W", cardId: "G1" as import("@rook/engine").CardId },
+      ],
+      winner: "N",
+      leadColor: "Yellow",
+    };
+    const gameState = makeGameState({ completedTricks: [completedTrick] });
+    const tree = OnlineGamePageView(makeProps({ showLastTrick: true, gameState }));
+    const all = flattenElements(tree);
+    expect(findByType(all, LastTrickOverlay)).toHaveLength(1);
+  });
+
+  it("27. does not render LastTrickOverlay when showLastTrick is false", () => {
+    const completedTrick: import("@rook/engine").CompletedTrick = {
+      plays: [
+        { seat: "N", cardId: "Y1" as import("@rook/engine").CardId },
+      ],
+      winner: "N",
+      leadColor: "Yellow",
+    };
+    const gameState = makeGameState({ completedTricks: [completedTrick] });
+    const tree = OnlineGamePageView(makeProps({ showLastTrick: false, gameState }));
+    const all = flattenElements(tree);
+    expect(findByType(all, LastTrickOverlay)).toHaveLength(0);
+  });
+
+  it("28. passes difficultyLabels to GameTable", () => {
+    const difficultyLabels = { E: "Hard" };
+    const tree = OnlineGamePageView(makeProps({ difficultyLabels }));
+    const all = flattenElements(tree);
+    const tables = findByType(all, GameTable);
+    expect(tables).toHaveLength(1);
+    const p = tables[0].props as Record<string, unknown>;
+    expect(p.difficultyLabels).toEqual({ E: "Hard" });
+  });
+
 });
 
 describe("DisconnectAlert rendering in OnlineGamePageView", () => {
@@ -595,6 +646,17 @@ describe("shouldShowReconnecting — blank-screen guard", () => {
 
 });
 
+  it("28. passes difficultyLabels to GameTable", () => {
+    const difficultyLabels = { E: "Hard" };
+    const tree = OnlineGamePageView(makeProps({ difficultyLabels }));
+    const all = flattenElements(tree);
+    const tables = findByType(all, GameTable);
+    expect(tables).toHaveLength(1);
+    const p = tables[0].props as Record<string, unknown>;
+    expect(p.difficultyLabels).toEqual({ E: "Hard" });
+  });
+
 // Suppress unused import warnings
 void GameTable;
 void DisconnectAlert;
+void LastTrickOverlay;

@@ -35,9 +35,15 @@ vi.mock("./OnlineLobbyPage.module.css", () => ({
     roomCode: "roomCode",
     shareUrl: "shareUrl",
     roomInfo: "roomInfo",
-    seatGrid: "seatGrid",
-    seatPair: "seatPair",
-    seatDivider: "seatDivider",
+    lobbyGrid: "lobbyGrid",
+    lobbyTop: "lobbyTop",
+    lobbyLeft: "lobbyLeft",
+    lobbyRight: "lobbyRight",
+    lobbyBottom: "lobbyBottom",
+    lobbyCenter: "lobbyCenter",
+    tableBadge: "tableBadge",
+    tableBadgeCode: "tableBadgeCode",
+    tableBadgeLabel: "tableBadgeLabel",
     seatCard: "seatCard",
     mySeat: "mySeat",
     seatLabel: "seatLabel",
@@ -585,18 +591,18 @@ describe("LobbyView", () => {
     expect(errors).toHaveLength(0);
   });
 
-  it("37. onClaimSeat called with 'N' when 'Sit Here' clicked for N", () => {
+  it("37. onClaimSeat called with 'S' when 'Sit Here' clicked for first card (S, rendered at top in cardinal grid)", () => {
     const onClaimSeat = vi.fn();
     const tree = LobbyView(makeLobbyProps({ onClaimSeat, mySeat: null }));
     const all = flattenElements(tree);
     const sitBtns = findButtons(all, "seatBtn").filter((el) =>
       flattenText(el).includes("Sit Here"),
     );
-    // N is the first seat — first Sit Here button
+    // Cardinal grid renders S (top) first — first Sit Here button is for S
     expect(sitBtns.length).toBeGreaterThanOrEqual(1);
     const p = sitBtns[0].props as Record<string, unknown>;
     (p.onClick as () => void)();
-    expect(onClaimSeat).toHaveBeenCalledWith("N");
+    expect(onClaimSeat).toHaveBeenCalledWith("S");
   });
 
   it("38. onLeaveSeat called when 'Leave' clicked", () => {
@@ -677,7 +683,7 @@ describe("LobbyView", () => {
     expect(labelTexts).not.toContain("W");
   });
 
-  it("43. seat render order is N, S, E, W (NS pair first, EW pair second)", () => {
+  it("43. seat render order is S, E, W, N (cardinal grid: top, left, right, bottom)", () => {
     const tree = LobbyView(makeLobbyProps());
     const all = flattenElements(tree);
     const seatCards = findByClass(all, "seatCard");
@@ -688,35 +694,47 @@ describe("LobbyView", () => {
       const label = findByClass(cardAll, "seatLabel");
       return label.length > 0 ? flattenText(label[0]) : "";
     });
-    expect(labelTexts).toEqual(["P1", "P2", "P3", "P4"]);
+    // Cardinal grid renders: S (top) → E (left) → W (right) → N (bottom)
+    // Labels: P2, P3, P4, P1
+    expect(labelTexts).toEqual(["P2", "P3", "P4", "P1"]);
   });
 
-  it("44. seatGrid contains two pair groups (seatPair class)", () => {
+  it("44. lobbyGrid contains wrapper divs for each cardinal position (no seatPair)", () => {
     const tree = LobbyView(makeLobbyProps());
     const all = flattenElements(tree);
-    const pairGroups = findByClass(all, "seatPair");
-    expect(pairGroups).toHaveLength(2);
+    // New cardinal layout: lobbyTop, lobbyLeft, lobbyRight, lobbyBottom (4 position wrappers)
+    const topDivs = findByClass(all, "lobbyTop");
+    const leftDivs = findByClass(all, "lobbyLeft");
+    const rightDivs = findByClass(all, "lobbyRight");
+    const bottomDivs = findByClass(all, "lobbyBottom");
+    expect(topDivs).toHaveLength(1);
+    expect(leftDivs).toHaveLength(1);
+    expect(rightDivs).toHaveLength(1);
+    expect(bottomDivs).toHaveLength(1);
   });
 
-  it("45. a divider element exists between the two pair groups", () => {
-    const tree = LobbyView(makeLobbyProps());
+  it("45. a center badge element exists (lobbyCenter with room code)", () => {
+    const tree = LobbyView(makeLobbyProps({ roomCode: "ABC123" }));
     const all = flattenElements(tree);
-    const dividers = findByClass(all, "seatDivider");
-    expect(dividers).toHaveLength(1);
+    const centerDivs = findByClass(all, "lobbyCenter");
+    expect(centerDivs).toHaveLength(1);
+    const text = flattenText(centerDivs[0]);
+    expect(text).toContain("ABC123");
   });
 
-  it("46. onClaimSeat called with 'S' when Sit Here clicked for second card (S, rendered at index 1)", () => {
+  it("46. onClaimSeat called with 'E' when Sit Here clicked for second card (E, rendered at index 1 in cardinal grid)", () => {
     const onClaimSeat = vi.fn();
     const tree = LobbyView(makeLobbyProps({ onClaimSeat, mySeat: null }));
     const all = flattenElements(tree);
     const sitBtns = findButtons(all, "seatBtn").filter((el) =>
       flattenText(el).includes("Sit Here"),
     );
-    // With order N,S,E,W the second Sit Here button is for S
+    // Cardinal order: S (top), E (left), W (right), N (bottom)
+    // Second Sit Here button is for seat E
     expect(sitBtns.length).toBeGreaterThanOrEqual(2);
     const p = sitBtns[1].props as Record<string, unknown>;
     (p.onClick as () => void)();
-    expect(onClaimSeat).toHaveBeenCalledWith("S");
+    expect(onClaimSeat).toHaveBeenCalledWith("E");
   });
 });
 
@@ -1111,8 +1129,8 @@ describe("LobbyView — bot seat difficulty picker", () => {
     const tree = LobbyView(makeLobbyProps({ seats, mySeat: "N", isHost: true, gameStarted: false, onSetBotDifficulty }));
     const all = flattenElements(tree);
     const diffBtns = findButtons(all, "difficultyBtn");
-    // Seats are rendered in order N (human), S (bot), E (bot), W (bot).
-    // S is the first bot seat — its 5 buttons are indices 0–4.
+    // Cardinal grid renders: S (top), E (left), W (right), N (bottom).
+    // S is the first bot seat in DOM order — its 5 buttons are indices 0–4.
     // Index 4 is L5 for seat S.
     expect(diffBtns.length).toBeGreaterThanOrEqual(5);
     const p = diffBtns[4].props as Record<string, unknown>;

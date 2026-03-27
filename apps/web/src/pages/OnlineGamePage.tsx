@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useOnlineGameStore, MID_GAME_ROOM_KEY } from "@/store/onlineGameStore";
 import type { SeatInfo } from "@/store/onlineGameStore.types";
 import type { OverlayKind } from "@/store/gameStore.types";
 import type { GameState, HandScore, Seat, CardId, Color, Team } from "@rook/engine";
+import { BOT_DIFFICULTY_LABELS } from "@rook/engine";
 import ScoreBar from "@/components/ScoreBar/ScoreBar";
 import GameTable from "@/components/GameTable/GameTable";
 import NestOverlay from "@/components/NestOverlay/NestOverlay";
@@ -13,6 +14,7 @@ import HandResultOverlay from "@/components/HandResultOverlay/HandResultOverlay"
 import GameOverScreen from "@/components/GameOverScreen/GameOverScreen";
 import AnnouncementBanner from "@/components/AnnouncementBanner/AnnouncementBanner";
 import HandHistoryModal from "@/components/HandHistoryModal/HandHistoryModal";
+import LastTrickOverlay from "@/components/LastTrickOverlay/LastTrickOverlay";
 import { DisconnectAlert } from "@/components/DisconnectAlert/DisconnectAlert";
 import { sortHand } from "@/utils/sortHand";
 import { buildHandHistoryRows } from "@/utils/handHistory";
@@ -32,8 +34,12 @@ export type OnlineGamePageViewProps = {
   biddingThinkingSeat: Seat | null;
   seatNames?: Partial<Record<Seat, string>>;
   humanTeam: Team;
+  difficultyLabels?: Partial<Record<Seat, string>>;
   disconnectedAlert: { seat: Seat; displayName: string } | null;
   isHost: boolean;
+  showLastTrick: boolean;
+  onOpenLastTrick: (() => void) | undefined;
+  onCloseLastTrick: () => void;
   onReplaceWithBot: (seat: Seat) => void;
   onDismissDisconnectAlert: () => void;
   onPlayCard: (cardId: CardId) => void;
@@ -64,8 +70,12 @@ export function OnlineGamePageView({
   biddingThinkingSeat,
   seatNames,
   humanTeam,
+  difficultyLabels,
   disconnectedAlert,
   isHost,
+  showLastTrick,
+  onOpenLastTrick,
+  onCloseLastTrick,
   onReplaceWithBot,
   onDismissDisconnectAlert,
   onPlayCard,
@@ -86,7 +96,7 @@ export function OnlineGamePageView({
 
   return (
     <div className={styles.page}>
-      <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} seatNames={seatNames} humanSeat={humanSeat} />
+      <ScoreBar gameState={gameState} onOpenHistory={openHistoryModal} onOpenLastTrick={onOpenLastTrick} seatNames={seatNames} humanSeat={humanSeat} />
 
       <AnnouncementBanner announcement={announcement} clearAnnouncement={clearAnnouncement} />
 
@@ -121,7 +131,7 @@ export function OnlineGamePageView({
         <TrumpPicker onSelect={onSelectTrump} />
       )}
 
-      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} humanSeat={humanSeat} biddingThinkingSeat={biddingThinkingSeat} />
+      <GameTable gameState={gameState} onPlayCard={onPlayCard} seatNames={seatNames} humanSeat={humanSeat} biddingThinkingSeat={biddingThinkingSeat} difficultyLabels={difficultyLabels} />
 
       {overlay === "nest" && mySeat !== null && (
         <NestOverlay
@@ -154,6 +164,16 @@ export function OnlineGamePageView({
           handHistory={gameState.handHistory}
           seatNames={seatNames}
           humanTeam={humanTeam}
+        />
+      )}
+
+      {showLastTrick && gameState.completedTricks.length > 0 && (
+        <LastTrickOverlay
+          lastTrick={gameState.completedTricks[gameState.completedTricks.length - 1]!}
+          trump={gameState.trump}
+          humanSeat={humanSeat}
+          seatNames={seatNames}
+          onClose={onCloseLastTrick}
         />
       )}
     </div>
@@ -291,6 +311,25 @@ export default function OnlineGamePage() {
 
   const humanTeam: Team = mySeat !== null && ["E", "W"].includes(mySeat) ? "EW" : "NS";
 
+  const difficultyLabels: Partial<Record<Seat, string>> = {};
+  for (const player of gameState.players) {
+    if (player.kind === "bot" && player.botProfile) {
+      difficultyLabels[player.seat] = BOT_DIFFICULTY_LABELS[player.botProfile.difficulty];
+    }
+  }
+
+  const [showLastTrick, setShowLastTrick] = useState(false);
+  const handNumber = gameState.handNumber;
+
+  // Reset last trick overlay when a new hand begins
+  useEffect(() => { setShowLastTrick(false); }, [handNumber]);
+
+  const canShowLastTrick =
+    gameState.completedTricks.length > 0 &&
+    (gameState.phase === "playing" ||
+     gameState.phase === "scoring" ||
+     overlay === "hand-result");
+
   return (
     <OnlineGamePageView
       gameState={gameState}
@@ -304,8 +343,12 @@ export default function OnlineGamePage() {
       biddingThinkingSeat={biddingThinkingSeat}
       seatNames={seatNames}
       humanTeam={humanTeam}
+      difficultyLabels={difficultyLabels}
       disconnectedAlert={disconnectedAlert}
       isHost={isHost}
+      showLastTrick={showLastTrick}
+      onOpenLastTrick={canShowLastTrick ? () => setShowLastTrick(true) : undefined}
+      onCloseLastTrick={() => setShowLastTrick(false)}
       onReplaceWithBot={replaceWithBot}
       onDismissDisconnectAlert={dismissDisconnectAlert}
       onPlayCard={humanPlayCard}
