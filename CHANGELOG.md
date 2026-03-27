@@ -4,6 +4,19 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.6.0] — 2026-03-26
+
+### New Features
+- **Difficulty badges in online play** — bot seats in the online game now show their difficulty label (e.g. "Expert") just like the offline game, so you always know what you're up against
+- **Cardinal seat grid in online lobby** — the seat selection layout now mirrors the actual in-game table positions (South at top, North at bottom, East/West on the sides) with the room code badge at the centre; makes it much easier to choose your seat intentionally
+
+### Bug Fixes
+- **Last trick button missing in online play** — the 🃏 button in the score bar was wired up in offline but not online; it now works identically in both modes
+- **Cards pushed down when trump picker opens (online, mobile)** — the trump selection panel was `position: static`, causing it to push the hand cards outside the overflow-hidden page container and clip them; fixed to `position: fixed` so it floats above the game table
+- **Trump picker scrim too dark on tablet/desktop** — the semi-transparent overlay behind the trump picker was `rgba(0,0,0,0.80)`, making it hard for P4 to see the cards on larger screens; reduced to `rgba(0,0,0,0.55)`
+
+---
+
 ## [v1.5.0] — 2026-03-25
 
 ### Improvements
