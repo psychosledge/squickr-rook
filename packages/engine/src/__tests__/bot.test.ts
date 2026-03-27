@@ -941,7 +941,8 @@ describe("botChooseCommand - Phase 6 (endgame awareness)", () => {
         W: [],
       },
     });
-    const profile = BOT_PRESETS[4]; // endgameCardAwareness=0.5
+    // Use playAccuracy=1.0 to ensure determinism (BOT_PRESETS[4] has 0.90 which is non-deterministic)
+    const profile = { ...BOT_PRESETS[4], playAccuracy: 1.0 };
     const cmd = botChooseCommand(state, "S", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
