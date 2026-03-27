@@ -560,7 +560,8 @@ describe("botChooseCommand - Phase 4 (role awareness)", () => {
         W: ["G6", "Y8"],
       },
     });
-    const profile = BOT_PRESETS[3]; // roleAwareness=true
+    // playAccuracy=1.0 ensures determinism (BOT_PRESETS[3] has 0.70 which is non-deterministic)
+    const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
     const cmd = botChooseCommand(state, "E", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
