@@ -229,22 +229,26 @@ export type SeatDifficultyPickerProps = {
   onSelect: (difficulty: BotDifficulty) => void;
 };
 
-const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5] as BotDifficulty[];
+const DISPLAYED_DIFFICULTIES: { value: BotDifficulty; label: string }[] = [
+  { value: 1, label: 'Easy' },
+  { value: 3, label: 'Medium' },
+  { value: 5, label: 'Hard' },
+];
 
 export function SeatDifficultyPicker({ currentDifficulty, onSelect }: SeatDifficultyPickerProps) {
   return (
     <div className={styles.difficultyPicker}>
-      {DIFFICULTY_LEVELS.map((level) => (
+      {DISPLAYED_DIFFICULTIES.map((item) => (
         <button
-          key={level}
+          key={item.value}
           className={
-            level === currentDifficulty
+            item.value === currentDifficulty
               ? `${styles.difficultyBtn} ${styles.difficultyBtnActive}`
               : styles.difficultyBtn
           }
-          onClick={() => onSelect(level)}
+          onClick={() => onSelect(item.value)}
         >
-          {`L${level}`}
+          {item.label}
         </button>
       ))}
     </div>

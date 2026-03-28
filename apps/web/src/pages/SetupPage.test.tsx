@@ -193,10 +193,10 @@ describe("SetupView", () => {
       const p = el.props as Record<string, unknown>;
       return typeof p.className === "string" && p.className.includes("diffBtn");
     });
-    // 5 "Set All" buttons + 5*3 seat picker buttons = 20 total
-    // The first 5 are the Set All buttons
-    expect(diffBtns.length).toBeGreaterThanOrEqual(5);
-    // Click first "Set All" button (difficulty=1)
+    // 3 "Set All" buttons + 3*3 seat picker buttons = 12 total
+    // The first 3 are the Set All buttons
+    expect(diffBtns.length).toBeGreaterThanOrEqual(3);
+    // Click first "Set All" button (difficulty=1, "Easy")
     const p = diffBtns[0].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onSetAll).toHaveBeenCalledWith(1);
@@ -235,15 +235,15 @@ describe("SetupView", () => {
       const p = el.props as Record<string, unknown>;
       return typeof p.className === "string" && p.className.includes("diffBtn");
     });
-    // Buttons 0–4 are Set All, 5–9 are East, 10–14 are Partner, 15–19 are West
-    expect(diffBtns.length).toBeGreaterThanOrEqual(10);
-    // Click East's first button (difficulty=1)
-    const p = diffBtns[5].props as Record<string, unknown>;
+    // Buttons 0–2 are Set All, 3–5 are East, 6–8 are Partner, 9–11 are West
+    expect(diffBtns.length).toBeGreaterThanOrEqual(6);
+    // Click East's first button (difficulty=1, "Easy")
+    const p = diffBtns[3].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onSetSeat).toHaveBeenCalledWith("E", 1);
   });
 
-  it("13. renders 5 difficulty buttons per seat row (1–5)", () => {
+  it("13. renders 3 difficulty buttons per seat row (Easy/Medium/Hard)", () => {
     const tree = SetupView(makeSetupViewProps());
     const all = flattenElements(tree);
     const diffBtns = all.filter((el) => {
@@ -251,8 +251,8 @@ describe("SetupView", () => {
       const p = el.props as Record<string, unknown>;
       return typeof p.className === "string" && p.className.includes("diffBtn");
     });
-    // 5 (Set All) + 5 (East) + 5 (Partner) + 5 (West) = 20
-    expect(diffBtns).toHaveLength(20);
+    // 3 (Set All) + 3 (East) + 3 (Partner) + 3 (West) = 12
+    expect(diffBtns).toHaveLength(12);
   });
 });
 
@@ -267,7 +267,7 @@ describe("DifficultyPicker", () => {
     expect(text).toContain("East");
   });
 
-  it("15. renders 5 difficulty buttons", () => {
+  it("15. renders 3 difficulty buttons (Easy, Medium, Hard)", () => {
     const tree = DifficultyPicker(makeDifficultyPickerProps());
     const all = flattenElements(tree);
     const diffBtns = all.filter((el) => {
@@ -275,10 +275,10 @@ describe("DifficultyPicker", () => {
       const p = el.props as Record<string, unknown>;
       return typeof p.className === "string" && p.className.includes("diffBtn");
     });
-    expect(diffBtns).toHaveLength(5);
+    expect(diffBtns).toHaveLength(3);
   });
 
-  it("16. active button corresponds to current value", () => {
+  it("16. active button corresponds to current value (value=3 → 'Medium' button active)", () => {
     const tree = DifficultyPicker(makeDifficultyPickerProps({ value: 3 }));
     const all = flattenElements(tree);
     const activeBtns = all.filter((el) => {
@@ -289,10 +289,10 @@ describe("DifficultyPicker", () => {
     expect(activeBtns).toHaveLength(1);
     const p = activeBtns[0].props as Record<string, unknown>;
     expect(p["aria-pressed"]).toBe(true);
-    expect(flattenText(activeBtns[0])).toBe("3");
+    expect(flattenText(activeBtns[0])).toBe("Medium");
   });
 
-  it("17. onChange called with correct difficulty when button clicked", () => {
+  it("17. onChange called with correct difficulty when button clicked (Hard=5)", () => {
     const onChange = vi.fn();
     const tree = DifficultyPicker(makeDifficultyPickerProps({ onChange }));
     const all = flattenElements(tree);
@@ -301,13 +301,13 @@ describe("DifficultyPicker", () => {
       const p = el.props as Record<string, unknown>;
       return typeof p.className === "string" && p.className.includes("diffBtn");
     });
-    // Click button for difficulty=5 (last button)
-    const p = diffBtns[4].props as Record<string, unknown>;
+    // Click button for difficulty=5 (last button, "Hard")
+    const p = diffBtns[2].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onChange).toHaveBeenCalledWith(5 as BotDifficulty);
   });
 
-  it("18. renders difficulty label text (e.g. 'Normal' for value=3)", () => {
+  it("18. does NOT render a diffLabel span (button text is now self-explanatory)", () => {
     const tree = DifficultyPicker(makeDifficultyPickerProps({ value: 3 }));
     const all = flattenElements(tree);
     const diffLabelSpans = all.filter((el) => {
@@ -315,12 +315,11 @@ describe("DifficultyPicker", () => {
       const p = el.props as Record<string, unknown>;
       return typeof p.className === "string" && p.className.includes("diffLabel");
     });
-    expect(diffLabelSpans).toHaveLength(1);
-    expect(flattenText(diffLabelSpans[0])).toBe("Normal");
+    expect(diffLabelSpans).toHaveLength(0);
   });
 
-  it("19. non-active buttons have aria-pressed=false", () => {
-    const tree = DifficultyPicker(makeDifficultyPickerProps({ value: 2 }));
+  it("19. non-active buttons have aria-pressed=false (value=1 → Easy active, Medium/Hard inactive)", () => {
+    const tree = DifficultyPicker(makeDifficultyPickerProps({ value: 1 }));
     const all = flattenElements(tree);
     const diffBtns = all.filter((el) => {
       if (el.type !== "button") return false;
@@ -331,6 +330,6 @@ describe("DifficultyPicker", () => {
       const p = el.props as Record<string, unknown>;
       return p["aria-pressed"] === false;
     });
-    expect(nonActiveBtns).toHaveLength(4);
+    expect(nonActiveBtns).toHaveLength(2);
   });
 });

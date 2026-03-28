@@ -349,7 +349,7 @@
 
 /* 32px (not 44px) — compact pill selectors in a constrained seatCard; full 44px would push card height uncomfortably */
 .difficultyBtn {
-  padding: 4px 5px;
+  padding: 4px 8px;
   font-size: 0.65rem;
   font-weight: 600;
   border-radius: 4px;

@@ -1025,51 +1025,49 @@ describe("SeatDifficultyPicker", () => {
     };
   }
 
-  it("70. renders 5 difficulty buttons (L1–L5)", () => {
+  it("70. renders 3 difficulty buttons (Easy, Medium, Hard)", () => {
     const tree = SeatDifficultyPicker(makePickerProps());
     const all = flattenElements(tree);
     const diffBtns = findButtons(all, "difficultyBtn");
-    expect(diffBtns).toHaveLength(5);
+    expect(diffBtns).toHaveLength(3);
   });
 
-  it("71. button texts include L1, L2, L3, L4, L5", () => {
+  it("71. button texts are 'Easy', 'Medium', 'Hard'", () => {
     const tree = SeatDifficultyPicker(makePickerProps());
     const text = flattenText(tree);
-    expect(text).toContain("L1");
-    expect(text).toContain("L2");
-    expect(text).toContain("L3");
-    expect(text).toContain("L4");
-    expect(text).toContain("L5");
+    expect(text).toContain("Easy");
+    expect(text).toContain("Medium");
+    expect(text).toContain("Hard");
   });
 
-  it("72. active button (currentDifficulty=3) has difficultyBtnActive class", () => {
+  it("72. active button (currentDifficulty=3) has difficultyBtnActive class and text 'Medium'", () => {
     const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 3 as BotDifficulty }));
     const all = flattenElements(tree);
     const activeBtns = findButtons(all, "difficultyBtnActive");
     expect(activeBtns).toHaveLength(1);
-    expect(flattenText(activeBtns[0])).toBe("L3");
+    expect(flattenText(activeBtns[0])).toBe("Medium");
   });
 
-  it("73. active button for difficulty=1 is L1", () => {
+  it("73. active button for difficulty=1 is 'Easy'", () => {
     const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 1 as BotDifficulty }));
     const all = flattenElements(tree);
     const activeBtns = findButtons(all, "difficultyBtnActive");
     expect(activeBtns).toHaveLength(1);
-    expect(flattenText(activeBtns[0])).toBe("L1");
+    expect(flattenText(activeBtns[0])).toBe("Easy");
   });
 
-  it("74. clicking a button calls onSelect with the difficulty", () => {
+  it("74. clicking the Hard button calls onSelect with 5", () => {
     const onSelect = vi.fn();
     const tree = SeatDifficultyPicker(makePickerProps({ onSelect }));
     const all = flattenElements(tree);
     const diffBtns = findButtons(all, "difficultyBtn");
-    // Click the 5th button (L5, difficulty=5)
-    const p = diffBtns[4].props as Record<string, unknown>;
+    // Click the 3rd button ("Hard", difficulty=5)
+    const p = diffBtns[2].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onSelect).toHaveBeenCalledWith(5);
   });
 
-  it("75. clicking L1 button calls onSelect with 1", () => {
+  it("75. clicking Easy button calls onSelect with 1", () => {
     const onSelect = vi.fn();
     const tree = SeatDifficultyPicker(makePickerProps({ onSelect }));
     const all = flattenElements(tree);
@@ -1077,6 +1075,28 @@ describe("SeatDifficultyPicker", () => {
     const p = diffBtns[0].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it("76b. no button highlighted when currentDifficulty=2 (backward compat — value 2 not in picker)", () => {
+    const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 2 as BotDifficulty }));
+    const all = flattenElements(tree);
+    const activeBtns = findButtons(all, "difficultyBtnActive");
+    expect(activeBtns).toHaveLength(0);
+  });
+
+  it("76c. no button highlighted when currentDifficulty=4 (backward compat — value 4 not in picker)", () => {
+    const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 4 as BotDifficulty }));
+    const all = flattenElements(tree);
+    const activeBtns = findButtons(all, "difficultyBtnActive");
+    expect(activeBtns).toHaveLength(0);
+  });
+
+  it("76d. active button for difficulty=5 is 'Hard'", () => {
+    const tree = SeatDifficultyPicker(makePickerProps({ currentDifficulty: 5 as BotDifficulty }));
+    const all = flattenElements(tree);
+    const activeBtns = findButtons(all, "difficultyBtnActive");
+    expect(activeBtns).toHaveLength(1);
+    expect(flattenText(activeBtns[0])).toBe("Hard");
   });
 });
 
@@ -1130,10 +1150,10 @@ describe("LobbyView — bot seat difficulty picker", () => {
     const all = flattenElements(tree);
     const diffBtns = findButtons(all, "difficultyBtn");
     // Cardinal grid renders: S (top), E (left), W (right), N (bottom).
-    // S is the first bot seat in DOM order — its 5 buttons are indices 0–4.
-    // Index 4 is L5 for seat S.
-    expect(diffBtns.length).toBeGreaterThanOrEqual(5);
-    const p = diffBtns[4].props as Record<string, unknown>;
+    // S is the first bot seat in DOM order — its 3 buttons are indices 0–2.
+    // Index 2 is "Hard" (difficulty=5) for seat S.
+    expect(diffBtns.length).toBeGreaterThanOrEqual(3);
+    const p = diffBtns[2].props as Record<string, unknown>;
     (p.onClick as () => void)();
     expect(onSetBotDifficulty).toHaveBeenCalledOnce();
     expect(onSetBotDifficulty).toHaveBeenCalledWith("S", 5);

@@ -5,7 +5,11 @@ import { BOT_DIFFICULTY_LABELS } from "@rook/engine";
 import type { BotDifficulty } from "@rook/engine";
 import styles from "./SetupPage.module.css";
 
-const DIFFICULTIES: BotDifficulty[] = [1, 2, 3, 4, 5];
+const DISPLAYED_DIFFICULTIES: { value: BotDifficulty; label: string }[] = [
+  { value: 1, label: 'Easy' },
+  { value: 3, label: 'Medium' },
+  { value: 5, label: 'Hard' },
+];
 
 // ---------------------------------------------------------------------------
 // Pure sub-components (exported for unit testing)
@@ -22,18 +26,17 @@ export function DifficultyPicker({ value, onChange, label }: DifficultyPickerPro
     <div className={styles.pickerRow}>
       <span className={styles.seatLabel}>{label}</span>
       <div className={styles.pickerButtons}>
-        {DIFFICULTIES.map((d) => (
+        {DISPLAYED_DIFFICULTIES.map((item) => (
           <button
-            key={d}
-            className={`${styles.diffBtn} ${value === d ? styles.active : ""}`}
-            onClick={() => onChange(d)}
-            aria-pressed={value === d}
+            key={item.value}
+            className={`${styles.diffBtn} ${value === item.value ? styles.active : ""}`}
+            onClick={() => onChange(item.value)}
+            aria-pressed={value === item.value}
           >
-            {d}
+            {item.label}
           </button>
         ))}
       </div>
-      <span className={styles.diffLabel}>{BOT_DIFFICULTY_LABELS[value]}</span>
     </div>
   );
 }
@@ -74,14 +77,14 @@ export function SetupView({
         <div className={`${styles.pickerRow} ${styles.setAllRow}`}>
           <span className={styles.seatLabel}>Set All</span>
           <div className={styles.pickerButtons}>
-            {DIFFICULTIES.map((d) => (
+            {DISPLAYED_DIFFICULTIES.map((item) => (
               <button
-                key={d}
-                className={`${styles.diffBtn} ${allSame && botDifficulties.E === d ? styles.active : ""}`}
-                onClick={() => onSetAll(d)}
-                aria-pressed={allSame && botDifficulties.E === d}
+                key={item.value}
+                className={`${styles.diffBtn} ${allSame && botDifficulties.E === item.value ? styles.active : ""}`}
+                onClick={() => onSetAll(item.value)}
+                aria-pressed={allSame && botDifficulties.E === item.value}
               >
-                {d}
+                {item.label}
               </button>
             ))}
           </div>
