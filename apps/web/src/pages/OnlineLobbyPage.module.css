@@ -144,14 +144,6 @@
   color: var(--color-accent);
 }
 
-.shareUrl {
-  font-size: 0.75rem;
-  color: #888;
-  word-break: break-all;
-  max-width: 300px;
-  text-align: center;
-}
-
 .roomInfo {
   display: flex;
   flex-direction: column;
@@ -209,8 +201,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
+  gap: 4px;
+  padding: 8px 6px;
   border-radius: 10px;
   background: var(--color-surface);
   border: 2px solid var(--color-border);
@@ -349,16 +341,16 @@
 .difficultyPicker {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   flex-wrap: nowrap;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
-/* 36px (not 44px) — compact pill selectors in a constrained seatCard; full 44px would push card height uncomfortably */
+/* 32px (not 44px) — compact pill selectors in a constrained seatCard; full 44px would push card height uncomfortably */
 .difficultyBtn {
-  padding: 6px 8px;
-  font-size: 0.7rem;
+  padding: 4px 5px;
+  font-size: 0.65rem;
   font-weight: 600;
   border-radius: 4px;
   border: 1px solid var(--color-border);
@@ -367,7 +359,7 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 @media (hover: hover) {
@@ -383,10 +375,41 @@
   color: #1a1a2e;
 }
 
-/* Side columns: allow difficulty buttons to wrap if space is tight */
-.lobbyLeft .difficultyPicker,
-.lobbyRight .difficultyPicker {
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 3px;
+/* Subtitle hidden when lobby grid is visible (saves vertical space) */
+.page:has(.lobbyGrid) .subtitle {
+  display: none;
+}
+
+/* Share URL — small one-liner shown below the player name row */
+.shareUrl {
+  font-size: 0.7rem;
+  color: #888;
+  text-align: center;
+  word-break: break-all;
+  max-width: 320px;
+}
+
+@media (max-width: 600px) {
+  .page {
+    gap: 12px;
+    padding: 16px;
+  }
+  .title {
+    font-size: 1.8rem;
+  }
+  .startBtn {
+    padding: 10px 32px;
+    font-size: 1rem;
+  }
+  .seatCard {
+    max-width: 110px;
+    min-width: 88px;
+    min-height: 96px;
+    padding: 6px 4px;
+    gap: 3px;
+  }
+  .lobbyGrid {
+    gap: 4px;
+    max-width: 340px;
+  }
 }

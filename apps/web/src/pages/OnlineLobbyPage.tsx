@@ -355,11 +355,7 @@ export function LobbyView({
         <LobbyDisplayNameRow myDisplayName={myDisplayName} onUpdateName={onUpdateName} triggerEdit={triggerEdit} />
       </div>
 
-      <div className={styles.roomInfo}>
-        <span className={styles.label}>Room Code</span>
-        <span className={styles.roomCode}>{roomCode}</span>
-        <span className={styles.shareUrl}>{shareUrl}</span>
-      </div>
+      <p className={styles.shareUrl}>{shareUrl}</p>
 
       {/* Cardinal seat grid — mirrors in-game table positions */}
       <div className={styles.lobbyGrid}>
