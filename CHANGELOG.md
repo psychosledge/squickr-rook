@@ -4,6 +4,13 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.8.1] — 2026-03-28
+
+### Bug Fixes
+- **Difficulty buttons overflow seat cards in online lobby** — Easy/Medium/Hard buttons were wider than the seat card bounds at all screen sizes; fixed by making buttons share the full card width equally (`flex: 1`) and bumping the mobile card minimum width slightly
+
+---
+
 ## [v1.8.0] — 2026-03-28
 
 ### Improvements

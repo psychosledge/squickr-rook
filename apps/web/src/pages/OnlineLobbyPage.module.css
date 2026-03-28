@@ -345,11 +345,14 @@
   flex-wrap: nowrap;
   justify-content: center;
   margin-top: 2px;
+  width: 100%;
 }
 
-/* 32px (not 44px) — compact pill selectors in a constrained seatCard; full 44px would push card height uncomfortably */
+/* 32px (not 44px) — compact pill selectors in a constrained seatCard; full 44px would push card height uncomfortably.
+   flex:1 ensures the three buttons share the full card width equally, so they never overflow. */
 .difficultyBtn {
-  padding: 4px 8px;
+  flex: 1;
+  padding: 4px 2px;
   font-size: 0.65rem;
   font-weight: 600;
   border-radius: 4px;
@@ -360,6 +363,7 @@
   white-space: nowrap;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
   min-height: 32px;
+  text-align: center;
 }
 
 @media (hover: hover) {
@@ -402,8 +406,8 @@
     font-size: 1rem;
   }
   .seatCard {
-    max-width: 110px;
-    min-width: 88px;
+    max-width: 120px;
+    min-width: 96px;
     min-height: 96px;
     padding: 6px 4px;
     gap: 3px;
