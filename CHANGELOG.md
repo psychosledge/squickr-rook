@@ -4,6 +4,13 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.7.0] — 2026-03-28
+
+### Bug Fixes
+- **Lobby difficulty buttons overflow on mobile** — the L1–L5 difficulty picker buttons inside bot seat cards were overflowing the card boundaries and pushing the Start Game button off-screen on small displays; fixed with compact button sizing, tighter seat card padding, and mobile CSS overrides; the redundant room-code block inside the lobby view was also removed (it was already shown in the connecting view above)
+
+---
+
 ## [v1.6.0] — 2026-03-26
 
 ### New Features
