@@ -4,6 +4,13 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.8.0] — 2026-03-28
+
+### Improvements
+- **Simplified difficulty picker** — the bot difficulty selector in both the offline setup screen and the online lobby now shows three clear options (**Easy**, **Medium**, **Hard**) instead of five numbered levels (L1–L5); maps to the same underlying engine presets (1, 3, 5) so existing games are unaffected
+
+---
+
 ## [v1.7.0] — 2026-03-28
 
 ### Bug Fixes
