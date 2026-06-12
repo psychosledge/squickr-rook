@@ -805,12 +805,12 @@ function chooseLeadCard(
     if (isBiddingTeam) {
       // ── Bidding team: pull trump or lead high off-suit ──────────────────
       if (!trumpPulled && trumpCards.length > 0) {
-        // Lead lowest trump — but respect ROOK-management rule
+        // Lead highest trump — but respect ROOK-management rule
         const nonRookTrump = trumpCards.filter(c => c.type === "PlayCard" && c.cardId !== "ROOK");
         const candidates = nonRookTrump.length > 0 ? nonRookTrump : trumpCards;
         return candidates.reduce((best, cmd) => {
           if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-          return trumpRank(cmd.cardId, trump) < trumpRank(best.cardId, trump) ? cmd : best;
+          return trumpRank(cmd.cardId, trump) > trumpRank(best.cardId, trump) ? cmd : best;
         });
       }
       // Trump pulled or no trump — lead highest off-suit card

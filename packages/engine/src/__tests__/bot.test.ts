@@ -3042,12 +3042,13 @@ describe("Fix 2 — trick-10 defensive ROOK preservation", () => {
   });
 });
 
-// ── Fix 3+5 — Trump Pull Sequencing: Lead Lowest Non-ROOK Trump ──────────────
+// ── Fix 3+5 — Trump Pull Sequencing: Lead Highest Non-ROOK Trump ─────────────
 
-describe("Fix 3+5 — trump pull leads lowest non-ROOK trump", () => {
-  it("bidding team has multiple non-ROOK trump — leads lowest (B5)", () => {
+describe("Fix 3+5 — trump pull leads highest non-ROOK trump", () => {
+  it("bidding team has multiple non-ROOK trump — leads highest (B14)", () => {
     // Hand: [B5, B9, B14, ROOK], trump=Black, trump not pulled, bidding team (N is bidder, N leads).
-    // Expected: leads B5 (trumpRank=2, lowest non-ROOK trump).
+    // Expected: leads B14 (trumpRank=11, highest non-ROOK trump).
+    // Expert Rook strategy: lead the highest trump to force opponents to spend their strong cards.
     const state = makePlayingState({
       activePlayer: "N",
       bidder: "N",    // N is bidder (NS team) → bidding team
@@ -3063,8 +3064,8 @@ describe("Fix 3+5 — trump pull leads lowest non-ROOK trump", () => {
     const cmd = botChooseCommand(state, "N", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
-      // B5 has trumpRank=2 (lowest non-ROOK trump)
-      expect(cmd.cardId).toBe("B5");
+      // B14 has trumpRank=11 (highest non-ROOK trump in this hand)
+      expect(cmd.cardId).toBe("B14");
     }
   });
 
@@ -3192,6 +3193,38 @@ describe("Fix 4 — ROOK not burned into winning tricks", () => {
     if (cmd.type === "PlayCard") {
       // B9 has lower trumpRank than B14 → chooseLowestWinningCard picks B9
       expect(cmd.cardId).toBe("B9");
+    }
+  });
+});
+
+// ── Trump-pull lead: bidding team leads highest non-Rook trump ────────────────
+
+describe("botChooseCommand - trump-pull lead order (bidding team leads highest first)", () => {
+  it("bidding team leads highest non-Rook trump (B1, rank 12) when trump not pulled", () => {
+    // S is active player on the NS bidding team (bidder = N).
+    // S holds multiple non-Rook Black (trump) cards including B1 (trumpRank=12, the highest).
+    // Trump has not been pulled (playedCards is empty).
+    // Expert bot (roleAwareness=true, playAccuracy=1.0 for determinism) must lead B1.
+    const state = makePlayingState({
+      activePlayer: "S",
+      bidder: "N",   // NS team → S is on the bidding team
+      trump: "Black",
+      tricksPlayed: 0,
+      playedCards: [],  // no trump played yet → not pulled
+      hands: {
+        S: ["B1", "B9", "B6", "R3", "G4"] as CardId[],  // B1=rank12, B9=rank6, B6=rank3
+        N: ["R5", "G6"],
+        E: ["Y7", "R8"],
+        W: ["Y8", "G9"],
+      },
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should lead B1 — the highest non-Rook trump (trumpRank=12), not B9 or B6
+      expect(cmd.cardId).toBe("B1");
+      expect(trumpRank(cmd.cardId, "Black")).toBe(12);
     }
   });
 });

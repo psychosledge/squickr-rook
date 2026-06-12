@@ -13,8 +13,8 @@
     "build":      "tsc -p tsconfig.build.json"
   },
   "devDependencies": {
-    "@vitest/ui": "^3.0.0",
-    "vitest":     "^3.0.0",
+    "@vitest/ui": "^4.1.0",
+    "vitest":     "^4.1.0",
     "typescript": "^5.7.0"
   },
   "dependencies": {
