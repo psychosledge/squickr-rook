@@ -257,3 +257,32 @@ export type GameState = {
   bidAmount: number;
   shotMoon: boolean;
 };
+
+export type TrickPlay = {
+  seat: Seat;
+  cardId: CardId;
+  /** Full hand the player held at trick start, before any card was played */
+  handAtTrickStart: CardId[];
+};
+
+export type TrickSnapshot = {
+  trickNumber: number;
+  leadSeat: Seat;
+  /** Non-nullable: snapshots are only constructed during playing phase when trump is always set */
+  trump: Color;
+  /** Each player's hand captured before the first card of this trick was played */
+  handsAtTrickStart: Record<Seat, CardId[]>;
+  /** Cards played in seat order */
+  plays: TrickPlay[];
+  winner: Seat;
+  pointsInTrick: number;
+  cumulativeScore: Record<Team, number>;
+};
+
+export type GameRecord = {
+  gameId: string;         // e.g. "game-0042"
+  dealSeed: number;       // state.seed at deal time — use for re-run targeting
+  handNumber: number;     // state.handNumber
+  transcript: TrickSnapshot[];
+  outcome: HandScore;     // HandScore is already defined in types.ts
+};
