@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import type { CardId, GameRecord, Seat, TrickSnapshot } from "@rook/engine";
+import { pointValue } from "@rook/engine";
 import PlayingCard from "@/components/PlayingCard/PlayingCard";
 import { sortHand } from "@/utils/sortHand";
 import styles from "./ReplayPage.module.css";
@@ -359,6 +360,20 @@ export default function ReplayPage() {
   const nsScore = trick.cumulativeScore["NS"];
   const ewScore = trick.cumulativeScore["EW"];
 
+  // Points remaining: sum of future trick points + nest bonus on last trick
+  const nestBonus = game.outcome.discarded.reduce((sum, c) => sum + pointValue(c), 0);
+  const futurePoints = game.transcript
+    .slice(trickIndex + 1)
+    .reduce((sum, t) => sum + t.pointsInTrick, 0);
+  const remainingPoints = futurePoints + nestBonus;
+
+  const bidder = game.outcome.bidder;
+  const bidAmount = game.outcome.bidAmount;
+  const bidTeam = bidder === "N" || bidder === "S" ? "NS" : "EW";
+  const bidTeamScore = bidTeam === "NS" ? nsScore : ewScore;
+  const bidTeamNeeds = Math.max(0, bidAmount - bidTeamScore);
+  const bidTeamLabel = bidTeam === "NS" ? "NS" : "EW";
+
   function buildTrickContext(): string {
     return `Game: ${game.gameId} | Trick: ${trick.trickNumber} | Perspective: ${perspective} | feedback: `;
   }
@@ -371,13 +386,32 @@ export default function ReplayPage() {
         </button>
         <span className={styles.gameIdLabel}>{game.gameId}</span>
         <span>
-          Trick {trick.trickNumber} of {totalTricks} | Lead: {trick.leadSeat} | Trump:{" "}
-          {trick.trump} | Points this trick: {trick.pointsInTrick} | Score — NS: {nsScore}, EW:{" "}
-          {ewScore}
+          Trick {trick.trickNumber} of {totalTricks} | Lead: {trick.leadSeat} | Trump: {trick.trump} | This trick: {trick.pointsInTrick} pts
         </span>
         <button className={styles.copyBtn} onClick={() => copyContext(buildTrickContext())}>
           {copied ? "Copied!" : "Copy context"}
         </button>
+      </div>
+
+      <div className={styles.scoreTally}>
+        <span className={`${styles.tallyTeam} ${bidTeam === "NS" ? styles.tallyBidder : ""}`}>
+          NS: {nsScore}
+        </span>
+        <span className={styles.tallySep}>|</span>
+        <span className={`${styles.tallyTeam} ${bidTeam === "EW" ? styles.tallyBidder : ""}`}>
+          EW: {ewScore}
+        </span>
+        <span className={styles.tallySep}>|</span>
+        <span className={styles.tallyBid}>
+          Bid: {bidder} ({bidTeamLabel}) — {bidAmount}
+        </span>
+        <span className={styles.tallySep}>|</span>
+        {bidTeamNeeds > 0
+          ? <span className={styles.tallyNeeds}>{bidTeamLabel} needs {bidTeamNeeds} more</span>
+          : <span className={styles.tallyMade}>{bidTeamLabel} has made it</span>
+        }
+        <span className={styles.tallySep}>|</span>
+        <span className={styles.tallyRemaining}>{remainingPoints} pts left</span>
       </div>
 
       <div className={styles.perspectiveBar}>

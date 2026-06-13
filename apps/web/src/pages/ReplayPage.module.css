@@ -183,6 +183,53 @@
   flex-shrink: 0;
 }
 
+/* --- Score tally bar --- */
+
+.scoreTally {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: #1e1e2e;
+  border: 1px solid #444;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.tallyTeam {
+  font-weight: 600;
+  color: #ccc;
+}
+
+.tallyBidder {
+  color: #fbbf24;
+}
+
+.tallySep {
+  color: #555;
+}
+
+.tallyBid {
+  color: #aaa;
+}
+
+.tallyNeeds {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.tallyMade {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.tallyRemaining {
+  color: #888;
+}
+
 /* --- Perspective bar --- */
 
 .perspectiveBar {
