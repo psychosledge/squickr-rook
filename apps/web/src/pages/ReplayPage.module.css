@@ -1,0 +1,320 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 1rem;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  box-sizing: border-box;
+}
+
+.heading {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.subheading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+/* --- Load screen --- */
+
+.loadSection {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.loadBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 240px;
+}
+
+.fileInput {
+  padding: 0.25rem 0;
+  color: #e0e0e0;
+}
+
+.pasteArea {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-family: monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.btn {
+  background: #3a3a3a;
+  color: #e0e0e0;
+  border: 1px solid #666;
+  border-radius: 4px;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  align-self: flex-start;
+}
+
+.btn:hover:not(:disabled) {
+  background: #4a4a4a;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #f87171;
+  background: #2a1010;
+  border: 1px solid #f87171;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* --- Game list --- */
+
+.gameList {
+  margin-top: 1rem;
+}
+
+.gameListItems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.gameListItem {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+}
+
+.gameListItem:hover {
+  background: #3a3a3a;
+}
+
+.gameId {
+  font-weight: 600;
+}
+
+.gameMeta {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+/* --- Trick view header --- */
+
+.trickHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  background: #222;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+}
+
+.backBtn {
+  background: #3a3a3a;
+  color: #e0e0e0;
+  border: 1px solid #666;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  background: #4a4a4a;
+}
+
+.gameIdLabel {
+  font-weight: 600;
+  color: #ccc;
+  flex-shrink: 0;
+}
+
+/* --- Perspective bar --- */
+
+.perspectiveBar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.perspectiveLabel {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.perspectiveBtn {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.perspectiveBtn:hover {
+  background: #3a3a3a;
+}
+
+.activePerspective {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+/* --- Table grid (4-seat layout) --- */
+
+.tableGrid {
+  display: grid;
+  grid-template-areas:
+    ". top ."
+    "left center right"
+    ". bottom .";
+  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 0.5rem;
+  flex: 1;
+  align-items: start;
+  margin-bottom: 0.75rem;
+}
+
+.topSeat {
+  grid-area: top;
+  display: flex;
+  justify-content: center;
+}
+
+.leftSeat {
+  grid-area: left;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.centerLabel {
+  grid-area: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #888;
+  font-size: 0.85rem;
+  min-height: 60px;
+}
+
+.rightSeat {
+  grid-area: right;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.bottomSeat {
+  grid-area: bottom;
+  display: flex;
+  justify-content: center;
+}
+
+/* --- Seat block (label + cards) --- */
+
+.seatBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.seatLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #bbb;
+  letter-spacing: 0.05em;
+}
+
+.winnerBadge {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.handWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+}
+
+/* --- Card slot highlighting --- */
+
+.cardSlot {
+  display: inline-flex;
+  position: relative;
+}
+
+.singleCard {
+  display: inline-flex;
+}
+
+/* Played card: dim everything else, or highlight played cards */
+.played {
+  outline: 2px solid #fbbf24;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.winningCard {
+  outline: 2px solid #34d399;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* --- Nav bar --- */
+
+.navBar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.trickCounter {
+  font-size: 0.9rem;
+  color: #aaa;
+}

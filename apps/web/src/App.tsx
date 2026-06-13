@@ -5,6 +5,7 @@ import SetupPage from "@/pages/SetupPage";
 import OnlineLobbyPage from "@/pages/OnlineLobbyPage";
 import OnlineGamePage from "@/pages/OnlineGamePage";
 import UpdateBanner from "@/components/UpdateBanner/UpdateBanner";
+import ReplayPage from "@/pages/ReplayPage";
 
 export default function App() {
   return (
@@ -17,6 +18,9 @@ export default function App() {
         <Route path="/online" element={<OnlineLobbyPage />} />
         <Route path="/online/:code" element={<OnlineLobbyPage />} />
         <Route path="/online/:code/game" element={<OnlineGamePage />} />
+        {import.meta.env.DEV && (
+          <Route path="/replay" element={<ReplayPage />} />
+        )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
