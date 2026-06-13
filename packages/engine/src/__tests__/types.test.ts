@@ -1,5 +1,6 @@
 import { describe, it, expectTypeOf } from "vitest";
 import type {
+  BidEntry,
   TrickPlay,
   TrickSnapshot,
   GameRecord,
@@ -47,6 +48,17 @@ describe("TrickSnapshot", () => {
   });
 });
 
+describe("BidEntry", () => {
+  it("accepts a numeric bid", () => {
+    const e: BidEntry = { seat: "N", bid: 110 };
+    expectTypeOf(e).toMatchTypeOf<BidEntry>();
+  });
+  it("accepts a pass", () => {
+    const e: BidEntry = { seat: "E", bid: "pass" };
+    expectTypeOf(e).toMatchTypeOf<BidEntry>();
+  });
+});
+
 describe("GameRecord", () => {
   it("accepts a valid GameRecord object", () => {
     const outcome: HandScore = {
@@ -74,6 +86,12 @@ describe("GameRecord", () => {
       gameId: "game-0042",
       dealSeed: 12345,
       handNumber: 3,
+      bidHistory: [
+        { seat: "N", bid: 100 },
+        { seat: "E", bid: "pass" },
+        { seat: "S", bid: "pass" },
+        { seat: "W", bid: "pass" },
+      ],
       transcript: [],
       outcome,
     };

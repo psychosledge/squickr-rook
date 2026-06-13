@@ -105,3 +105,13 @@
   width: var(--card-w-sm);
   height: var(--card-h-sm);
 }
+
+/* Reduce label sizes so all three fit inside the smaller card bounds */
+.small .topLeft,
+.small .bottomRight {
+  font-size: 0.5rem;
+}
+
+.small .center {
+  font-size: 0.75rem;
+}

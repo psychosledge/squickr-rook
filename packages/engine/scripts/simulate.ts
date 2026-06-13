@@ -22,6 +22,7 @@ import {
   SEAT_ORDER,
 } from "../src/types.js";
 import type {
+  BidEntry,
   GameRecord,
   GameState,
   HandScore,
@@ -81,8 +82,12 @@ function parseArgs(): { games: number; seed: number; out: string } {
       seed = parseInt(next, 10);
       i++;
     } else if (flag === "--out" && next !== undefined) {
-      // Resolve relative paths from the invoker's cwd, not the package root
-      out = path.isAbsolute(next) ? next : path.resolve(process.cwd(), next);
+      // Resolve relative paths from the repo root so paths like
+      // "packages/engine/scripts/output/foo.ndjson" work when invoked via
+      // `pnpm --filter engine simulate` (pnpm sets cwd to the package dir,
+      // not the repo root where the user typed the command).
+      const repoRoot = path.resolve(__dirname, "../../..");
+      out = path.isAbsolute(next) ? next : path.resolve(repoRoot, next);
       i++;
     }
   }
@@ -138,6 +143,9 @@ function simulateGame(gameIndex: number, dealSeed: number): GameRecord {
 
   let state: GameState = applyEvent(INITIAL_STATE, startEvent);
 
+  // Bid-capture state
+  const bidHistory: BidEntry[] = [];
+
   // Trick-capture state
   const transcript: TrickSnapshot[] = [];
 
@@ -150,8 +158,13 @@ function simulateGame(gameIndex: number, dealSeed: number): GameRecord {
   let lastHandScore: HandScore | null = null;
 
   // ── Game loop ─────────────────────────────────────────────────────────────
+  // Stop after the first HandScored event — we simulate one hand per game.
+  // "finished" only triggers when a team crosses the win threshold, which can
+  // take multiple hands; without this guard, bidHistory and transcript would
+  // accumulate data from multiple hands.
 
-  while (state.phase !== "finished") {
+  let handComplete = false;
+  while (state.phase !== "finished" && !handComplete) {
     const seat = state.activePlayer;
     if (seat === null) {
       throw new Error(`[simulate] activePlayer is null in phase "${state.phase}" (game ${gameId})`);
@@ -196,9 +209,15 @@ function simulateGame(gameIndex: number, dealSeed: number): GameRecord {
     for (const event of result.events) {
       state = applyEvent(state, event);
 
-      // Capture HandScore when the hand is scored
-      if (event.type === "HandScored") {
+      if (event.type === "BidPlaced") {
+        bidHistory.push({ seat: event.seat, bid: event.amount });
+      } else if (event.type === "BidPassed") {
+        bidHistory.push({ seat: event.seat, bid: "pass" });
+      } else if (event.type === "MoonDeclared") {
+        bidHistory.push({ seat: event.seat, bid: event.amount });
+      } else if (event.type === "HandScored") {
         lastHandScore = event.score;
+        handComplete = true;
       }
     }
 
@@ -245,7 +264,8 @@ function simulateGame(gameIndex: number, dealSeed: number): GameRecord {
   return {
     gameId,
     dealSeed,
-    handNumber: 0,
+    handNumber: state.handNumber,
+    bidHistory,
     transcript,
     outcome: lastHandScore,
   };

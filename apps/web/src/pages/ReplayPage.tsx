@@ -1,14 +1,28 @@
 import { useState, useRef } from "react";
-import type { GameRecord, Seat, TrickSnapshot, Team } from "@rook/engine";
-import CardHand from "@/components/CardHand/CardHand";
+import type { CardId, GameRecord, Seat, TrickSnapshot } from "@rook/engine";
+import PlayingCard from "@/components/PlayingCard/PlayingCard";
+import { sortHand } from "@/utils/sortHand";
 import styles from "./ReplayPage.module.css";
+
+export function computeOriginalHand(
+  handAtTrick1: CardId[],
+  nestCards: CardId[],
+  discarded: CardId[]
+): CardId[] {
+  const nestSet = new Set(nestCards);
+  const discardSet = new Set(discarded);
+  return [
+    ...handAtTrick1.filter((c) => !nestSet.has(c) || discardSet.has(c)),
+    ...discarded.filter((c) => !nestSet.has(c)),
+  ];
+}
 
 // Perspective mapping: given a perspective seat, which seat goes in each grid position?
 const PERSPECTIVE_MAP: Record<Seat, { bottom: Seat; top: Seat; left: Seat; right: Seat }> = {
-  N: { bottom: "N", top: "S", left: "W", right: "E" },
-  E: { bottom: "E", top: "W", left: "N", right: "S" },
-  S: { bottom: "S", top: "N", left: "E", right: "W" },
-  W: { bottom: "W", top: "E", left: "S", right: "N" },
+  N: { bottom: "N", top: "S", left: "E", right: "W" },
+  E: { bottom: "E", top: "W", left: "S", right: "N" },
+  S: { bottom: "S", top: "N", left: "W", right: "E" },
+  W: { bottom: "W", top: "E", left: "N", right: "S" },
 };
 
 export function parseInput(raw: string): GameRecord[] {
@@ -31,7 +45,15 @@ export default function ReplayPage() {
   const [perspective, setPerspective] = useState<Seat>("N");
   const [pasteText, setPasteText] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function copyContext(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   function loadGames(records: GameRecord[]) {
     setGames(records);
@@ -67,7 +89,7 @@ export default function ReplayPage() {
 
   function handleSelectGame(game: GameRecord) {
     setSelectedGame(game);
-    setTrickIndex(0);
+    setTrickIndex(-1); // start at bidding summary step
     setPerspective("N");
   }
 
@@ -132,20 +154,154 @@ export default function ReplayPage() {
     );
   }
 
-  // --- Trick view ---
-  const trick: TrickSnapshot = selectedGame.transcript[trickIndex]!;
-  const totalTricks = selectedGame.transcript.length;
+  // Capture narrowed reference so closures below know game is non-nullable.
+  const game = selectedGame;
+  const totalTricks = game.transcript.length;
+
+  // --- Bidding summary step (trickIndex === -1) ---
+  if (trickIndex === -1) {
+    const bidSeat = game.outcome.bidder;
+    const bidAmount = game.outcome.bidAmount;
+    const trump = game.transcript[0]!.trump;
+    const trick1Hands = game.transcript[0]!.handsAtTrickStart;
+
+    // Each player knew their own hand at bid time; only the bidder saw the nest.
+    const perspHandAtBid = sortHand(
+      perspective === bidSeat
+        ? computeOriginalHand(trick1Hands[bidSeat], game.outcome.nestCards, game.outcome.discarded)
+        : trick1Hands[perspective],
+      trump,
+    );
+
+    function renderBidCard(cardId: CardId, idx: number) {
+      return (
+        <div key={idx} className={styles.cardSlot}>
+          <PlayingCard cardId={cardId} faceDown={false} size="sm" isDisplay={true} style={{ marginLeft: 0 }} />
+        </div>
+      );
+    }
+
+    function buildBidContext(): string {
+      return `Game: ${game.gameId} | Step: Bidding | Perspective: ${perspective} | feedback: `;
+    }
+
+    return (
+      <div className={styles.page}>
+        <div className={styles.trickHeader}>
+          <button className={styles.backBtn} onClick={handleBack}>
+            &larr; Games
+          </button>
+          <span className={styles.gameIdLabel}>{game.gameId}</span>
+          <span>
+            Bidding | Winner: {bidSeat} — {bidAmount} pts | Trump: {trump}
+          </span>
+          <button className={styles.copyBtn} onClick={() => copyContext(buildBidContext())}>
+            {copied ? "Copied!" : "Copy context"}
+          </button>
+        </div>
+
+        <div className={styles.perspectiveBar}>
+          <span className={styles.perspectiveLabel}>Perspective:</span>
+          {(["N", "E", "S", "W"] as Seat[]).map((seat) => (
+            <button
+              key={seat}
+              className={`${styles.perspectiveBtn} ${perspective === seat ? styles.activePerspective : ""}`}
+              onClick={() => setPerspective(seat)}
+            >
+              {seat}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.biddingView}>
+          {game.bidHistory && game.bidHistory.length > 0 && (
+            <div className={styles.biddingSection}>
+              <span className={styles.biddingLabel}>Auction</span>
+              <table className={styles.bidTable}>
+                <thead>
+                  <tr>
+                    {(["N", "E", "S", "W"] as Seat[]).map((s) => (
+                      <th key={s} className={`${styles.bidCol} ${s === bidSeat ? styles.bidWinner : ""}`}>
+                        {s}{s === bidSeat ? " ★" : ""}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {game.bidHistory.map((entry, i) => (
+                    <tr key={i}>
+                      {(["N", "E", "S", "W"] as Seat[]).map((s) => (
+                        <td key={s} className={`${styles.bidCell} ${s === entry.seat && s === bidSeat && entry.bid === bidAmount ? styles.bidWinningBid : ""}`}>
+                          {s === entry.seat ? (entry.bid === "pass" ? "pass" : String(entry.bid)) : ""}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className={styles.biddingSection}>
+            <span className={styles.biddingLabel}>
+              {perspective}'s hand at high bid
+              {perspective === bidSeat ? ` (won: ${bidAmount})` : ""}
+            </span>
+            <div className={styles.handWrapper}>
+              {perspHandAtBid.map(renderBidCard)}
+            </div>
+          </div>
+
+          {perspective === bidSeat && (
+            <div className={styles.biddingSection}>
+              <span className={styles.biddingLabel}>Nest (picked up)</span>
+              <div className={styles.handWrapper}>
+                {sortHand(game.outcome.nestCards, trump).map(renderBidCard)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.navBar}>
+          <button className={styles.btn} disabled>
+            &larr; Prev
+          </button>
+          <span className={styles.trickCounter}>Bid</span>
+          <button className={styles.btn} onClick={() => setTrickIndex(0)}>
+            Next &rarr;
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Trick view (trickIndex >= 0) ---
+  const trick: TrickSnapshot = game.transcript[trickIndex]!;
   const positions = PERSPECTIVE_MAP[perspective];
 
-  const playedCardIds = new Set(trick.plays.map((p) => p.cardId));
   const winnerSeat = trick.winner;
   const winnerCardId = trick.plays.find((p) => p.seat === winnerSeat)?.cardId;
 
-  function renderSeatHand(seat: Seat, orientation: "horizontal" | "vertical") {
-    const hand = trick.handsAtTrickStart[seat] ?? [];
+  // Cards each seat played in tricks before the current one (perfect-memory record)
+  function computePreviouslyPlayed(seat: Seat): CardId[] {
+    const result: CardId[] = [];
+    for (let i = 0; i < trickIndex; i++) {
+      const t = game.transcript[i]!;
+      const play = t.plays.find((p) => p.seat === seat);
+      if (play) result.push(play.cardId);
+    }
+    return result;
+  }
+
+  function renderSeatHand(seat: Seat) {
+    const hand = sortHand(trick.handsAtTrickStart[seat] ?? [], trick.trump);
     const seatPlay = trick.plays.find((p) => p.seat === seat);
     const playedCard = seatPlay?.cardId;
     const isWinner = seat === winnerSeat;
+    const isFaceUp = seat === perspective;
+    const prevPlayed = sortHand(computePreviouslyPlayed(seat), trick.trump);
+    // After the nest exchange only the discards are relevant — the nest itself is gone.
+    const showDiscards = isFaceUp && seat === game.outcome.bidder;
 
     return (
       <div className={styles.seatBlock}>
@@ -155,25 +311,47 @@ export default function ReplayPage() {
         </div>
         <div className={styles.handWrapper}>
           {hand.map((cardId, idx) => {
-            const isPlayed = playedCardIds.has(cardId) && playedCard === cardId;
-            const isWinningCard = cardId === winnerCardId && isPlayed;
+            const isPlayedThisTrick = cardId === playedCard;
+            const isWinningCard = cardId === winnerCardId;
+            // Show played-this-trick card face-up for all seats (it's on the table)
+            const showFaceUp = isFaceUp || isPlayedThisTrick;
             return (
               <div
                 key={idx}
-                className={`${styles.cardSlot} ${isPlayed ? styles.played : ""} ${isWinningCard ? styles.winningCard : ""}`}
+                className={`${styles.cardSlot} ${isPlayedThisTrick ? styles.played : ""} ${isWinningCard ? styles.winningCard : ""}`}
               >
-                <div className={styles.singleCard}>
-                  <CardHand
-                    cards={[cardId]}
-                    faceDown={false}
-                    size="sm"
-                    orientation={orientation}
-                  />
-                </div>
+                <PlayingCard
+                  cardId={cardId}
+                  faceDown={!showFaceUp}
+                  size="sm"
+                  isDisplay={true}
+                  style={{ marginLeft: 0 }}
+                />
               </div>
             );
           })}
         </div>
+        {prevPlayed.length > 0 && (
+          <div className={styles.playedHistory}>
+            {prevPlayed.map((cardId, idx) => (
+              <div key={idx} className={styles.cardSlot}>
+                <PlayingCard cardId={cardId} faceDown={false} size="sm" isDisplay={true} style={{ marginLeft: 0 }} />
+              </div>
+            ))}
+          </div>
+        )}
+        {showDiscards && (
+          <div className={styles.nestSection}>
+            <span className={styles.nestLabel}>Discarded (out of play)</span>
+            <div className={styles.handWrapper}>
+              {sortHand(game.outcome.discarded, trick.trump).map((cardId, idx) => (
+                <div key={idx} className={styles.cardSlot}>
+                  <PlayingCard cardId={cardId} faceDown={false} size="sm" isDisplay={true} style={{ marginLeft: 0 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -181,18 +359,25 @@ export default function ReplayPage() {
   const nsScore = trick.cumulativeScore["NS"];
   const ewScore = trick.cumulativeScore["EW"];
 
+  function buildTrickContext(): string {
+    return `Game: ${game.gameId} | Trick: ${trick.trickNumber} | Perspective: ${perspective} | feedback: `;
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.trickHeader}>
         <button className={styles.backBtn} onClick={handleBack}>
           &larr; Games
         </button>
-        <span className={styles.gameIdLabel}>{selectedGame.gameId}</span>
+        <span className={styles.gameIdLabel}>{game.gameId}</span>
         <span>
           Trick {trick.trickNumber} of {totalTricks} | Lead: {trick.leadSeat} | Trump:{" "}
           {trick.trump} | Points this trick: {trick.pointsInTrick} | Score — NS: {nsScore}, EW:{" "}
           {ewScore}
         </span>
+        <button className={styles.copyBtn} onClick={() => copyContext(buildTrickContext())}>
+          {copied ? "Copied!" : "Copy context"}
+        </button>
       </div>
 
       <div className={styles.perspectiveBar}>
@@ -209,18 +394,13 @@ export default function ReplayPage() {
       </div>
 
       <div className={styles.tableGrid}>
-        {/* Top */}
-        <div className={styles.topSeat}>{renderSeatHand(positions.top, "horizontal")}</div>
-        {/* Left */}
-        <div className={styles.leftSeat}>{renderSeatHand(positions.left, "vertical")}</div>
-        {/* Center label */}
+        <div className={styles.topSeat}>{renderSeatHand(positions.top)}</div>
+        <div className={styles.leftSeat}>{renderSeatHand(positions.left)}</div>
         <div className={styles.centerLabel}>
           <div>Trump: {trick.trump}</div>
         </div>
-        {/* Right */}
-        <div className={styles.rightSeat}>{renderSeatHand(positions.right, "vertical")}</div>
-        {/* Bottom */}
-        <div className={styles.bottomSeat}>{renderSeatHand(positions.bottom, "horizontal")}</div>
+        <div className={styles.rightSeat}>{renderSeatHand(positions.right)}</div>
+        <div className={styles.bottomSeat}>{renderSeatHand(positions.bottom)}</div>
       </div>
 
       <div className={styles.navBar}>

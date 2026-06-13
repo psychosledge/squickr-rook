@@ -279,10 +279,18 @@ export type TrickSnapshot = {
   cumulativeScore: Record<Team, number>;
 };
 
+export type BidEntry = {
+  seat: Seat;
+  /** Numeric bid amount, or "pass" */
+  bid: number | "pass";
+};
+
 export type GameRecord = {
   gameId: string;         // e.g. "game-0042"
   dealSeed: number;       // state.seed at deal time — use for re-run targeting
   handNumber: number;     // state.handNumber
+  /** Chronological sequence of every bid action during the auction */
+  bidHistory?: BidEntry[];
   transcript: TrickSnapshot[];
   outcome: HandScore;     // HandScore is already defined in types.ts
 };
