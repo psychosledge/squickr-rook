@@ -32,3 +32,6 @@ workbox-*.js
 
 # Windows artifacts
 nul
+
+# Simulation harness output
+packages/engine/scripts/output/*.ndjson
