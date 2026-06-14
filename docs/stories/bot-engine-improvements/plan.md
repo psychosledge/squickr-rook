@@ -10,14 +10,14 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ### Slice 1: Defender lead — exploit known bidder void to force trump
 **Scope:** In `packages/engine/src/bot.ts`, improve the defending team's lead selection logic. When the bot is leading and `trackPlayedCards` is enabled, check if any bidding-team player is known void in a suit (they failed to follow that suit in a previous trick). If so, prioritize leading that suit to force the bidder to spend trump. Applies only when defending and the bidder still holds trump. No changes to bid logic, discard logic, or non-lead card play.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 8dd45b5
 **Evidence:** game-0000 (seed 12345), trick 3, N perspective. N holds B13 and knows E is void in Black (E trumped trick 1's Black lead with Y5). Bot led G12; E won with G14 at zero trump cost. A Black lead forces E to burn a trump. Also confirmed trick 5, N perspective: bot led G10 when B13 would have forced E to trump (0-pt trick) or sluff G1 (NS captures 15 pts); instead E won G10+G1 = 25 pts at zero trump cost.
 **Acceptance Criteria:**
-- [ ] When defending and `trackPlayedCards` is true, bot identifies suits in which a bidding-team player is known void
-- [ ] Bot preferentially leads a void-forcing suit over an arbitrary off-suit card when one is available
-- [ ] Existing trump-pull behavior (Slice 1 of Phase 1) is unchanged
-- [ ] `pnpm --filter engine test` passes with no regressions
+- [x] When defending and `trackPlayedCards` is true, bot identifies suits in which a bidding-team player is known void
+- [x] Bot preferentially leads a void-forcing suit over an arbitrary off-suit card when one is available
+- [x] Existing trump-pull behavior (Slice 1 of Phase 1) is unchanged
+- [x] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — change is isolated to the lead-selection branch of `botChooseCommand` for defending bots
 
 ---
@@ -75,6 +75,20 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 - [ ] Applies regardless of whether the bot is on the bidding or defending team
 - [ ] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — isolated to the follow-suit card selection branch of `botChooseCommand`
+
+---
+
+### Slice 6: Defender lead — prefer cheapest card within void-forcing suit
+**Scope:** In `packages/engine/src/bot.ts`, in the void-forcing lead selection introduced in Slice 1: when multiple cards are available in the void-forcing suit, prefer the lowest 0-pt card rather than the highest-ranked card. A B6 forces the same trump spend as a B13 but preserves the point card for a winnable trick.
+**Status:** not started
+**Commit:** —
+**Evidence:** Surfaced during Slice 1 code review. Slice 1 selects `reduce((best, cmd) => offSuitRank(cmd) > offSuitRank(best) ? cmd : best)` — highest ranked wins. Leading the cheapest card in the void suit is strictly superior: same trump-forcing outcome, lower opportunity cost.
+**Acceptance Criteria:**
+- [ ] When void-forcing and multiple cards exist in the void suit, bot leads the lowest 0-pt card rather than the highest-ranked card
+- [ ] If all cards in the void suit are point-valued, falls back to leading the lowest point card (minimize loss)
+- [ ] Slice 1 void-forcing behavior (leads void suit over non-void suit) is unchanged
+- [ ] `pnpm --filter engine test` passes with no regressions
+**Needs Architect:** no — isolated to the candidate-selection reduce within the void-forcing block of `chooseLeadCard`
 
 ---
 
