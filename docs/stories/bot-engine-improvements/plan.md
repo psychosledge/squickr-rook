@@ -22,13 +22,14 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ---
 
-### Slice 2: Trump pull — prefer lowest 0-pt trump when Y1 unaccounted
-**Scope:** In `packages/engine/src/bot.ts`, in the bidding team's trump-pull lead selection: when `trackPlayedCards` is true and Y1 has not been played, skip point-card trump leads (Y14, Y10) in favor of the lowest available 0-pt trump card. If the bot holds only point-card trump, fall back to current behavior.
+### Slice 2: Trump pull — prefer lowest 0-pt trump when a higher trump is unaccounted
+**Scope:** In `packages/engine/src/bot.ts`, in the bidding team's trump-pull lead selection: when `trackPlayedCards` is true, before committing to a point-card trump lead, check whether any higher-ranked trump is unaccounted (not in `state.playedCards` and not in the bot's own hand). If so, skip the point-card lead and lead the lowest available 0-pt trump as a safe probe instead. If the bot holds only point-card trump, fall back to current highest-trump-first behavior. Note: the original evidence keyed on Y1, but the same risk applies to any unaccounted trump ranked above the intended lead — Y14 is equally endangered by an unaccounted Y13. This is the trump-lead instance of the broader "don't spend points into an unbeatable card" principle; the off-suit variant is Slice 3, and the follower variant is Slice 5.
 **Status:** not started
 **Commit:** —
-**Evidence:** game-0000 (seed 12345), trick 2, E perspective. E led Y14 (10 pts) with Y1 unaccounted; N played Y1, NS captured 25 pts. Leading Y6 instead forces N to spend Y13 on a 0-pt trick while preserving E's Y12 for future pulls.
+**Evidence:** game-0000 (seed 12345), trick 2, E perspective. E led Y14 (10 pts) with Y1 unaccounted; N played Y1, NS captured 25 pts. Leading Y6 instead forces N to spend Y13 on a 0-pt trick while preserving E's Y12 for future pulls. Same principle: if E had held Y12 with Y13 unaccounted, leading Y12 carries the same risk.
 **Acceptance Criteria:**
-- [ ] When pulling trump with `trackPlayedCards: true` and Y1 unplayed, bot leads the lowest 0-pt trump card from its hand rather than a point-card trump (Y14, Y10)
+- [ ] When pulling trump with `trackPlayedCards: true`, if any trump ranked above the bot's intended lead is unaccounted, bot leads the lowest available 0-pt trump instead
+- [ ] If all higher trumps are accounted for, bot leads normally (highest trump first)
 - [ ] If the bot holds only point-card trump, it falls back to current highest-trump-first behavior
 - [ ] Slice 1 defender void-lead behavior is unchanged
 - [ ] `pnpm --filter engine test` passes with no regressions
