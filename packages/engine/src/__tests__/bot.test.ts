@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { botChooseCommand, computeBidCeiling } from "../bot.js";
 import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import { legalCommands } from "../validator.js";
-import { trumpRank } from "../deck.js";
+import { trumpRank, cardFromId } from "../deck.js";
 import type { GameCommand } from "../commands.js";
 import type { GameEvent } from "../events.js";
 import type { BotDifficulty, CardId, Color, GameState, Seat } from "../types.js";
@@ -3225,6 +3225,264 @@ describe("botChooseCommand - trump-pull lead order (bidding team leads highest f
       // Should lead B1 — the highest non-Rook trump (trumpRank=12), not B9 or B6
       expect(cmd.cardId).toBe("B1");
       expect(trumpRank(cmd.cardId, "Black")).toBe(12);
+    }
+  });
+});
+
+// ── Slice 1: Defender void-forcing lead ───────────────────────────────────────
+
+/**
+ * Build a playing-phase state for void-forcing tests.
+ *
+ * Setup:
+ *   - N is the defender (EW bid), trump = Black
+ *   - completedTricks captures past trick history so the bot can derive voids
+ *   - The bidding-team player (E or W) is known void in some suit
+ */
+function makeVoidForcingState(opts: {
+  defenderSeat: Seat;
+  defenderHand: CardId[];
+  bidderSeat: Seat;
+  bidderHand: CardId[];
+  trump: Color;
+  completedTricks: Array<{
+    leadColor: Color | null;
+    plays: Array<{ seat: Seat; cardId: CardId }>;
+    winner: Seat;
+  }>;
+  tricksPlayed?: number;
+  playedCards?: CardId[];
+}): GameState {
+  const base = stateAfterTrumpSelected();
+  const allHands: Record<Seat, CardId[]> = { N: [], E: [], S: [], W: [] };
+  allHands[opts.defenderSeat] = opts.defenderHand;
+  allHands[opts.bidderSeat] = opts.bidderHand;
+
+  return {
+    ...base,
+    phase: "playing",
+    activePlayer: opts.defenderSeat,
+    hands: allHands,
+    trump: opts.trump,
+    bidder: opts.bidderSeat,
+    tricksPlayed: opts.tricksPlayed ?? 2,
+    currentTrick: [],
+    completedTricks: opts.completedTricks,
+    playedCards: opts.playedCards ?? [],
+    scores: { NS: 0, EW: 0 },
+    originalNest: [],
+  };
+}
+
+describe("botChooseCommand - Slice 1 (defender void-forcing lead)", () => {
+  it("defender leads void-forcing suit even when it has fewer cards than another suit", () => {
+    // N is defending (bidder=E, EW team). Trump=Yellow.
+    // N holds: G6, G7, G8 (3 Green cards) and B13 (1 Black card).
+    // E is known void in Black (E trumped a Black lead with Y5 in trick 1).
+    // E still holds Yellow trump cards.
+    //
+    // WITHOUT void-forcing: normal logic picks longest suit = Green → leads G8.
+    // WITH void-forcing: bot recognises E is void in Black and E has trump →
+    //   leads B13 to force E to burn a Yellow trump (0-pt trick → E wastes trump).
+    //
+    // This is the core scenario from game-0000 evidence: a shorter void-forcing suit
+    // should win over a longer safe suit.
+    const completedTricks = [
+      {
+        // Trick 1: W led Black (B8), E trumped with Y5 → E is void in Black
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },   // W led Black
+          { seat: "N" as Seat, cardId: "B9" as CardId },   // N followed Black
+          { seat: "E" as Seat, cardId: "Y5" as CardId },   // E played Yellow trump → void in Black
+          { seat: "S" as Seat, cardId: "B6" as CardId },   // S followed Black
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["G6", "G7", "G8", "B13"],  // 3 Green + 1 Black
+      bidderSeat: "E",
+      bidderHand: ["Y8", "Y9", "G14"],           // E still holds trump (Yellow)
+      trump: "Yellow",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B6"],
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should lead B13 (Black void-forcing) NOT G8 (longest suit)
+      expect(cmd.cardId).toBe("B13");
+    }
+  });
+
+  it("void-forcing is skipped when trackPlayedCards is false — longest suit wins instead", () => {
+    // Same scenario as above but trackPlayedCards=false.
+    // Without tracking, bot cannot know E is void → falls through to normal longest-suit logic.
+    // N has 3 Green + 1 Black → longest suit = Green → bot leads G8 (not B13).
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B6" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["G6", "G7", "G8", "B13"],
+      bidderSeat: "E",
+      bidderHand: ["Y8", "Y9", "G14"],
+      trump: "Yellow",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B6"],
+    });
+
+    // trackPlayedCards=false → no void detection → normal longest-suit logic
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0, trackPlayedCards: false };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Normal logic: longest suit = Green (3 cards) → leads G8 (highest in Green)
+      expect(cmd.cardId).toBe("G8");
+    }
+  });
+
+  it("void-forcing does not apply when bot is on the bidding team", () => {
+    // Bot is the bidder (N=bidder, N=active, NS team). Void-forcing is defender-only.
+    // N holds: G6, G7, G8 (3 Green) and B13 (1 Black).
+    // Even if E is void in Black, bidding team follows its own lead logic (pull trump).
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B6" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const base = stateAfterTrumpSelected();
+    const state: GameState = {
+      ...base,
+      phase: "playing",
+      activePlayer: "N",
+      hands: {
+        N: ["G6", "G7", "G8", "B13"],
+        E: ["Y8", "Y9", "G14"],
+        S: [],
+        W: [],
+      },
+      trump: "Yellow",
+      bidder: "N",  // N is the BIDDER (NS team) — NOT a defender
+      tricksPlayed: 2,
+      currentTrick: [],
+      completedTricks,
+      playedCards: ["B8", "B9", "Y5", "B6"],
+      scores: { NS: 0, EW: 0 },
+      originalNest: [],
+    };
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // Bidding team has no trump (no Yellow cards) → falls to highest off-suit card.
+    // offSuitRank: B13=9, G8=4, G7=3, G6=2 → B13 is highest.
+    // Key assertion: bidding team logic picks B13 for its high rank,
+    // NOT because of void-forcing (which should only activate for defenders).
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("B13");
+    }
+  });
+
+  it("void-forcing skipped when bidder has no trump remaining — normal logic applies", () => {
+    // N defending against E (bidder). E is void in Black per trick history.
+    // BUT E holds NO Yellow trump cards → void-forcing is pointless.
+    // Normal longest-suit logic: N has 3 Green + 1 Black → leads G8.
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B6" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["G6", "G7", "G8", "B13"],
+      bidderSeat: "E",
+      bidderHand: ["G14", "G8", "R9"],  // E has NO Yellow (trump) cards
+      trump: "Yellow",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B6"],
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // No trump in bidder's hand → void-forcing not useful → normal longest-suit leads G8
+      expect(cmd.cardId).toBe("G8");
+    }
+  });
+
+  it("void-forcing overrides longest-suit: leads Red (void-forcing) over Green (longer)", () => {
+    // N is defending against E (bidder). E is void in Red (played Black trump on a Red lead).
+    // N holds: G6, G7 (2 Green), R9 (1 Red). Trump = Black. E still holds Black trump.
+    //
+    // WITHOUT void-forcing: longest suit = Green (2 cards) → leads G7.
+    // WITH void-forcing: E is void in Red AND E has Black trump →
+    //   leads R9 (Red) to force E to spend a trump (or let N win the trick).
+    const completedTricks = [
+      {
+        leadColor: "Red" as Color,
+        plays: [
+          { seat: "S" as Seat, cardId: "R5" as CardId },   // S led Red
+          { seat: "W" as Seat, cardId: "R6" as CardId },   // W followed Red
+          { seat: "N" as Seat, cardId: "R7" as CardId },   // N followed Red
+          { seat: "E" as Seat, cardId: "B6" as CardId },   // E played Black trump → void in Red
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["G6", "G7", "R9"],  // 2 Green + 1 Red
+      bidderSeat: "E",
+      bidderHand: ["B12", "B13"],         // E still holds Black (trump)
+      trump: "Black",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["R5", "R6", "R7", "B6"],
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should lead R9 (Red void-forcing) NOT G7 (longest suit)
+      expect(cmd.cardId).toBe("R9");
     }
   });
 });

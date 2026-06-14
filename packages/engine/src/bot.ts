@@ -844,6 +844,53 @@ function chooseLeadCard(
       const canLeadTrump = state.tricksPlayed >= 7 || onlyHasTrump;
 
       if (nonTrumpCards.length > 0) {
+        // ── Void-forcing lead: exploit known bidder void to spend trump ──────
+        // If trackPlayedCards is enabled, check whether a bidding-team player
+        // is known void in a suit (they trumped a lead of that suit in a prior
+        // trick). If so, and the bidder still holds trump, prefer leading that
+        // suit to force the bidder to burn a trump on a zero- or low-point trick.
+        if (profile.trackPlayedCards) {
+          // Void-forcing is only worthwhile if the bidder still holds trump
+          const bidderSeat = state.bidder;
+          const bidderHand = bidderSeat !== null ? (state.hands[bidderSeat] ?? []) : [];
+          const bidderHasTrump = bidderHand.some(c => trumpRank(c, trump) >= 0);
+
+          if (bidderHasTrump) {
+            // Derive suits where a bidding-team player is known void.
+            // When a player trumps a non-trump lead, they must be void in that
+            // suit (game enforces must-follow). We detect this signal from
+            // completed trick history.
+            const biddingTeam = SEAT_TEAM[state.bidder!];
+            const knownVoidSuits = new Set<Color>();
+
+            for (const trick of state.completedTricks) {
+              if (trick.leadColor === null || trick.leadColor === trump) continue;
+              for (const play of trick.plays) {
+                if (SEAT_TEAM[play.seat] !== biddingTeam) continue;
+                if (trumpRank(play.cardId, trump) >= 0) {
+                  knownVoidSuits.add(trick.leadColor);
+                }
+              }
+            }
+
+            if (knownVoidSuits.size > 0) {
+              // Prefer leading a card whose suit is a known bidder void
+              const voidForcingCards = nonTrumpCards.filter(cmd => {
+                if (cmd.type !== "PlayCard") return false;
+                const card = cardFromId(cmd.cardId);
+                return card.kind === "regular" && knownVoidSuits.has(card.color);
+              });
+
+              if (voidForcingCards.length > 0) {
+                return voidForcingCards.reduce((best, cmd) => {
+                  if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+                  return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+                });
+              }
+            }
+          }
+        }
+
         // Lead from longest side suit (most cards in a single non-trump color)
         const colorGroups: Record<Color, GameCommand[]> = {
           Black: [], Red: [], Green: [], Yellow: [],
