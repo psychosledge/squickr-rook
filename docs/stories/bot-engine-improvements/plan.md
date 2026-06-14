@@ -24,16 +24,16 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ### Slice 2: Lead any suit — prefer cheapest non-point card when a higher card is unaccounted
 **Scope:** In `packages/engine/src/bot.ts`, in the lead selection logic for both teams: when `trackPlayedCards` is true and the bot is leading a suit (trump or off-suit), check whether any card ranked above the bot's candidate lead in that suit is unaccounted (not in `state.playedCards` and not in the bot's own hand). If so, prefer the lowest available 0-pt card in that suit rather than spending a point card into a potential loss. If the bot holds only point cards in the suit, lead the lowest point card (minimize loss). Applies to all lead contexts — bidding team pulling trump, bidding team leading off-suit, and defending team leading off-suit. Void-force logic (Slice 1) takes precedence for defenders when a known void opportunity is available. No changes to bid logic, discard logic, or follow-card play. *(Merges the original Slice 2 trump-lead case and Slice 3 off-suit defender case — same principle, unified implementation.)*
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 8e54aa3
 **Evidence (trump):** game-0000 (seed 12345), trick 2, E perspective. E led Y14 (10 pts) with Y1 unaccounted; N played Y1, NS captured 25 pts. Leading Y6 instead loses nothing — same trump-pull effect, 10 pts saved.
 **Evidence (off-suit):** game-0000 (seed 12345), trick 5, N perspective. N holds G7, G9, G10; highest remaining Green is G1 (unaccounted). Bot led G10; E won with G1, EW scored 25 pts. Leading G7 limits EW to 15 pts.
 **Acceptance Criteria:**
-- [ ] When leading any suit with `trackPlayedCards: true`, if any card ranked above the bot's candidate lead in that suit is unaccounted, bot leads the lowest available 0-pt card in that suit instead
-- [ ] If the bot holds the highest remaining card in the suit (all higher cards accounted), it may safely lead a point card — logic does not suppress it
-- [ ] If the bot holds only point cards in the suit, it leads the lowest point card (minimize loss)
-- [ ] Void-force behavior (Slice 1) takes precedence for defenders when a known void is available
-- [ ] `pnpm --filter engine test` passes with no regressions
+- [x] When leading any suit with `trackPlayedCards: true`, if any card ranked above the bot's candidate lead in that suit is unaccounted, bot leads the lowest available 0-pt card in that suit instead
+- [x] If the bot holds the highest remaining card in the suit (all higher cards accounted), it may safely lead a point card — logic does not suppress it
+- [x] If the bot holds only point cards in the suit, it leads the lowest point card (minimize loss)
+- [x] Void-force behavior (Slice 1) takes precedence for defenders when a known void is available
+- [x] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — isolated to the lead-selection branch of `botChooseCommand`; applies in both bidding-team and defending-team lead paths
 
 ---
