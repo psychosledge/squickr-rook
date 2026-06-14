@@ -17,9 +17,10 @@ Analyze a specific trick or bidding step from a bot game replay and evaluate the
 - value 14 (any color): 10 points
 - value 5 (any color): 5 points
 - all other values (6–9, 11–13): 0 points
-- Total per hand: 180 points (160 from cards + 20 ROOK)
-- Nest bonus: sum the point values of `outcome.discarded` — awarded to the team that wins the last trick (the 5 discarded nest cards also count toward that team's card total)
-- Most-cards bonus: +20 points to the team that ends the hand with more than 22 of the 45 total cards (trick cards + nest cards). There is no separate "last trick" bonus — winning the last trick only awards the nest bonus above.
+- Total per hand: 200 points (180 from cards + 20 most-cards bonus)
+  - Cards: 160 from regular cards + 20 ROOK = 180
+  - Most-cards bonus: +20 to the team with >22 of the 45 total cards — always awarded (45 cards means one team always has ≥23)
+- Nest bonus: sum the point values of `outcome.discarded` — awarded to the team that wins the last trick (the 5 discarded nest cards also count toward that team's card total for the most-cards calculation)
 
 **Bidding:**
 - Minimum bid: 100, Maximum: 200, Increment: 5
