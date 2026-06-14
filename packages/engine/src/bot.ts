@@ -934,7 +934,7 @@ function chooseFollowCard(
 
   const leadPlay = trick[0]!;
   const leadCard = cardFromId(leadPlay.cardId);
-  const leadColor: Color | null = leadCard.kind === "regular" ? leadCard.color : null;
+  const leadColor: Color | null = leadCard.kind === "regular" ? leadCard.color : trump;
 
   // Find current trick winner
   let currentWinnerPlay = leadPlay;

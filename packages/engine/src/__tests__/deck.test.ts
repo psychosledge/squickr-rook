@@ -190,9 +190,8 @@ describe("compareTrickCards", () => {
     expect(result).toBeLessThan(0); // B5 wins
   });
 
-  it("Rook loses to regular trump in Rook-led trick (leadColor=null)", () => {
-    // ROOK vs B1 when lead was ROOK (leadColor=null), trump=Black
-    // Both are trump, ROOK rank=0 vs B1 rank=12 → B1 wins
+  it("Rook loses to regular trump when both are trump (leadColor=null edge case)", () => {
+    // ROOK vs B1, both trump, ROOK rank=0 vs B1 rank=12 → B1 wins regardless of leadColor
     const result = compareTrickCards("ROOK", "B1", null, "Black");
     expect(result).toBeLessThan(0); // B1 wins
   });

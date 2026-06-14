@@ -352,7 +352,7 @@ export function validateCommand(
         const leadPlay = newTrick[0]!;
         const leadCard = cardFromId(leadPlay.cardId);
         const leadColor: Color | null =
-          leadCard.kind === "regular" ? leadCard.color : null;
+          leadCard.kind === "regular" ? leadCard.color : state.trump;
 
         // Find winner: card that beats all others
         let winnerPlay = leadPlay;

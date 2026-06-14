@@ -18,25 +18,26 @@ Analyze a specific trick or bidding step from a bot game replay and evaluate the
 - value 5 (any color): 5 points
 - all other values (6–9, 11–13): 0 points
 - Total per hand: 180 points (160 from cards + 20 ROOK)
-- Nest bonus: sum the point values of `outcome.discarded` using the table above — these points are awarded to the team that wins the last trick
-- Most-cards bonus: team with more captured tricks gets a bonus (check `packages/engine/src/scoring.ts` for exact value)
-- Last trick bonus: separate from most-cards (verify in `scoring.ts`)
+- Nest bonus: sum the point values of `outcome.discarded` — awarded to the team that wins the last trick (the 5 discarded nest cards also count toward that team's card total)
+- Most-cards bonus: +20 points to the team that ends the hand with more than 22 of the 45 total cards (trick cards + nest cards). There is no separate "last trick" bonus — winning the last trick only awards the nest bonus above.
 
 **Bidding:**
 - Minimum bid: 100, Maximum: 200, Increment: 5
 - Bidder wins the bid, picks up the 5-card nest, discards 5, picks trump
-- To make the bid: bidding team must score ≥ bid amount (trick points + nest bonus + bonuses)
-- Going set: bidding team scores 0 if they miss; the set penalty equals the bid amount subtracted from their total score
-- Bust threshold: -500 points ends the game immediately
+- To make the bid: bidding team must score ≥ bid amount (trick points + nest bonus + most-cards bonus)
+- Going set: the bidding team's cumulative score is reduced by the bid amount (`nsDelta = -bidAmount`); they can and do go negative. The opposing team still scores their points normally.
+- Bust threshold: score reaching -500 ends the game immediately
+- Win threshold: first team to reach 500 points wins
 
 **Trump:**
-- ROOK is always the highest trump (beats 1 of trump)
-- 1 of trump is second highest
+- 1 of trump is the highest trump
 - Then 14, 13, 12, 11, 10, 9, 8, 7, 6, 5 of trump
+- ROOK is the lowest trump — beats any off-suit card but loses to all regular trump cards (including 5 of trump)
 - Off-suit: 1 is highest, then 14, 13, 12, 11, 10, 9, 8, 7, 6, 5
 
 **Card play:**
 - Must follow suit if able; otherwise may play any card including trump
+- When ROOK is led, it is a trump lead — all players must follow trump if able
 - Trick winner leads next trick
 - A player void in a suit (failed to follow it in a previous trick) is known void to observers
 

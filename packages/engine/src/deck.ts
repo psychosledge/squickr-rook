@@ -143,7 +143,8 @@ export function trumpRank(cardId: CardId, trump: Color): number {
  * - Trump beats off-suit (trump only meaningful when trump has been established)
  * - Rook Bird is the LOWEST trump — beats off-suit but loses to any regular trump card
  * - Must-follow: if a card is not trump AND not the lead color, it cannot win
- * - Lead color: the color of the first card played (null if ROOK was led)
+ * - Lead color: the color of the first card played; null only before trump is established
+ * - When ROOK is led during play, leadColor should be set to the trump color (ROOK IS a trump lead)
  */
 export function compareTrickCards(
   a: CardId,
@@ -176,9 +177,8 @@ export function compareTrickCards(
   const aIsLeadColor = leadColor !== null && aColor === leadColor;
   const bIsLeadColor = leadColor !== null && bColor === leadColor;
 
-  // If lead was ROOK (leadColor=null), any card could be played and first card wins ties
+  // leadColor is null only when trump has not been established yet (pre-trump-selection)
   if (leadColor === null) {
-    // In a ROOK-led trick with no trump, compare off-suit ranks
     return offSuitRank(a) - offSuitRank(b);
   }
 
