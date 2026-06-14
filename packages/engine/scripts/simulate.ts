@@ -152,7 +152,6 @@ function simulateGame(gameIndex: number, dealSeed: number): GameRecord {
   // In-progress snapshot fields
   let currentTrickPlays: TrickPlay[] = [];
   let handsAtTrickStart: Record<Seat, string[]> | null = null;
-  let prevTricksPlayed = state.tricksPlayed;
 
   // Track the last HandScore emitted by HandScored events
   let lastHandScore: HandScore | null = null;
@@ -215,45 +214,36 @@ function simulateGame(gameIndex: number, dealSeed: number): GameRecord {
         bidHistory.push({ seat: event.seat, bid: "pass" });
       } else if (event.type === "MoonDeclared") {
         bidHistory.push({ seat: event.seat, bid: event.amount });
+      } else if (event.type === "TrickCompleted" && handsAtTrickStart !== null) {
+        // Capture here, before HandScored can reset state.tricksPlayed / capturedCards
+        const completedTrick = state.completedTricks[state.completedTricks.length - 1];
+        if (completedTrick === undefined) {
+          throw new Error(`[simulate] completedTricks empty after TrickCompleted (game ${gameId})`);
+        }
+
+        const pointsInTrick = trickPoints(completedTrick.plays.map((p) => p.cardId));
+        const cumulativeScore = capturedPoints(state.capturedCards);
+        const leadSeat = completedTrick.plays[0]?.seat ?? seat;
+        const trump = state.trump!;
+
+        const snapshot: TrickSnapshot = {
+          trickNumber: state.tricksPlayed,
+          leadSeat,
+          trump,
+          handsAtTrickStart: handsAtTrickStart as Record<Seat, string[]>,
+          plays: currentTrickPlays,
+          winner: completedTrick.winner,
+          pointsInTrick,
+          cumulativeScore,
+        };
+
+        transcript.push(snapshot);
+        handsAtTrickStart = null;
+        currentTrickPlays = [];
       } else if (event.type === "HandScored") {
         lastHandScore = event.score;
         handComplete = true;
       }
-    }
-
-    // Detect trick completion: tricksPlayed incremented
-    if (state.tricksPlayed > prevTricksPlayed && handsAtTrickStart !== null) {
-      const completedTrick = state.completedTricks[state.completedTricks.length - 1];
-      if (completedTrick === undefined) {
-        throw new Error(`[simulate] completedTricks empty after tricksPlayed increment (game ${gameId})`);
-      }
-
-      const pointsInTrick = trickPoints(completedTrick.plays.map((p) => p.cardId));
-      const cumulativeScore = capturedPoints(state.capturedCards);
-
-      // leadSeat is the seat that played the first card in the trick
-      const leadSeat = completedTrick.plays[0]?.seat ?? seat;
-
-      // trump is always set when playing phase is active
-      const trump = state.trump!;
-
-      const snapshot: TrickSnapshot = {
-        trickNumber: state.tricksPlayed, // already incremented — equals 1-based trick index
-        leadSeat,
-        trump,
-        handsAtTrickStart: handsAtTrickStart as Record<Seat, string[]>,
-        plays: currentTrickPlays,
-        winner: completedTrick.winner,
-        pointsInTrick,
-        cumulativeScore,
-      };
-
-      transcript.push(snapshot);
-
-      // Reset for next trick
-      handsAtTrickStart = null;
-      currentTrickPlays = [];
-      prevTricksPlayed = state.tricksPlayed;
     }
   }
 

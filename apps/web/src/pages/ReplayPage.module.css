@@ -333,6 +333,16 @@
   letter-spacing: 0.05em;
 }
 
+.bidderBadge {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.leadBadge {
+  color: #60a5fa;
+  font-weight: 700;
+}
+
 .winnerBadge {
   color: #fbbf24;
   font-weight: 700;

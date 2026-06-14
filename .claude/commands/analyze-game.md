@@ -4,15 +4,21 @@ Analyze a specific trick or bidding step from a bot game replay and evaluate the
 
 ## House Rules (always authoritative)
 
+**Card ID format (authoritative — do not verify from source):**
+- Format: `${initial}${value}` — e.g. `B13`, `R5`, `G10`, `Y14`, `ROOK`
+- Color initials: B = Black, R = Red, G = Green, Y = Yellow
+- No hyphens. ROOK is a literal string with no color prefix.
+- To compute point value from a card ID: strip the leading color initial (or "ROOK"), parse the numeric suffix, then apply the table below.
+
 **Scoring:**
-- ROOK card: 20 points
-- 1 of any color: 15 points
-- 10 of any color: 10 points
-- 14 of any color: 10 points
-- 5 of any color: 5 points
-- All other cards (6–9, 11–13): 0 points
+- ROOK: 20 points
+- value 1 (any color): 15 points
+- value 10 (any color): 10 points
+- value 14 (any color): 10 points
+- value 5 (any color): 5 points
+- all other values (6–9, 11–13): 0 points
 - Total per hand: 180 points (160 from cards + 20 ROOK)
-- Nest bonus: discarded cards' point values are awarded to the team that wins the last trick
+- Nest bonus: sum the point values of `outcome.discarded` using the table above — these points are awarded to the team that wins the last trick
 - Most-cards bonus: team with more captured tricks gets a bonus (check `packages/engine/src/scoring.ts` for exact value)
 - Last trick bonus: separate from most-cards (verify in `scoring.ts`)
 

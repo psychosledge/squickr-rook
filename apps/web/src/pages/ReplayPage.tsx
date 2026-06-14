@@ -308,6 +308,8 @@ export default function ReplayPage() {
       <div className={styles.seatBlock}>
         <div className={styles.seatLabel}>
           {seat}
+          {seat === bidder && <span className={styles.bidderBadge}> ★</span>}
+          {seat === trick.leadSeat && <span className={styles.leadBadge}> ▶</span>}
           {isWinner && <span className={styles.winnerBadge}> W</span>}
         </div>
         <div className={styles.handWrapper}>
@@ -441,7 +443,6 @@ export default function ReplayPage() {
         <button
           className={styles.btn}
           onClick={() => setTrickIndex((i) => i - 1)}
-          disabled={trickIndex === 0}
         >
           &larr; Prev
         </button>
