@@ -76,6 +76,29 @@ At the decision point (start of the trick), the perspective bot knew:
 - Running score: `transcript[trickIndex-1].cumulativeScore` (or 0/0 at trick 1)
 - Points remaining: sum of `pointsInTrick` for tricks after current + nest bonus from discards
 
+**When unknown card distributions are material** (e.g., trick 1, or evaluating whether an opponent might hold a specific card), compute the void probability rather than hand-waving with "they can't know":
+
+*Formula — P(target player void in suit X):*
+- T = total cards in that suit in the 45-card deck (typically 11: values 1, 5–14)
+- H = cards in that suit held by the perspective player
+- R = T − H (remaining cards in that suit, distributed among the other 35 cards)
+- P(void) = C(35 − R, 10) / C(35, 10)
+
+*Quick reference (T = 11, one opponent with 10 cards):*
+| Cards held (H) | Remaining (R) | Base void % |
+|---|---|---|
+| 3 | 8 | ~5% |
+| 4 | 7 | ~7% |
+| 5 | 6 | ~11% |
+| 6 | 5 | ~16% |
+| 7 | 4 | ~24% |
+| 8 | 3 | ~35% |
+| 9 | 2 | ~50% |
+
+*Bidder adjustment:* The bidder saw 15 cards (10 dealt + 5 nest) and discarded 5 strategically to maximize their hand. If R is small (≤4), the bidder had strong incentive to discard to void that suit. Apply a rough +10–15pp adjustment to the base void % when evaluating whether the bidder is void.
+
+State this in the analysis as: "P(E void in Black | S holds 5) ≈ 11% base, ~20–25% with bidder discard adjustment." This replaces vague "can't know" caveats with a concrete probability that informs whether a play was reasonable.
+
 **Step 3 — Enumerate candidate plays**
 
 List the 2–4 most meaningful alternative plays at that decision point (not every card). For each:
