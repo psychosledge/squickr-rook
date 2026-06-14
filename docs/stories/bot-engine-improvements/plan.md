@@ -12,7 +12,7 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 **Scope:** In `packages/engine/src/bot.ts`, improve the defending team's lead selection logic. When the bot is leading and `trackPlayedCards` is enabled, check if any bidding-team player is known void in a suit (they failed to follow that suit in a previous trick). If so, prioritize leading that suit to force the bidder to spend trump. Applies only when defending and the bidder still holds trump. No changes to bid logic, discard logic, or non-lead card play.
 **Status:** not started
 **Commit:** —
-**Evidence:** game-0000 (seed 12345), trick 3, N perspective. N holds B13 and knows E is void in Black (E trumped trick 1's Black lead with Y5). Bot led G12; E won with G14 at zero trump cost. A Black lead forces E to burn a trump.
+**Evidence:** game-0000 (seed 12345), trick 3, N perspective. N holds B13 and knows E is void in Black (E trumped trick 1's Black lead with Y5). Bot led G12; E won with G14 at zero trump cost. A Black lead forces E to burn a trump. Also confirmed trick 5, N perspective: bot led G10 when B13 would have forced E to trump (0-pt trick) or sluff G1 (NS captures 15 pts); instead E won G10+G1 = 25 pts at zero trump cost.
 **Acceptance Criteria:**
 - [ ] When defending and `trackPlayedCards` is true, bot identifies suits in which a bidding-team player is known void
 - [ ] Bot preferentially leads a void-forcing suit over an arbitrary off-suit card when one is available
@@ -33,6 +33,20 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 - [ ] Slice 1 defender void-lead behavior is unchanged
 - [ ] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — change is isolated to the trump lead candidate selection in `botChooseCommand`
+
+---
+
+### Slice 3: Defender lead — prefer low cards over point cards in losing suits
+**Scope:** In `packages/engine/src/bot.ts`, in the defending team's lead selection logic: when leading off-suit and the bot does not hold the highest remaining card in that suit (inferrable via `trackPlayedCards`), prefer 0-point cards over point-valued cards (5, 10, 14, 1) in that suit. Void-force logic (Slice 1) takes precedence when applicable. No changes to bid logic, discard logic, trump leads, or non-lead card play.
+**Status:** not started
+**Commit:** —
+**Evidence:** game-0000 (seed 12345), trick 5, N perspective. N holds G7 (0-pt), G9 (0-pt), G10 (10-pt). Highest remaining Green is G1 (unaccounted — held by E). Bot led G10; E won with G1, EW scored G10+G1 = 25 pts. Leading G7 instead limits EW to 15 pts (G1+G7).
+**Acceptance Criteria:**
+- [ ] When defending and `trackPlayedCards` is true, and bot is leading a suit where it does not hold the highest remaining card, bot prefers 0-point cards over point-valued cards in that suit
+- [ ] Logic does not apply when bot holds the highest remaining card in the suit (leading a point card to win is correct)
+- [ ] Void-force behavior (Slice 1) takes precedence over this heuristic when a known void is available
+- [ ] `pnpm --filter engine test` passes with no regressions
+**Needs Architect:** no — isolated to the lead-selection branch of `botChooseCommand` for defending bots
 
 ---
 
