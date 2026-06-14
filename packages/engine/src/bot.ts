@@ -704,6 +704,53 @@ function safeSuitsToLead(
   return safe;
 }
 
+/**
+ * Returns true if the bot's best card in a suit (measured by `rankFn`) is topped by
+ * at least one card in the same suit that is neither played nor in the bot's hand.
+ *
+ * "Unaccounted" = not in `playedCards` AND not in `hand`.
+ *
+ * `suitCardIds` is the exhaustive list of card IDs that belong to the suit
+ * (all valid values: 1,5–14 for off-suit colors, plus ROOK for trump).
+ * `myBestRank` is the highest rank the bot holds in that suit.
+ */
+function hasUnaccountedHigher(
+  hand: CardId[],
+  playedCards: CardId[],
+  suitCardIds: CardId[],
+  myBestRank: number,
+  rankFn: (c: CardId) => number,
+): boolean {
+  const playedSet = new Set(playedCards);
+  const handSet = new Set(hand);
+  for (const c of suitCardIds) {
+    if (playedSet.has(c) || handSet.has(c)) continue;
+    if (rankFn(c) > myBestRank) return true;
+  }
+  return false;
+}
+
+/**
+ * From a list of play commands in a single suit, pick the cheapest lead:
+ *   1. Lowest 0-pt card (by offSuitRank, ascending) if any exist.
+ *   2. Otherwise lowest point-value card; ties broken by offSuitRank ascending.
+ */
+function cheapestLeadInSuit(candidates: GameCommand[]): GameCommand {
+  const zeroPt = candidates.filter(c => c.type === "PlayCard" && pointValue(c.cardId) === 0);
+  if (zeroPt.length > 0) {
+    return zeroPt.reduce((best, cmd) => {
+      if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+      return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
+    });
+  }
+  return candidates.reduce((best, cmd) => {
+    if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+    const ptCmp = pointValue(cmd.cardId) - pointValue(best.cardId);
+    if (ptCmp !== 0) return ptCmp < 0 ? cmd : best;
+    return offSuitRank(cmd.cardId) < offSuitRank(best.cardId) ? cmd : best;
+  });
+}
+
 function chooseLeadCard(
   playCommands: GameCommand[],
   state: GameState,
@@ -808,6 +855,24 @@ function chooseLeadCard(
         // Lead highest trump — but respect ROOK-management rule
         const nonRookTrump = trumpCards.filter(c => c.type === "PlayCard" && c.cardId !== "ROOK");
         const candidates = nonRookTrump.length > 0 ? nonRookTrump : trumpCards;
+
+        // Slice 2: if a higher trump is unaccounted, lead cheapest trump to avoid loss
+        if (profile.trackPlayedCards) {
+          const hand = state.hands[seat] ?? [];
+          const trumpInitial = trump[0]!;
+          const allTrumpCards: CardId[] = [
+            ...([1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(v => `${trumpInitial}${v}` as CardId)),
+            "ROOK" as CardId,
+          ];
+          const myBestTrumpRank = candidates.reduce(
+            (best, c) => c.type === "PlayCard" ? Math.max(best, trumpRank(c.cardId, trump)) : best,
+            -1,
+          );
+          if (hasUnaccountedHigher(hand, state.playedCards, allTrumpCards, myBestTrumpRank, c => trumpRank(c, trump))) {
+            return cheapestLeadInSuit(candidates);
+          }
+        }
+
         return candidates.reduce((best, cmd) => {
           if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
           return trumpRank(cmd.cardId, trump) > trumpRank(best.cardId, trump) ? cmd : best;
@@ -825,14 +890,70 @@ function chooseLeadCard(
             return card.kind === "regular" && safeSuits.has(card.color);
           });
           if (safeCandidates.length > 0) {
-            return safeCandidates.reduce((best, cmd) => {
+            // Slice 2: within the safe-suit candidates, still prefer cheapest when higher unaccounted
+            // Group by color and apply cheap-lead check per suit, then return the best candidate
+            const handCards = hand;
+            const bestSafeCandidate = safeCandidates.reduce((best, cmd) => {
               if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
               return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
             });
+            // Determine the suit of the best candidate and apply cheap-lead
+            const bestCard = cardFromId((bestSafeCandidate as { type: "PlayCard"; cardId: CardId }).cardId);
+            if (bestCard.kind === "regular") {
+              const color = bestCard.color;
+              const initial = color[0]!;
+              const allColorCards: CardId[] = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
+                v => `${initial}${v}` as CardId,
+              );
+              const colorCandidates = safeCandidates.filter(c => {
+                if (c.type !== "PlayCard") return false;
+                const card = cardFromId(c.cardId);
+                return card.kind === "regular" && card.color === color;
+              });
+              const myBestRank = colorCandidates.reduce(
+                (best, c) => c.type === "PlayCard" ? Math.max(best, offSuitRank(c.cardId)) : best,
+                -1,
+              );
+              if (hasUnaccountedHigher(handCards, state.playedCards, allColorCards, myBestRank, offSuitRank)) {
+                return cheapestLeadInSuit(colorCandidates.length > 0 ? colorCandidates : safeCandidates);
+              }
+            }
+            return bestSafeCandidate;
           }
         }
       }
       const offSuitCandidates = nonTrumpCards.length > 0 ? nonTrumpCards : playCommands;
+      // Slice 2: for off-suit lead, group by best color and apply cheap-lead check
+      if (profile.trackPlayedCards && offSuitCandidates.length > 0) {
+        const hand = state.hands[seat] ?? [];
+        // Find which color has the highest-rank card (the color we'd normally lead from)
+        const bestCmd = offSuitCandidates.reduce((best, cmd) => {
+          if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
+          return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
+        });
+        if (bestCmd.type === "PlayCard") {
+          const bestCard = cardFromId(bestCmd.cardId);
+          if (bestCard.kind === "regular") {
+            const color = bestCard.color;
+            const initial = color[0]!;
+            const allColorCards: CardId[] = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
+              v => `${initial}${v}` as CardId,
+            );
+            const colorCandidates = offSuitCandidates.filter(c => {
+              if (c.type !== "PlayCard") return false;
+              const card = cardFromId(c.cardId);
+              return card.kind === "regular" && card.color === color;
+            });
+            const myBestRank = colorCandidates.reduce(
+              (best, c) => c.type === "PlayCard" ? Math.max(best, offSuitRank(c.cardId)) : best,
+              -1,
+            );
+            if (hasUnaccountedHigher(hand, state.playedCards, allColorCards, myBestRank, offSuitRank)) {
+              return cheapestLeadInSuit(colorCandidates.length > 0 ? colorCandidates : offSuitCandidates);
+            }
+          }
+        }
+      }
       return offSuitCandidates.reduce((best, cmd) => {
         if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
         return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
@@ -921,6 +1042,21 @@ function chooseLeadCard(
             });
             if (nonPointLeads.length > 0) leadCandidates = nonPointLeads;
             // else fallback: all suitCards (only aces/14s available)
+          }
+          // Slice 2: if a higher card in this suit is unaccounted, prefer cheapest card
+          if (profile.trackPlayedCards) {
+            const hand = state.hands[seat] ?? [];
+            const initial = longestColor[0]!;
+            const allColorCards: CardId[] = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
+              v => `${initial}${v}` as CardId,
+            );
+            const myBestRank = leadCandidates.reduce(
+              (best, c) => c.type === "PlayCard" ? Math.max(best, offSuitRank(c.cardId)) : best,
+              -1,
+            );
+            if (hasUnaccountedHigher(hand, state.playedCards, allColorCards, myBestRank, offSuitRank)) {
+              return cheapestLeadInSuit(leadCandidates);
+            }
           }
           return leadCandidates.reduce((best, cmd) => {
             if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;

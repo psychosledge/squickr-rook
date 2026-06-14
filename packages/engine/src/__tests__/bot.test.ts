@@ -2741,18 +2741,20 @@ describe("ADR-010 Fix 3: defending lead avoids aces/14s on early tricks", () => 
     }
   });
 
-  it("L3+ defending bot leads trick 1, avoids 14-point card, leads non-14 from longest suit", () => {
+  it("L3+ defending bot leads trick 1, avoids 14-point card, leads cheapest non-14 (Slice 2)", () => {
     // W holds: R14 (14-point card, 10pts), R9, R8 — all Red (off-suit, longest suit).
-    // tricksPlayed=0. Fix 3: R14 is excluded (value=14). nonPointLeads=[R9,R8].
-    // Picks highest offSuitRank: R9 > R8 → R9.
+    // tricksPlayed=0. Fix 3: R14 excluded (value=14). leadCandidates=[R9, R8].
+    // Slice 2 (trackPlayedCards=true): R1 is unaccounted (offSuitRank=11 > R9's rank=5).
+    // cheapestLeadInSuit([R9, R8]): 0-pt cards both; lowest offSuitRank = R8 (rank=4 < R9's 5).
+    // Result: leads R8 (cheapest safe lead), not R14, not R9.
     const state = makeDefendingLeadState(["R14", "R9", "R8"], 0);
     const profile = { ...BOT_PRESETS[3], playAccuracy: 1.0 };
     const cmd = botChooseCommand(state, "W", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
-      // Should avoid R14, picks R9 (highest non-ace/non-14)
+      // Fix 3 avoids R14; Slice 2 picks cheapest among non-14 = R8 (not R9)
       expect(cmd.cardId).not.toBe("R14");
-      expect(cmd.cardId).toBe("R9");
+      expect(cmd.cardId).toBe("R8");
     }
   });
 
@@ -2770,11 +2772,14 @@ describe("ADR-010 Fix 3: defending lead avoids aces/14s on early tricks", () => 
     }
   });
 
-  it("L3+ defending bot leads 14-pt card freely after early tricks (tricksPlayed > 2)", () => {
+  it("L3+ defending bot leads 14-pt card freely when all higher Red accounted (tricksPlayed > 2)", () => {
     // Fix 3: isEarlyLead = tricksPlayed <= 2. At tricksPlayed=9, isEarlyLead=false → no restriction.
-    // W holds: R14 (14-point card), R9, R8. All 11 Black trump exhausted (late game).
-    // Normal logic picks highest offSuitRank: R14 (rank=14) > R9 (rank=9) > R8 (rank=8) → R14.
-    const playedCards: CardId[] = ["B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12", "B13", "B14", "ROOK"]; // all 11 trump
+    // Slice 2: still applies — but with R1, R1 is unaccounted if not in playedCards.
+    // To verify Fix 3 isolation (14s freely led after early tricks), also account for R1 in playedCards
+    // so Slice 2 does not fire. Then normal logic: highest offSuitRank → R14.
+    const playedCards: CardId[] = ["B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12", "B13", "B14", "ROOK", "R1"] as CardId[];
+    // All 11 Black trump exhausted + R1 accounted → W's max Red = R14 (rank=10); outstanding: R5,R6,R8..R13
+    // R13 has offSuitRank=9 < R14's 10 → no higher unaccounted → Slice 2 does NOT fire.
     const state = makePlayingState({
       activePlayer: "W",
       bidder: "N",   // NS team → W is defending (EW)
@@ -2787,7 +2792,8 @@ describe("ADR-010 Fix 3: defending lead avoids aces/14s on early tricks", () => 
     const cmd = botChooseCommand(state, "W", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
-      // tricksPlayed=9 > 2 → isEarlyLead=false → Fix 3 inactive → normal logic: highest offSuitRank → R14
+      // Fix 3 inactive (tricksPlayed=9>2), Slice 2 inactive (R1 accounted, no higher outstanding)
+      // Normal logic: highest offSuitRank → R14
       expect(cmd.cardId).toBe("R14");
     }
   });
@@ -3045,16 +3051,17 @@ describe("Fix 2 — trick-10 defensive ROOK preservation", () => {
 // ── Fix 3+5 — Trump Pull Sequencing: Lead Highest Non-ROOK Trump ─────────────
 
 describe("Fix 3+5 — trump pull leads highest non-ROOK trump", () => {
-  it("bidding team has multiple non-ROOK trump — leads highest (B14)", () => {
-    // Hand: [B5, B9, B14, ROOK], trump=Black, trump not pulled, bidding team (N is bidder, N leads).
-    // Expected: leads B14 (trumpRank=11, highest non-ROOK trump).
-    // Expert Rook strategy: lead the highest trump to force opponents to spend their strong cards.
+  it("bidding team has multiple non-ROOK trump — leads B9 (cheapest) when B1 unaccounted (Slice 2)", () => {
+    // Hand: [B5, B9, B14, ROOK], trump=Black, trump not pulled, bidding team (N leads).
+    // B1 (trumpRank=12) is unaccounted → Slice 2 fires: cheapest non-ROOK trump.
+    // 0-pt non-ROOK trump candidates = [B9]. Leads B9.
+    // (B5=5pt, B9=0pt, B14=10pt → cheapestLeadInSuit picks B9)
     const state = makePlayingState({
       activePlayer: "N",
       bidder: "N",    // N is bidder (NS team) → bidding team
       trump: "Black",
       tricksPlayed: 2,
-      playedCards: [], // no trump played → not pulled
+      playedCards: [], // no trump played → not pulled, B1 unaccounted
       hands: {
         N: ["B5", "B9", "B14", "ROOK"] as CardId[],
         E: [], S: [], W: [],
@@ -3064,7 +3071,30 @@ describe("Fix 3+5 — trump pull leads highest non-ROOK trump", () => {
     const cmd = botChooseCommand(state, "N", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
-      // B14 has trumpRank=11 (highest non-ROOK trump in this hand)
+      // B1 unaccounted → Slice 2: cheapest non-ROOK trump = B9 (0pt, lowest 0-pt trump)
+      expect(cmd.cardId).toBe("B9");
+    }
+  });
+
+  it("bidding team leads highest trump when B1 is already accounted", () => {
+    // Hand: [B5, B9, B14, ROOK], trump=Black, B1 in playedCards → accounted.
+    // No higher trump unaccounted → Slice 2 does not fire → leads highest = B14.
+    const state = makePlayingState({
+      activePlayer: "N",
+      bidder: "N",
+      trump: "Black",
+      tricksPlayed: 2,
+      playedCards: ["B1"] as CardId[],  // B1 accounted
+      hands: {
+        N: ["B5", "B9", "B14", "ROOK"] as CardId[],
+        E: [], S: [], W: [],
+      },
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // B1 accounted → no higher unaccounted → leads highest non-ROOK trump = B14
       expect(cmd.cardId).toBe("B14");
     }
   });
@@ -3409,10 +3439,10 @@ describe("botChooseCommand - Slice 1 (defender void-forcing lead)", () => {
     }
   });
 
-  it("void-forcing skipped when bidder has no trump remaining — normal logic applies", () => {
+  it("void-forcing skipped when bidder has no trump remaining — Slice 2 leads cheapest instead", () => {
     // N defending against E (bidder). E is void in Black per trick history.
     // BUT E holds NO Yellow trump cards → void-forcing is pointless.
-    // Normal longest-suit logic: N has 3 Green + 1 Black → leads G8.
+    // Longest suit: N has 3 Green (G6, G7, G8). G1 is unaccounted → Slice 2 fires → leads G6.
     const completedTricks = [
       {
         leadColor: "Black" as Color,
@@ -3441,8 +3471,9 @@ describe("botChooseCommand - Slice 1 (defender void-forcing lead)", () => {
     const cmd = botChooseCommand(state, "N", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
-      // No trump in bidder's hand → void-forcing not useful → normal longest-suit leads G8
-      expect(cmd.cardId).toBe("G8");
+      // No trump in bidder's hand → void-forcing skipped.
+      // Longest suit = Green (3 cards). G1 unaccounted → Slice 2: leads G6 (cheapest 0-pt Green).
+      expect(cmd.cardId).toBe("G6");
     }
   });
 
@@ -3483,6 +3514,364 @@ describe("botChooseCommand - Slice 1 (defender void-forcing lead)", () => {
     if (cmd.type === "PlayCard") {
       // Should lead R9 (Red void-forcing) NOT G7 (longest suit)
       expect(cmd.cardId).toBe("R9");
+    }
+  });
+});
+
+// ── Slice 2: Prefer cheapest non-point card when higher card unaccounted ─────
+
+/**
+ * Build a playing-phase state for "cheap lead" tests.
+ *
+ * Active player is leading (currentTrick is empty).
+ * trackPlayedCards is always true for these tests (bot profiles set accordingly).
+ */
+function makeCheapLeadState(opts: {
+  activePlayer: Seat;
+  bidderSeat: Seat;
+  trump: Color;
+  hands: Partial<Record<Seat, CardId[]>>;
+  playedCards?: CardId[];
+  tricksPlayed?: number;
+}): GameState {
+  return makePlayingState({
+    activePlayer: opts.activePlayer,
+    bidder: opts.bidderSeat,
+    trump: opts.trump,
+    hands: opts.hands,
+    playedCards: opts.playedCards ?? [],
+    tricksPlayed: opts.tricksPlayed ?? 2,
+    scores: { NS: 0, EW: 0 },
+    originalNest: [],
+  });
+}
+
+describe("botChooseCommand - Slice 2 (cheap lead when higher card unaccounted)", () => {
+  // ── AC1: bidding team, trump pull, higher trump unaccounted ────────────────
+
+  it("AC1: bidding team pulling trump leads cheapest trump when a higher trump is unaccounted", () => {
+    // Evidence: game-0000 trick 2, E led Y14 with Y1 unaccounted; N played Y1, cost 25 pts.
+    // Bot: S is bidding team (bidder=N, NS team). Trump=Yellow. Trump not pulled.
+    // S hand: Y6 (0pt), Y14 (10pt). Y1 is unaccounted (not in playedCards, not in S's hand).
+    // Y1 has trumpRank=12 (highest), Y14 has trumpRank=11. Y6 has trumpRank=3.
+    // S's max trump rank = 11 (Y14). Y1 (rank=12) > 11 and unaccounted → risk exists.
+    // Cheap lead: prefer lowest 0-pt trump = Y6.
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",  // NS team → S is bidding team
+      trump: "Yellow",
+      hands: {
+        S: ["Y6", "Y14"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      // Y1 is unaccounted (not in playedCards, not in S's hand)
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Y1 unaccounted (higher than Y14) → lead cheapest trump = Y6 (0pt) not Y14 (10pt)
+      expect(cmd.cardId).toBe("Y6");
+    }
+  });
+
+  it("AC2: bidding team leads point trump freely when all higher trumps are accounted", () => {
+    // S (bidding team, NS). Trump=Yellow. S holds Y6 (0pt), Y14 (10pt).
+    // Y1 is in playedCards (accounted) → no unaccounted higher trump → safe to lead Y14.
+    // Existing behavior: leads highest trump = Y14 (trumpRank=11 > Y6's 3).
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",
+      trump: "Yellow",
+      hands: {
+        S: ["Y6", "Y14"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      playedCards: ["Y1"],  // Y1 accounted → no higher trump outstanding
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // All higher trumps (Y1) accounted → may lead highest trump = Y14
+      expect(cmd.cardId).toBe("Y14");
+    }
+  });
+
+  it("AC3: bidding team leads lowest point trump when only point trumps remain and higher unaccounted", () => {
+    // S (bidding team, NS). Trump=Yellow. S holds Y14 (10pt), Y5 (5pt). Y1 unaccounted.
+    // Risk exists (Y1 unaccounted). No 0-pt trump → lead lowest point trump = Y5 (5pt < 10pt).
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",
+      trump: "Yellow",
+      hands: {
+        S: ["Y14", "Y5"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      playedCards: [],  // Y1 unaccounted
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Only point trumps → lead lowest point trump (Y5=5pt < Y14=10pt)
+      expect(cmd.cardId).toBe("Y5");
+    }
+  });
+
+  // ── AC1 off-suit: bidding team, off-suit lead, higher card unaccounted ─────
+
+  it("AC4: bidding team (trump pulled) leads cheapest off-suit when higher card unaccounted", () => {
+    // Evidence: game-0000 trick 5, N holds G7/G9/G10; G1 unaccounted. Led G10; E won with G1.
+    // S (bidding team, NS), trump=Black, trump pulled (9 Black in playedCards).
+    // S hand: G7 (0pt), G9 (0pt), G10 (0pt). G1 (offSuitRank=11) is unaccounted.
+    // S's max Green offSuitRank = offSuitRank(G10) = 6. G1 rank=11 > 6 → risk.
+    // Cheap lead: prefer lowest 0-pt Green = G7 (offSuitRank=3, lowest 0-pt).
+    const TRUMP_PULLED: CardId[] = ["B1", "B6", "B7", "B8", "B10", "B11", "B12", "B13", "B14"] as CardId[];
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",
+      trump: "Black",
+      hands: {
+        S: ["G7", "G9", "G10"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      playedCards: TRUMP_PULLED,  // trump pulled; G1 not in played
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // G1 unaccounted (higher than G10) → lead cheapest 0-pt Green = G7
+      expect(cmd.cardId).toBe("G7");
+    }
+  });
+
+  it("AC5: bidding team (trump pulled) leads highest off-suit when all higher cards accounted", () => {
+    // S (bidding team) holds G7, G9, G10. All higher Green cards (G11–G14, G1) are in playedCards.
+    // No unaccounted higher Green → safe to lead highest = G10.
+    const TRUMP_PULLED: CardId[] = ["B1", "B6", "B7", "B8", "B10", "B11", "B12", "B13", "B14"] as CardId[];
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",
+      trump: "Black",
+      hands: {
+        S: ["G7", "G9", "G10"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      // All higher Green cards accounted: G1(rank 11), G11(7), G12(8), G13(9), G14(10) > G10(6)
+      playedCards: [...TRUMP_PULLED, "G1", "G11", "G12", "G13", "G14"] as CardId[],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // All higher Green accounted → no risk → safe to lead highest = G10
+      expect(cmd.cardId).toBe("G10");
+    }
+  });
+
+  // ── AC1 defending team off-suit: higher card unaccounted ──────────────────
+
+  it("AC6: defending team leads cheapest off-suit when higher card unaccounted", () => {
+    // E (defending, EW team; bidder=N, NS team). Trump=Black. tricksPlayed=2 (not early enough for Fix3 ace avoidance suppression).
+    // E hand: G7 (0pt), G9 (0pt), G10 (0pt). G1 is unaccounted.
+    // G1 offSuitRank=11 > G10's offSuitRank=6 → risk.
+    // Cheap lead: lead lowest 0-pt Green = G7.
+    const state = makeCheapLeadState({
+      activePlayer: "E",
+      bidderSeat: "N",  // NS team → E is defending
+      trump: "Black",
+      hands: {
+        E: ["G7", "G9", "G10"],
+        N: [],
+        S: [],
+        W: [],
+      },
+      playedCards: [],  // G1 unaccounted
+      tricksPlayed: 3,  // past early-trick restriction
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // G1 unaccounted → lead cheapest 0-pt Green = G7 (not G10)
+      expect(cmd.cardId).toBe("G7");
+    }
+  });
+
+  it("AC7: defending team leads highest off-suit when all higher cards accounted", () => {
+    // E (defending). E holds G7, G9, G10. G1 in playedCards → accounted.
+    // G14 is in E's hand? No — G14 not in hand, but in playedCards too.
+    // G1 and G14 both accounted. E's max Green = G10 (offSuitRank=6).
+    // Outstanding Green: G5(1), G6(2), G8(4), G11(7), G12(8), G13(9).
+    // G11-G13 are unaccounted and have higher rank than G10 → still risky?
+    // To ensure no higher outstanding: put G11, G12, G13, G14, G1 all in playedCards.
+    // Outstanding Green: G5(1), G6(2), G8(4) — all lower than G10(6) → safe!
+    const state = makeCheapLeadState({
+      activePlayer: "E",
+      bidderSeat: "N",
+      trump: "Black",
+      hands: {
+        E: ["G7", "G9", "G10"],
+        N: [],
+        S: [],
+        W: [],
+      },
+      playedCards: ["G1", "G11", "G12", "G13", "G14"] as CardId[],  // all higher accounted
+      tricksPlayed: 3,
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // No higher Green unaccounted → lead highest off-suit in suit = G10
+      expect(cmd.cardId).toBe("G10");
+    }
+  });
+
+  it("AC8: defending team leads lowest point card when only point cards remain and higher unaccounted", () => {
+    // E (defending). E holds G1 (15pt), G14 (10pt). G1 unaccounted higher? G1 is in E's hand.
+    // G1 is THE HIGHEST Green (offSuitRank=11). No higher Green exists — so G1 is safe!
+    // Use a scenario where E has point cards but not the highest: G10(10pt), G14(10pt). G1 unaccounted.
+    // G1 offSuitRank=11 > G14's offSuitRank=10 > G10's offSuitRank=6.
+    // E's max = offSuitRank(G14) = 10. G1 rank=11 > 10 → unaccounted → risk.
+    // No 0-pt cards → lead lowest point card = G10 (10pt = G14's 10pt — both equal, pick lowest offSuitRank).
+    // Both G10 and G14 have pointValue=10. Tiebreak: lowest offSuitRank = G10(6) vs G14(10) → G10.
+    const state = makeCheapLeadState({
+      activePlayer: "E",
+      bidderSeat: "N",
+      trump: "Black",
+      hands: {
+        E: ["G10", "G14"],
+        N: [],
+        S: [],
+        W: [],
+      },
+      playedCards: [],  // G1 unaccounted (higher than G14 and G10)
+      tricksPlayed: 3,
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Only point cards, higher (G1) unaccounted → lead lowest point value card
+      // G10=10pt, G14=10pt (equal). Tiebreak by lowest offSuitRank: G10(6) < G14(10) → G10
+      expect(cmd.cardId).toBe("G10");
+    }
+  });
+
+  // ── Void-force takes precedence for defenders ──────────────────────────────
+
+  it("AC9: void-force takes precedence over cheap-lead for defenders", () => {
+    // N is defending (bidder=E, EW team). Trump=Yellow.
+    // N holds: G6 (0pt, would be cheap lead candidate), B13 (0pt, void-forcing suit).
+    // E is known void in Black (from completedTricks). E still holds Yellow trump.
+    // G1 is unaccounted → cheap-lead logic would say lead G6 (cheapest Green).
+    // But void-force fires first: B13 is the void-forcing card. Void-force should win.
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B6" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const base = stateAfterTrumpSelected();
+    const state: GameState = {
+      ...base,
+      phase: "playing",
+      activePlayer: "N",
+      hands: {
+        N: ["G6", "B13"],  // G6 in Green (G1 unaccounted → cheap-lead would pick G6), B13 in void-forcing suit
+        E: ["Y8", "Y9"],   // E still holds Yellow (trump)
+        S: [],
+        W: [],
+      },
+      trump: "Yellow",
+      bidder: "E",    // E is the bidder (EW team) → N is defending
+      tricksPlayed: 2,
+      currentTrick: [],
+      completedTricks,
+      playedCards: ["B8", "B9", "Y5", "B6"],  // G1 NOT in played → G1 unaccounted
+      scores: { NS: 0, EW: 0 },
+      originalNest: [],
+    };
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Void-force takes precedence: leads B13 (void-forcing), NOT G6 (cheap lead)
+      expect(cmd.cardId).toBe("B13");
+    }
+  });
+
+  // ── trackPlayedCards=false: no cheap-lead logic applied ───────────────────
+
+  it("AC10: trackPlayedCards=false disables cheap-lead — leads highest as before", () => {
+    // S (bidding team, NS). Trump=Yellow, trump not pulled.
+    // S holds Y6 (0pt), Y14 (10pt). Y1 unaccounted.
+    // trackPlayedCards=false → cheap-lead logic not applied → existing behavior: lead highest trump = Y14.
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",
+      trump: "Yellow",
+      hands: {
+        S: ["Y6", "Y14"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0, trackPlayedCards: false };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // trackPlayedCards=false → no cheap-lead → leads highest trump = Y14
+      expect(cmd.cardId).toBe("Y14");
+    }
+  });
+
+  it("AC11: cheap-lead does not apply at L1/L2 (difficulty <= 2 → random play path)", () => {
+    // L2 bot: chooseBestPlay short-circuits to pickRandom for difficulty <= 2.
+    // Even if cheap-lead would kick in, L2 never reaches that path.
+    const state = makeCheapLeadState({
+      activePlayer: "S",
+      bidderSeat: "N",
+      trump: "Yellow",
+      hands: {
+        S: ["Y6", "Y14"],
+        N: [],
+        E: [],
+        W: [],
+      },
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[2], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // L2: random play — just verify it's a legal card
+    if (cmd.type === "PlayCard") {
+      expect(["Y6", "Y14"]).toContain(cmd.cardId);
     }
   });
 });
