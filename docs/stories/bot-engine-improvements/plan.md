@@ -72,14 +72,14 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ### Slice 6: Defender lead — prefer cheapest card within void-forcing suit
 **Scope:** In `packages/engine/src/bot.ts`, in the void-forcing lead selection introduced in Slice 1: when multiple cards are available in the void-forcing suit, prefer the lowest 0-pt card rather than the highest-ranked card. A B6 forces the same trump spend as a B13 but preserves the point card for a winnable trick.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 60c1da4
 **Evidence:** Surfaced during Slice 1 code review. Slice 1 selects `reduce((best, cmd) => offSuitRank(cmd) > offSuitRank(best) ? cmd : best)` — highest ranked wins. Leading the cheapest card in the void suit is strictly superior: same trump-forcing outcome, lower opportunity cost.
 **Acceptance Criteria:**
-- [ ] When void-forcing and multiple cards exist in the void suit, bot leads the lowest 0-pt card rather than the highest-ranked card
-- [ ] If all cards in the void suit are point-valued, falls back to leading the lowest point card (minimize loss)
-- [ ] Slice 1 void-forcing behavior (leads void suit over non-void suit) is unchanged
-- [ ] `pnpm --filter engine test` passes with no regressions
+- [x] When void-forcing and multiple cards exist in the void suit, bot leads the lowest 0-pt card rather than the highest-ranked card
+- [x] If all cards in the void suit are point-valued, falls back to leading the lowest point card (minimize loss)
+- [x] Slice 1 void-forcing behavior (leads void suit over non-void suit) is unchanged
+- [x] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — isolated to the candidate-selection reduce within the void-forcing block of `chooseLeadCard`
 
 ---
