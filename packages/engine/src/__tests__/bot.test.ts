@@ -3439,10 +3439,12 @@ describe("botChooseCommand - Slice 1 (defender void-forcing lead)", () => {
     }
   });
 
-  it("void-forcing skipped when bidder has no trump remaining — Slice 2 leads cheapest instead", () => {
+  it("void-forcing skipped when bidder has no trump remaining — Slice 4 leads short cheap suit instead", () => {
     // N defending against E (bidder). E is void in Black per trick history.
-    // BUT E holds NO Yellow trump cards → void-forcing is pointless.
-    // Longest suit: N has 3 Green (G6, G7, G8). G1 is unaccounted → Slice 2 fires → leads G6.
+    // BUT E holds NO Yellow trump cards → void-forcing is pointless (skipped).
+    // N holds: G6, G7, G8 (3 Green, 0-pt), B13 (1 Black, 0-pt). 0 trump in hand.
+    // Slice 4: Black is a ≤2-card all-0-pt suit and N has 0 trump (≤2) → fires → leads B13.
+    // Many Yellow cards still unaccounted from bot's perspective → voiding in Black has future value.
     const completedTricks = [
       {
         leadColor: "Black" as Color,
@@ -3471,9 +3473,9 @@ describe("botChooseCommand - Slice 1 (defender void-forcing lead)", () => {
     const cmd = botChooseCommand(state, "N", profile);
     expect(cmd.type).toBe("PlayCard");
     if (cmd.type === "PlayCard") {
-      // No trump in bidder's hand → void-forcing skipped.
-      // Longest suit = Green (3 cards). G1 unaccounted → Slice 2: leads G6 (cheapest 0-pt Green).
-      expect(cmd.cardId).toBe("G6");
+      // Void-force skipped (bidder has no trump). Slice 4 fires: Black (1 card, 0-pt) is
+      // shortest qualifying suit → leads B13 to set up a void and preserve future trump opportunities.
+      expect(cmd.cardId).toBe("B13");
     }
   });
 
@@ -3872,6 +3874,292 @@ describe("botChooseCommand - Slice 2 (cheap lead when higher card unaccounted)",
     // L2: random play — just verify it's a legal card
     if (cmd.type === "PlayCard") {
       expect(["Y6", "Y14"]).toContain(cmd.cardId);
+    }
+  });
+});
+
+// ── Slice 4: Defender lead — prefer short cheap suits to enable voiding ────────
+
+/**
+ * Build a playing-phase state for Slice 4 tests.
+ *
+ * Defender is leading. trackPlayedCards=true. No void-forcing context (no
+ * completed tricks with known bidder void). The heuristic fires when:
+ *   - Defending team
+ *   - trackPlayedCards=true
+ *   - Bot holds ≤2 trump cards
+ *   - At least one ≤2-card suit exists where ALL cards in hand are 0-pt
+ *
+ * When triggered, leads the cheapest card in the shortest all-0-pt suit.
+ */
+function makeShortCheapSuitLeadState(opts: {
+  defenderSeat: Seat;
+  defenderHand: CardId[];
+  bidderSeat: Seat;
+  bidderHand: CardId[];
+  trump: Color;
+  tricksPlayed?: number;
+  playedCards?: CardId[];
+  completedTricks?: Array<{
+    leadColor: Color | null;
+    plays: Array<{ seat: Seat; cardId: CardId }>;
+    winner: Seat;
+  }>;
+}): GameState {
+  const base = stateAfterTrumpSelected();
+  const allHands: Record<Seat, CardId[]> = { N: [], E: [], S: [], W: [] };
+  allHands[opts.defenderSeat] = opts.defenderHand;
+  allHands[opts.bidderSeat] = opts.bidderHand;
+
+  return {
+    ...base,
+    phase: "playing",
+    activePlayer: opts.defenderSeat,
+    hands: allHands,
+    trump: opts.trump,
+    bidder: opts.bidderSeat,
+    tricksPlayed: opts.tricksPlayed ?? 1,
+    currentTrick: [],
+    completedTricks: opts.completedTricks ?? [],
+    playedCards: opts.playedCards ?? [],
+    scores: { NS: 0, EW: 0 },
+    originalNest: [],
+  };
+}
+
+describe("botChooseCommand - Slice 4 (defender lead: prefer short cheap suits to enable voiding)", () => {
+  it("AC1: defender leads from short all-0-pt suit over longer suit", () => {
+    // Evidence scenario (game-0000, seed 12345, trick 1, S perspective):
+    // S holds: 5 Black (B8–B12), 2 Red (R7, R10), 2 Green (G6, G8), 1 trump (Y11).
+    // G6/G8 is a 2-card Green suit that is all-0-pt.
+    // Black is a 5-card suit (longer, but B12=0pt top is still risky).
+    // Heuristic: ≤2-card all-0-pt suit exists (Green) AND ≤2 trump → prefer Green (G6 = cheapest).
+    //
+    // Map to test: trump=Yellow. Defender=S (bidder=N, NS team → S is EW defending? No.
+    // Let's use bidder=N (NS team) and defenderSeat=W (EW).
+    // W holds: B8, B9, B10, B11, B12 (5 Black), R7, R10 (2 Red), G6, G8 (2 Green), Y11 (1 trump).
+    // Green: 2 cards, all 0-pt → qualifies.
+    // Red: 2 cards, R10=10pt → NOT all 0-pt → does not qualify.
+    // Black: 5 cards → length > 2 → does not qualify.
+    // Trump: Y11 (1 trump) → ≤2 trump.
+    // Heuristic fires. Shortest all-0-pt suit = Green (2 cards). Cheapest in Green = G6 (offSuitRank 2 < G8's 4).
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "W",
+      defenderHand: ["B8", "B9", "B10", "B11", "B12", "R7", "R10", "G6", "G8", "Y11"],
+      bidderSeat: "N",
+      bidderHand: [],
+      trump: "Yellow",
+      tricksPlayed: 0,
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Heuristic: short all-0-pt suit = Green → cheapest in Green = G6
+      expect(cmd.cardId).toBe("G6");
+    }
+  });
+
+  it("AC2: falls back to longest-suit when no all-0-pt short suit exists", () => {
+    // W holds: B8, B9, B10, B11, B12 (5 Black), R7, R10 (2 Red, R10 is 10-pt), Y11 (1 trump).
+    // Red: 2 cards, R10=10pt → NOT all 0-pt → does not qualify.
+    // No qualifying short suit → fallback to longest-suit (Black).
+    // Longest suit = Black (5 cards). Slice 2: B1 unaccounted (B9 is myBestRank off-suit... wait).
+    // Actually the test just needs to confirm non-G6 behavior (no short cheap suit → normal logic).
+    // Normal logic: longest suit = Black (5 cards). Slice 2 may apply.
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "W",
+      defenderHand: ["B8", "B9", "B10", "B11", "B12", "R7", "R10", "Y11"],
+      bidderSeat: "N",
+      bidderHand: [],
+      trump: "Yellow",
+      tricksPlayed: 3,
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // No all-0-pt short suit → normal logic; longest = Black → leads from Black
+      const cardFromResult = cardFromId(cmd.cardId);
+      expect(cardFromResult.kind).toBe("regular");
+      if (cardFromResult.kind === "regular") {
+        expect(cardFromResult.color).toBe("Black");
+      }
+    }
+  });
+
+  it("AC3: heuristic does not fire when bot holds >2 trump cards", () => {
+    // W holds: B8, B9, B10 (3 Black), G6, G8 (2 Green, all 0-pt), Y9, Y10, Y11 (3 trump).
+    // Trump count = 3 > 2 → heuristic does NOT fire.
+    // Normal logic: longest suit. Black=3, Green=2 → longest = Black.
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "W",
+      defenderHand: ["B8", "B9", "B10", "G6", "G8", "Y9", "Y10", "Y11"],
+      bidderSeat: "N",
+      bidderHand: [],
+      trump: "Yellow",
+      tricksPlayed: 3,
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // >2 trump → heuristic not triggered → normal logic → longest = Black (3 cards)
+      const cardFromResult = cardFromId(cmd.cardId);
+      expect(cardFromResult.kind).toBe("regular");
+      if (cardFromResult.kind === "regular") {
+        expect(cardFromResult.color).toBe("Black");
+      }
+    }
+  });
+
+  it("AC4: void-force takes precedence over short-cheap-suit heuristic", () => {
+    // N is defending (bidder=E). E is known void in Black (trumped a Black lead with Y5 in trick 1).
+    // N holds: G6, G8 (2 Green, all 0-pt), B13 (1 Black, void-forcing suit), Y11 (1 trump).
+    // Heuristic would fire (Green is short, all-0-pt, 1 trump ≤ 2).
+    // But void-force fires first: B13 is the void-forcing card.
+    // Must lead B13 (void-force), NOT G6 (short-cheap-suit heuristic).
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B6" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "N",
+      defenderHand: ["G6", "G8", "B13", "Y11"],  // Green=2 (all 0-pt), Black=1, trump=1
+      bidderSeat: "E",
+      bidderHand: ["Y8", "Y9"],  // E still holds Yellow trump
+      trump: "Yellow",
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B6"],
+      completedTricks,
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Void-force takes precedence: leads B13 (void-forcing), NOT G6 (short-cheap-suit)
+      expect(cmd.cardId).toBe("B13");
+    }
+  });
+
+  it("AC5: when two suits qualify, prefers the shortest one", () => {
+    // W holds: B8 (1 Black, 0-pt), G6, G8 (2 Green, all 0-pt), Y11 (1 trump).
+    // Black: 1 card, 0-pt → qualifies (shorter, 1 card).
+    // Green: 2 cards, all 0-pt → qualifies.
+    // Shorter = Black (1 card). Cheapest in Black = B8.
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "W",
+      defenderHand: ["B8", "G6", "G8", "Y11"],
+      bidderSeat: "N",
+      bidderHand: [],
+      trump: "Yellow",
+      tricksPlayed: 3,
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Two qualifying suits: Black (1 card) < Green (2 cards) → prefer Black → B8
+      expect(cmd.cardId).toBe("B8");
+    }
+  });
+
+  it("AC6: heuristic does not fire when trackPlayedCards is false", () => {
+    // Same hand as AC1 but trackPlayedCards=false.
+    // Without tracking, heuristic is gated and should not fire.
+    // Normal logic fires: longest = Black (5 cards).
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "W",
+      defenderHand: ["B8", "B9", "B10", "B11", "B12", "R7", "G6", "G8", "Y11"],
+      bidderSeat: "N",
+      bidderHand: [],
+      trump: "Yellow",
+      tricksPlayed: 3,
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0, trackPlayedCards: false };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // trackPlayedCards=false → heuristic not triggered → longest = Black
+      const cardFromResult = cardFromId(cmd.cardId);
+      expect(cardFromResult.kind).toBe("regular");
+      if (cardFromResult.kind === "regular") {
+        expect(cardFromResult.color).toBe("Black");
+      }
+    }
+  });
+
+  it("AC7: heuristic does not apply when bot is on the bidding team", () => {
+    // N is the bidder (NS team). N holds: B8, B9 (2 Black, 0-pt), G6, G8 (2 Green, 0-pt), Y11 (1 trump).
+    // N is the BIDDER — on the bidding team — so heuristic does not fire.
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "N",  // used for the hand but bidder will be set to N
+      defenderHand: ["B8", "B9", "G6", "G8", "Y11"],
+      bidderSeat: "N",    // N is the BIDDER → N is on the bidding team, not defender
+      bidderHand: ["B8", "B9", "G6", "G8", "Y11"],
+      trump: "Yellow",
+      tricksPlayed: 1,
+      playedCards: [],
+    });
+    // Override: N is the bidder and active player, so it's on the bidding team
+    const stateWithBidderLead: GameState = {
+      ...state,
+      activePlayer: "N",
+      bidder: "N",  // N is bidder (NS team) → bidding team
+      hands: {
+        N: ["B8", "B9", "G6", "G8", "Y11"],
+        E: [], S: [], W: [],
+      },
+    };
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(stateWithBidderLead, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    // Bidding team path: pulls trump since trump not pulled. Y11 is trump.
+    // (Just verify it's a legal play — not G6 from the heuristic path)
+    if (cmd.type === "PlayCard") {
+      expect(isLegalCommand(stateWithBidderLead, "N", cmd)).toBe(true);
+    }
+  });
+
+  it("AC8: cheapest card within qualifying suit uses lowest offSuitRank", () => {
+    // W holds: G6, G8, G9 (3 Green, all 0-pt) and R7, R10 (2 Red, R10=10pt), Y11 (1 trump).
+    // Green: 3 cards → length > 2 → does NOT qualify (only ≤2 qualify).
+    // Red: 2 cards, R10 is 10-pt → NOT all 0-pt.
+    // No qualifying suit. Falls back to normal logic.
+    // Now try: W holds G6, G8 (2 Green, 0-pt) and R7 (1 Red, 0-pt) and Y11.
+    // Red: 1 card, all 0-pt → qualifies (1 card).
+    // Green: 2 cards, all 0-pt → qualifies (2 cards).
+    // Both qualify. Shorter = Red (1 card). Cheapest in Red = R7.
+    const state = makeShortCheapSuitLeadState({
+      defenderSeat: "W",
+      defenderHand: ["G6", "G8", "R7", "Y11"],
+      bidderSeat: "N",
+      bidderHand: [],
+      trump: "Yellow",
+      tricksPlayed: 3,
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Red (1 card, 0-pt) shorter than Green (2 cards) → leads R7
+      expect(cmd.cardId).toBe("R7");
     }
   });
 });

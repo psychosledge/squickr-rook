@@ -1012,6 +1012,54 @@ function chooseLeadCard(
           }
         }
 
+        // ── Slice 4: Prefer short cheap suits to enable voiding ──────────────
+        // When defending with trackPlayedCards and limited trump (≤2), if a
+        // ≤2-card suit exists where ALL cards in hand are 0-pt, lead from the
+        // shortest such suit (cheapest card) to begin a void sequence.
+        // This fires AFTER void-force (Slice 1) and BEFORE longest-suit logic.
+        if (profile.trackPlayedCards) {
+          const hand = state.hands[seat] ?? [];
+          const trumpCount = hand.filter(c => trumpRank(c, trump) >= 0).length;
+
+          if (trumpCount <= 2) {
+            // Group non-trump cards by color
+            const colorGroups4: Record<Color, GameCommand[]> = {
+              Black: [], Red: [], Green: [], Yellow: [],
+            };
+            for (const cmd of nonTrumpCards) {
+              if (cmd.type !== "PlayCard") continue;
+              const card = cardFromId(cmd.cardId);
+              if (card.kind === "regular") colorGroups4[card.color].push(cmd);
+            }
+
+            // Find qualifying suits: ≤2 cards AND all 0-pt
+            type QualifyingEntry = { color: Color; cmds: GameCommand[]; count: number };
+            const qualifying: QualifyingEntry[] = [];
+            for (const color of COLORS) {
+              if (color === trump) continue;
+              const cmds = colorGroups4[color];
+              if (cmds.length === 0 || cmds.length > 2) continue;
+              const allZeroPt = cmds.every(
+                c => c.type === "PlayCard" && pointValue(c.cardId) === 0,
+              );
+              if (allZeroPt) qualifying.push({ color, cmds, count: cmds.length });
+            }
+
+            if (qualifying.length > 0) {
+              // Prefer shortest; ties broken by lowest offSuitRank of the cheapest card
+              qualifying.sort((a, b) => {
+                if (a.count !== b.count) return a.count - b.count;
+                const cheapA = cheapestLeadInSuit(a.cmds);
+                const cheapB = cheapestLeadInSuit(b.cmds);
+                const rankA = cheapA.type === "PlayCard" ? offSuitRank(cheapA.cardId) : 0;
+                const rankB = cheapB.type === "PlayCard" ? offSuitRank(cheapB.cardId) : 0;
+                return rankA - rankB;
+              });
+              return cheapestLeadInSuit(qualifying[0]!.cmds);
+            }
+          }
+        }
+
         // Lead from longest side suit (most cards in a single non-trump color)
         const colorGroups: Record<Color, GameCommand[]> = {
           Black: [], Red: [], Green: [], Yellow: [],
