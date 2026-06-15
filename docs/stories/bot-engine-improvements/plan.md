@@ -58,14 +58,14 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ### Slice 5: Follower — prefer cheap cards when highest remaining card in suit is unplayed
 **Scope:** In `packages/engine/src/bot.ts`, in the follow-suit card selection logic: when `trackPlayedCards` is true and the bot must follow a led suit, if the highest remaining card in that suit is unplayed (and not in the bot's hand), prefer 0-point cards over point-valued cards rather than playing up toward the top. Applies to both bidding and defending team followers.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 66be698
 **Evidence:** game-0000 (seed 12345), trick 1, W perspective. W is E's partner (bidding team). S led B12. W played B14 (10 pts); B1 unplayed, N beat W's B14 with B1, then E trumped to salvage the trick. Playing B6 would cost NS nothing (N wins cheaply with B13, E saves trump), with same or better expected outcome. Note: same principle as Slice 3 (protect point cards on likely-losing tricks) applied to following rather than leading — could be implemented as an extension of Slice 3's scope.
 **Acceptance Criteria:**
-- [ ] When following a suit with `trackPlayedCards: true` and the highest remaining card in that suit is unplayed and not in the bot's hand, bot prefers 0-pt followers over point-card followers
-- [ ] Logic does not suppress playing a point card when the bot holds the highest remaining card (playing to win is correct)
-- [ ] Applies regardless of whether the bot is on the bidding or defending team
-- [ ] `pnpm --filter engine test` passes with no regressions
+- [x] When following a suit with `trackPlayedCards: true` and the highest remaining card in that suit is unplayed and not in the bot's hand, bot prefers 0-pt followers over point-card followers
+- [x] Logic does not suppress playing a point card when the bot holds the highest remaining card (playing to win is correct)
+- [x] Applies regardless of whether the bot is on the bidding or defending team
+- [x] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — isolated to the follow-suit card selection branch of `botChooseCommand`
 
 ---
