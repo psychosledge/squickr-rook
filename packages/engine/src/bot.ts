@@ -1242,6 +1242,59 @@ function chooseFollowCard(
     }
   }
 
+  // ── Slice 5: Follow cheap when a higher card in the led suit is unaccounted ─
+  // When trackPlayedCards is true and the bot must follow the led suit, if there
+  // is a higher card in that suit that has not been played and is not in our hand,
+  // prefer a cheap (0-pt first, then lowest point) follower over a point card.
+  // Exception: if the bot holds the highest remaining card (nothing higher is
+  // unaccounted), it plays normally — winning is correct in that case.
+  if (profile.trackPlayedCards && leadColor !== null) {
+    const hand = state.hands[seat] ?? [];
+    const isTrumpLed = trump !== null && leadColor === trump;
+
+    // Get only the suit cards among the legal plays
+    const suitFollowCards = playCommands.filter(c => {
+      if (c.type !== "PlayCard") return false;
+      if (isTrumpLed) return trump !== null && trumpRank(c.cardId, trump) >= 0;
+      const card = cardFromId(c.cardId);
+      return card.kind === "regular" && card.color === leadColor;
+    });
+
+    if (suitFollowCards.length > 0) {
+      // Build the exhaustive card-ID list and rank function for this suit
+      let allSuitCardIds: CardId[];
+      let rankFn: (c: CardId) => number;
+      let myBestRank: number;
+
+      if (isTrumpLed && trump !== null) {
+        const trumpInitial = trump[0]!;
+        allSuitCardIds = [
+          ...([1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(v => `${trumpInitial}${v}` as CardId)),
+          "ROOK" as CardId,
+        ];
+        rankFn = (c: CardId) => trumpRank(c, trump);
+        myBestRank = suitFollowCards.reduce(
+          (best, c) => c.type === "PlayCard" ? Math.max(best, trumpRank(c.cardId, trump)) : best,
+          -1,
+        );
+      } else {
+        const initial = leadColor[0]!;
+        allSuitCardIds = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
+          v => `${initial}${v}` as CardId,
+        );
+        rankFn = offSuitRank;
+        myBestRank = suitFollowCards.reduce(
+          (best, c) => c.type === "PlayCard" ? Math.max(best, offSuitRank(c.cardId)) : best,
+          -1,
+        );
+      }
+
+      if (hasUnaccountedHigher(hand, state.playedCards, allSuitCardIds, myBestRank, rankFn)) {
+        return cheapestLeadInSuit(suitFollowCards);
+      }
+    }
+  }
+
   if (winningCommands.length > 0) {
     // Play the cheapest winning card
     return chooseLowestWinningCard(winningCommands, leadColor, trump);

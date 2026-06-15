@@ -4163,3 +4163,208 @@ describe("botChooseCommand - Slice 4 (defender lead: prefer short cheap suits to
     }
   });
 });
+
+// ── Slice 5: Follower — prefer cheap cards when highest remaining card in suit is unplayed ──
+
+/**
+ * Build a playing-phase state for Slice 5 follow tests.
+ *
+ * A trick is in progress (currentTrick non-empty), so the active player is
+ * following (not leading). trackPlayedCards is always true for these tests.
+ */
+function makeFollowCheapState(opts: {
+  followerSeat: Seat;
+  followerHand: CardId[];
+  bidderSeat: Seat;
+  trump: Color;
+  currentTrick: Array<{ seat: Seat; cardId: CardId }>;
+  playedCards?: CardId[];
+  tricksPlayed?: number;
+  otherHands?: Partial<Record<Seat, CardId[]>>;
+}): GameState {
+  const base = stateAfterTrumpSelected();
+  const allHands: Record<Seat, CardId[]> = { N: [], E: [], S: [], W: [] };
+  allHands[opts.followerSeat] = opts.followerHand;
+  if (opts.otherHands) {
+    for (const [seat, hand] of Object.entries(opts.otherHands)) {
+      allHands[seat as Seat] = hand!;
+    }
+  }
+  return {
+    ...base,
+    phase: "playing",
+    activePlayer: opts.followerSeat,
+    hands: allHands,
+    trump: opts.trump,
+    bidder: opts.bidderSeat,
+    tricksPlayed: opts.tricksPlayed ?? 1,
+    currentTrick: opts.currentTrick,
+    playedCards: opts.playedCards ?? [],
+    scores: { NS: 0, EW: 0 },
+    originalNest: [],
+  };
+}
+
+describe("botChooseCommand - Slice 5 (follower: prefer cheap cards when highest in suit unaccounted)", () => {
+  it("AC1 (bidding team): following a suit with higher card unaccounted → prefers 0-pt follower over point card", () => {
+    // Evidence scenario: game-0000, trick 1, W perspective.
+    // S led B12. W must follow Black. W holds B6 (0pt) and B14 (10pt).
+    // B1 is unaccounted (not played, not in W's hand) — highest remaining Black.
+    // B1 has higher offSuitRank than B14 → unaccounted higher exists.
+    // Slice 5: prefer B6 (0-pt) over B14 (10-pt) to avoid losing points to B1.
+    // W is on bidding team (bidder=W's partner E, EW team — wait, let's use NS team):
+    // Setup: bidder=W (EW team), W is on bidding team. trump=Green (not Black).
+    // S (NS, defending) led B12. W must follow Black.
+    const state = makeFollowCheapState({
+      followerSeat: "W",
+      followerHand: ["B6", "B14"],  // 0-pt and 10-pt Black cards
+      bidderSeat: "W",              // W is bidder (EW team → bidding team)
+      trump: "Green",               // Black is off-suit
+      currentTrick: [{ seat: "S", cardId: "B12" }],  // S led Black
+      // B1 is NOT in playedCards and NOT in W's hand → unaccounted
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // B1 unaccounted (higher than B14) → prefer cheap 0-pt follower B6
+      expect(cmd.cardId).toBe("B6");
+    }
+  });
+
+  it("AC2: bot holds highest remaining card → plays to win (not suppressed)", () => {
+    // W follows Black. W holds B6 (0pt) and B14 (10pt).
+    // B1 IS in playedCards → no higher unaccounted card.
+    // W's B14 is the highest remaining Black → play normally (winning card).
+    // S led B12. W's B14 beats B12 → should play B14 to win.
+    const state = makeFollowCheapState({
+      followerSeat: "W",
+      followerHand: ["B6", "B14"],
+      bidderSeat: "W",
+      trump: "Green",
+      currentTrick: [{ seat: "S", cardId: "B12" }],
+      // B1 is in playedCards → W's B14 is highest remaining
+      playedCards: ["B1"],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // B1 accounted → no higher unaccounted → play normally → cheapest winning card = B14
+      expect(cmd.cardId).toBe("B14");
+    }
+  });
+
+  it("AC3 (defending team): same logic applies — prefers 0-pt follower when higher unaccounted", () => {
+    // E is defending (bidder=N, NS team → EW defending). S led R9 (Red).
+    // E must follow Red. E holds R7 (0pt) and R10 (10pt).
+    // R1 is unaccounted (not in playedCards, not in E's hand) → higher than R10.
+    // Slice 5: prefer R7 (0-pt) over R10 (10-pt).
+    const state = makeFollowCheapState({
+      followerSeat: "E",
+      followerHand: ["R7", "R10"],
+      bidderSeat: "N",              // N is bidder (NS team) → E is defending (EW)
+      trump: "Black",               // Red is off-suit
+      currentTrick: [{ seat: "S", cardId: "R9" }],
+      playedCards: [],              // R1 unaccounted
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "E", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // R1 unaccounted → prefer cheap 0-pt follower R7
+      expect(cmd.cardId).toBe("R7");
+    }
+  });
+
+  it("AC4: when only point cards available and higher unaccounted → plays lowest point card", () => {
+    // W follows Black. W holds B5 (5pt) and B10 (10pt). No 0-pt Black cards.
+    // B1 is unaccounted → higher card exists. Bot cannot play a 0-pt card.
+    // Minimize loss: play lowest point card = B5.
+    const state = makeFollowCheapState({
+      followerSeat: "W",
+      followerHand: ["B5", "B10"],
+      bidderSeat: "W",
+      trump: "Green",
+      currentTrick: [{ seat: "S", cardId: "B12" }],
+      playedCards: [],  // B1 unaccounted
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // B1 unaccounted, no 0-pt cards → minimize loss: play B5 (5pt) not B10 (10pt)
+      expect(cmd.cardId).toBe("B5");
+    }
+  });
+
+  it("AC5: does not fire when trackPlayedCards is false", () => {
+    // Same as AC1 but trackPlayedCards=false.
+    // Without tracking, no preference → normal follow logic.
+    // W can win with B14 (beats S's B12). With sluffStrategy off, plays cheapest winning.
+    const state = makeFollowCheapState({
+      followerSeat: "W",
+      followerHand: ["B6", "B14"],
+      bidderSeat: "W",
+      trump: "Green",
+      currentTrick: [{ seat: "S", cardId: "B12" }],
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0, trackPlayedCards: false };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // trackPlayedCards=false → Slice 5 not triggered
+      // W is bidding team, partner (E) is not winning (no partner in trick yet/winning is S with B12)
+      // winningCommands = [B14] (B14 beats B12). Plays cheapest winning = B14.
+      expect(cmd.cardId).toBe("B14");
+    }
+  });
+
+  it("AC6: partner winning the trick → sluff path overrides Slice 5", () => {
+    // W's partner E is currently winning. Slice 5 should NOT interfere — sluffStrategy fires first.
+    // Setup: bidder=E (EW team), W is also EW (partner of E).
+    // E led R9 (Red). W must follow Red. Partner E is winning with R9.
+    // W holds R7 (0pt) and R10 (10pt). R1 unaccounted.
+    // sluffStrategy=true (L5 bot): dumps best point card → R10 (sluff tier 1: off-suit point card).
+    // Slice 5 would say R7 (prefer cheap). But sluffStrategy takes priority → R10.
+    const state = makeFollowCheapState({
+      followerSeat: "W",
+      followerHand: ["R7", "R10"],
+      bidderSeat: "E",   // E is bidder (EW team) → W is also EW → partner of E
+      trump: "Black",
+      currentTrick: [{ seat: "E", cardId: "R9" }],  // E led and is winning, W is partner
+      playedCards: [],
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // sluffStrategy fires first (partner winning) → dump highest point card = R10
+      expect(cmd.cardId).toBe("R10");
+    }
+  });
+
+  it("AC7: trump follow — when higher trump is unaccounted, prefer cheap trump", () => {
+    // S led trump (Black B9). W must follow trump.
+    // W holds B6 (0pt trump) and B14 (10pt trump).
+    // B1 is unaccounted (highest trump). B1 trumpRank > B14 trumpRank.
+    // Slice 5: prefer cheap trump B6 (0pt) over B14 (10pt).
+    const state = makeFollowCheapState({
+      followerSeat: "W",
+      followerHand: ["B6", "B14"],
+      bidderSeat: "W",   // W is bidder (EW team → bidding team)
+      trump: "Black",    // Black is trump now
+      currentTrick: [{ seat: "S", cardId: "B9" }],  // S led trump
+      playedCards: [],   // B1 unaccounted
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "W", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // B1 unaccounted in trump suit → prefer cheap trump B6
+      expect(cmd.cardId).toBe("B6");
+    }
+  });
+});
