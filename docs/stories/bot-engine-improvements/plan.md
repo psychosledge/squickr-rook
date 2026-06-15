@@ -44,14 +44,14 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ### Slice 4: Defender lead — prefer short cheap suits to enable voiding
 **Scope:** In `packages/engine/src/bot.ts`, in the defending team's lead selection logic: when leading and `trackPlayedCards` is true, prefer leading from the shortest off-suit where all (or most) cards are 0-pt over leading from the longest off-suit. Void-force logic (Slice 1) takes precedence. Applies only when a short (≤2 card) 0-pt suit exists and the bot holds limited trump (≤2 trump cards).
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 802a04a
 **Evidence:** game-0000 (seed 12345), trick 1, S perspective. S holds 5 Black (B8–B12), 2 Red (R7, R10), 2 Green (G6, G8), 1 trump (Y11). Bot led B12; E (void in Black, P≈20–25% with bidder discard adjustment) trumped with Y5, EW won 30 pts including N's B1. Leading G6 would have cost EW ≤10 pts and begun a 2-trick void sequence giving S future trump opportunities.
 **Acceptance Criteria:**
-- [ ] When defending with `trackPlayedCards: true`, if a ≤2-card suit exists where all cards are 0-pt, bot prefers leading from it over longer suits
-- [ ] If no 0-pt short suit exists, behavior falls back to current logic
-- [ ] Void-force behavior (Slice 1) takes precedence over this heuristic when a known void is available
-- [ ] `pnpm --filter engine test` passes with no regressions
+- [x] When defending with `trackPlayedCards: true`, if a ≤2-card suit exists where all cards are 0-pt, bot prefers leading from it over longer suits
+- [x] If no 0-pt short suit exists, behavior falls back to current logic
+- [x] Void-force behavior (Slice 1) takes precedence over this heuristic when a known void is available
+- [x] `pnpm --filter engine test` passes with no regressions
 **Needs Architect:** no — isolated to the lead-selection branch of `botChooseCommand` for defending bots
 
 ---
