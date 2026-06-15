@@ -4368,3 +4368,128 @@ describe("botChooseCommand - Slice 5 (follower: prefer cheap cards when highest 
     }
   });
 });
+
+// ── Slice 6: Defender void-forcing lead — cheapest card in void suit ──────────
+
+describe("botChooseCommand - Slice 6 (cheapest card in void-forcing suit)", () => {
+  it("AC1: leads lowest 0-pt card in void suit rather than highest-ranked", () => {
+    // N is defending (bidder=E, EW team). Trump=Yellow.
+    // E is known void in Black (trumped a Black lead with Y5 in trick 1).
+    // E still holds Yellow trump.
+    //
+    // N holds: B6 (0pt, rank=2), B13 (0pt, rank=9), B14 (10pt, rank=10).
+    // Without Slice 6 fix: highest-rank reduce picks B14.
+    // With Slice 6 fix: cheapestLeadInSuit picks B6 (lowest 0-pt card).
+    // B6 forces the same trump spend as B13 or B14 but preserves the 10-pt card.
+    const completedTricks = [
+      {
+        // Trick 1: W led Black (B8), E trumped with Y5 → E void in Black
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B7" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["B6", "B13", "B14"],  // multiple Black cards
+      bidderSeat: "E",
+      bidderHand: ["Y8", "Y9"],              // E still holds Yellow trump
+      trump: "Yellow",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B7"],
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Should lead B6 (lowest 0-pt card in void suit), NOT B13 or B14
+      expect(cmd.cardId).toBe("B6");
+    }
+  });
+
+  it("AC2: falls back to lowest point card when all cards in void suit are point-valued", () => {
+    // N is defending (bidder=E, EW team). Trump=Yellow.
+    // E is known void in Black. E still holds trump.
+    //
+    // N holds: B5 (5pt), B10 (10pt), B14 (10pt) — all point-valued Black cards.
+    // cheapestLeadInSuit: no 0-pt cards → lowest point value = B5 (5pts).
+    // Ties in point value broken by lowest rank: B5 has rank=1 (value=5 maps to rank 1 in offSuitRank).
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B7" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["B5", "B10", "B14"],  // all point-valued Black cards
+      bidderSeat: "E",
+      bidderHand: ["Y8", "Y9"],              // E still holds Yellow trump
+      trump: "Yellow",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B7"],
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // All cards point-valued → fallback to lowest point = B5 (5pt < 10pt)
+      expect(cmd.cardId).toBe("B5");
+    }
+  });
+
+  it("AC3: void-forcing suit override still fires (leads void suit over non-void suit)", () => {
+    // Confirm Slice 1 behavior is preserved: void suit wins over longer non-void suit.
+    // N holds: G6, G7, G8 (3 Green, 0-pt) + B6, B13 (2 Black, 0-pt in void suit).
+    // E is void in Black. Longest suit = Green (3 cards). Void suit = Black (2 cards).
+    // With Slice 6: leads cheapest Black card = B6 (not G8 the longest-suit highest).
+    const completedTricks = [
+      {
+        leadColor: "Black" as Color,
+        plays: [
+          { seat: "W" as Seat, cardId: "B8" as CardId },
+          { seat: "N" as Seat, cardId: "B9" as CardId },
+          { seat: "E" as Seat, cardId: "Y5" as CardId },  // E void in Black
+          { seat: "S" as Seat, cardId: "B7" as CardId },
+        ],
+        winner: "E" as Seat,
+      },
+    ];
+
+    const state = makeVoidForcingState({
+      defenderSeat: "N",
+      defenderHand: ["G6", "G7", "G8", "B6", "B13"],
+      bidderSeat: "E",
+      bidderHand: ["Y8", "Y9"],              // E still holds Yellow trump
+      trump: "Yellow",
+      completedTricks,
+      tricksPlayed: 2,
+      playedCards: ["B8", "B9", "Y5", "B7"],
+    });
+
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "N", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Void-forcing overrides longest suit; cheapest in void suit = B6
+      expect(cmd.cardId).toBe("B6");
+    }
+  });
+});

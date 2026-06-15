@@ -1003,10 +1003,7 @@ function chooseLeadCard(
               });
 
               if (voidForcingCards.length > 0) {
-                return voidForcingCards.reduce((best, cmd) => {
-                  if (cmd.type !== "PlayCard" || best.type !== "PlayCard") return best;
-                  return offSuitRank(cmd.cardId) > offSuitRank(best.cardId) ? cmd : best;
-                });
+                return cheapestLeadInSuit(voidForcingCards);
               }
             }
           }
