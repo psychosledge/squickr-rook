@@ -1,9 +1,33 @@
 import { useState, useRef } from "react";
-import type { CardId, GameRecord, Seat, TrickSnapshot } from "@rook/engine";
+import type { CardId, GameRecord, HandScore, Seat, TrickSnapshot } from "@rook/engine";
 import { pointValue } from "@rook/engine";
 import PlayingCard from "@/components/PlayingCard/PlayingCard";
 import { sortHand } from "@/utils/sortHand";
 import styles from "./ReplayPage.module.css";
+
+export function computeDisplayScores(
+  trick: TrickSnapshot,
+  outcome: HandScore,
+  isLastTrick: boolean,
+): { nsScore: number; ewScore: number } {
+  if (isLastTrick) {
+    return { nsScore: outcome.nsTotal, ewScore: outcome.ewTotal };
+  }
+  return { nsScore: trick.cumulativeScore["NS"], ewScore: trick.cumulativeScore["EW"] };
+}
+
+export function computeRemainingPoints(
+  transcript: TrickSnapshot[],
+  discarded: CardId[],
+  trickIndex: number,
+): number {
+  if (trickIndex === transcript.length - 1) {
+    return 0;
+  }
+  const nestBonus = discarded.reduce((sum, c) => sum + pointValue(c), 0);
+  const futurePoints = transcript.slice(trickIndex + 1).reduce((sum, t) => sum + t.pointsInTrick, 0);
+  return futurePoints + nestBonus;
+}
 
 export function computeOriginalHand(
   handAtTrick1: CardId[],
@@ -278,6 +302,7 @@ export default function ReplayPage() {
 
   // --- Trick view (trickIndex >= 0) ---
   const trick: TrickSnapshot = game.transcript[trickIndex]!;
+  const isLastTrick = trickIndex === totalTricks - 1;
   const positions = PERSPECTIVE_MAP[perspective];
 
   const winnerSeat = trick.winner;
@@ -302,7 +327,8 @@ export default function ReplayPage() {
     const isFaceUp = seat === perspective;
     const prevPlayed = sortHand(computePreviouslyPlayed(seat), trick.trump);
     // After the nest exchange only the discards are relevant — the nest itself is gone.
-    const showDiscards = isFaceUp && seat === game.outcome.bidder;
+    // On the last trick always show discards under the bidder's seat regardless of perspective.
+    const showDiscards = seat === game.outcome.bidder && (isFaceUp || isLastTrick);
 
     return (
       <div className={styles.seatBlock}>
@@ -359,15 +385,8 @@ export default function ReplayPage() {
     );
   }
 
-  const nsScore = trick.cumulativeScore["NS"];
-  const ewScore = trick.cumulativeScore["EW"];
-
-  // Points remaining: sum of future trick points + nest bonus on last trick
-  const nestBonus = game.outcome.discarded.reduce((sum, c) => sum + pointValue(c), 0);
-  const futurePoints = game.transcript
-    .slice(trickIndex + 1)
-    .reduce((sum, t) => sum + t.pointsInTrick, 0);
-  const remainingPoints = futurePoints + nestBonus;
+  const { nsScore, ewScore } = computeDisplayScores(trick, game.outcome, isLastTrick);
+  const remainingPoints = computeRemainingPoints(game.transcript, game.outcome.discarded, trickIndex);
 
   const bidder = game.outcome.bidder;
   const bidAmount = game.outcome.bidAmount;
