@@ -1292,6 +1292,70 @@ function chooseFollowCard(
     }
   }
 
+  // ── Slice 7: Discard-to-void — prefer 0-pt from shortest non-trump suit ─────
+  // Fires when the bot is void in the led suit and must choose a discard.
+  // Goals: shed a 0-pt card from the shortest non-trump suit to make fastest
+  // progress toward creating a void (enabling future sluff-to-partner plays).
+  //
+  // Conditions: trackPlayedCards=true, sluffStrategy=true, void in led suit
+  // (suitFollowCards was empty or Slice 5 block was not entered), and at least
+  // one non-trump suit in hand has a 0-pt card.
+  //
+  // Note: the partner-winning early return above ensures this only runs when
+  // the opponent is currently winning.
+  if (profile.trackPlayedCards && profile.sluffStrategy && trump !== null) {
+    const hand = state.hands[seat] ?? [];
+
+    // Determine if the bot is void in the led suit: the bot has no legal cards
+    // that match the led suit/trump — i.e., all playCommands are non-led-suit.
+    const ledSuitFollowers = playCommands.filter(c => {
+      if (c.type !== "PlayCard") return false;
+      if (leadColor === null) return false;
+      const isTrumpLed = leadColor === trump;
+      if (isTrumpLed) return trumpRank(c.cardId, trump) >= 0;
+      const card = cardFromId(c.cardId);
+      return card.kind === "regular" && card.color === leadColor;
+    });
+
+    const voidInLedSuit = ledSuitFollowers.length === 0 && hand.length > 0;
+
+    if (voidInLedSuit) {
+      // Group all non-trump discard candidates by suit (color)
+      const suitGroups: Record<Color, GameCommand[]> = {
+        Black: [], Red: [], Green: [], Yellow: [],
+      };
+      for (const cmd of playCommands) {
+        if (cmd.type !== "PlayCard") continue;
+        if (trumpRank(cmd.cardId, trump) >= 0) continue; // skip trump cards
+        const card = cardFromId(cmd.cardId);
+        if (card.kind === "regular") {
+          suitGroups[card.color].push(cmd);
+        }
+      }
+
+      // Among suits that contain at least one 0-pt card, pick the shortest
+      let bestSuit: Color | null = null;
+      let bestCount = Infinity;
+      for (const color of COLORS) {
+        const cmds = suitGroups[color];
+        if (cmds.length === 0) continue;
+        const zeroPtCmds = cmds.filter(c => c.type === "PlayCard" && pointValue(c.cardId) === 0);
+        if (zeroPtCmds.length === 0) continue; // no 0-pt card in this suit
+        if (cmds.length < bestCount) {
+          bestCount = cmds.length;
+          bestSuit = color;
+        }
+      }
+
+      if (bestSuit !== null) {
+        const zeroPtCmdsInSuit = suitGroups[bestSuit].filter(
+          c => c.type === "PlayCard" && pointValue(c.cardId) === 0,
+        );
+        return cheapestLeadInSuit(zeroPtCmdsInSuit);
+      }
+    }
+  }
+
   if (winningCommands.length > 0) {
     // Play the cheapest winning card
     return chooseLowestWinningCard(winningCommands, leadColor, trump);

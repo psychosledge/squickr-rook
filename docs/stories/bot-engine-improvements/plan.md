@@ -84,6 +84,35 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ---
 
+### Slice 7: Discard to create void — prefer shortest 0-pt suit when unable to follow
+**Scope:** In `packages/engine/src/bot.ts`, in the discard-selection logic of `chooseFollowCard` when the bot cannot follow the led suit: when `trackPlayedCards` is true and `sluffStrategy` is true, among 0-pt discard candidates, prefer the card from the non-trump suit with the fewest cards remaining in hand. This prioritizes making progress toward a void (shorter suits get voided sooner, enabling future sluff-to-partner opportunities) over arbitrary suit selection. If all non-trump discard candidates are point cards, fall back to current logic. Applies to both teams. Mirrors the Slice 4 lead heuristic ("prefer shortest 0-pt suit") in the discard context.
+**Status:** not started
+**Commit:** —
+**Evidence:** game-0000 (seed 12345), trick 4, S perspective. S's hand: B12 R10 B8 G8 B10 B9 B11. E led Y7 (trump); S void in trump, must discard. S played B8 (from 5-card Black suit, 5 cards). Should have played G8 — S's only Green card (0-pt, 1 card in suit). Discarding G8 creates a Green void in one trick; discarding B8 makes no progress toward any void. Both are 0-pt, so suit size is the right tiebreaker.
+**Acceptance Criteria:**
+- [ ] When unable to follow led suit with `trackPlayedCards: true` and `sluffStrategy: true`, among 0-pt discard candidates, bot prefers the card from the non-trump suit with the fewest cards remaining
+- [ ] Point cards (5, 10, 14, 1, ROOK) are never selected by this logic; if only point cards remain as candidates, falls back to current behavior
+- [ ] If all 0-pt suits have equal size, behavior is unchanged from current logic
+- [ ] Applies to both bidding and defending teams
+- [ ] `pnpm --filter engine test` passes with no regressions
+**Needs Architect:** no — isolated to the discard-path of `chooseFollowCard`
+
+---
+
+### Slice 8: Fix replay score display to show post-trick totals
+**Scope:** The score displayed in replay/analyze-game output at trick 10 (E perspective) shows EW 150, but the final settled score is EW 185. The 35-point gap (20 most-cards bonus + 15 pts from the last trick's point cards) indicates the score is captured from `state.scores` before the final trick's points are tallied. Identify where replay perspective snapshots are written and ensure scores reflect the post-trick state rather than the pre-trick state. No changes to game logic, bot logic, or simulation output.
+**Status:** not started
+**Commit:** —
+**Evidence:** game-0000 (seed 12345), trick 10, E perspective. Score shown: EW 150. Actual final score: EW 185. Difference: 35 pts (20 most-cards bonus + 15 pts from trick 10 point cards). Score appears to be snapshotted from `state.scores` at trick start rather than after trick resolution.
+**Acceptance Criteria:**
+- [ ] Score shown in replay perspective at the final trick reflects the fully settled score (including that trick's points and any end-of-hand bonuses)
+- [ ] Scores shown mid-game (tricks 1–9) accurately reflect points scored in all completed tricks up to and including the displayed trick
+- [ ] No change to simulation output format, game logic, or bot logic
+- [ ] `pnpm --filter engine test` passes with no regressions
+**Needs Architect:** no — isolated to replay snapshot logic; investigate where perspective state is serialized to identify the off-by-one in score capture timing
+
+---
+
 ## UAT Checklist
 ✅ UAT accepted 2026-06-15
 

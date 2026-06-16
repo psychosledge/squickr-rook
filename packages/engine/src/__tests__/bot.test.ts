@@ -4493,3 +4493,187 @@ describe("botChooseCommand - Slice 6 (cheapest card in void-forcing suit)", () =
     }
   });
 });
+
+// ── Slice 7: Discard-to-void — prefer 0-pt cards from shortest non-trump suit ─
+
+/**
+ * Build a GameState where the active player (followerSeat) is void in the led
+ * suit and must choose a discard.  The lead card must be in a suit the follower
+ * cannot follow, so every card in their hand is a legal discard.
+ *
+ * opts.leadCard    — the card that was led (determines void suit)
+ * opts.followerSeat — the bot that must discard
+ * opts.followerHand — cards in the bot's hand (none match the led suit)
+ * opts.bidderSeat  — who is the bidder (affects team awareness)
+ * opts.trump       — trump color
+ * opts.tricksPlayed — how many tricks have been completed (default 1)
+ * opts.playedCards  — already-played card IDs (default [])
+ */
+function makeDiscardToVoidState(opts: {
+  followerSeat: Seat;
+  followerHand: CardId[];
+  bidderSeat: Seat;
+  leadCard: CardId;
+  leadSeat: Seat;
+  trump: Color;
+  tricksPlayed?: number;
+  playedCards?: CardId[];
+  otherHands?: Partial<Record<Seat, CardId[]>>;
+}): GameState {
+  const base = stateAfterTrumpSelected();
+  const allHands: Record<Seat, CardId[]> = { N: [], E: [], S: [], W: [] };
+  allHands[opts.followerSeat] = opts.followerHand;
+  if (opts.otherHands) {
+    for (const [seat, hand] of Object.entries(opts.otherHands)) {
+      allHands[seat as Seat] = hand!;
+    }
+  }
+  return {
+    ...base,
+    phase: "playing",
+    activePlayer: opts.followerSeat,
+    hands: allHands,
+    trump: opts.trump,
+    bidder: opts.bidderSeat,
+    tricksPlayed: opts.tricksPlayed ?? 1,
+    currentTrick: [{ seat: opts.leadSeat, cardId: opts.leadCard }],
+    completedTricks: [],
+    playedCards: opts.playedCards ?? [],
+    scores: { NS: 0, EW: 0 },
+    originalNest: [],
+  };
+}
+
+describe("botChooseCommand - Slice 7 (discard-to-void: prefer 0-pt from shortest non-trump suit)", () => {
+  it("AC1 (golden path): void in trump led suit → discards from 1-card Green over 5-card Black", () => {
+    // Evidence scenario: S holds B12, R10, B8, G8, B10, B9, B11. Trump=Yellow. E led Y7.
+    // S is void in trump. Non-trump suits: Green (G8, 1 card, 0-pt), Black (B8..B12, 5 cards).
+    // R10 is 1-card Red but has 10-pt value → excluded from 0-pt candidates.
+    // Slice 7: among suits with a 0-pt card, pick shortest (Green=1) → discard G8.
+    const state = makeDiscardToVoidState({
+      followerSeat: "S",
+      followerHand: ["B12", "R10", "B8", "G8", "B10", "B9", "B11"],
+      bidderSeat: "N",
+      leadCard: "Y7",
+      leadSeat: "E",
+      trump: "Yellow",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Green is the only 1-card suit with a 0-pt card → G8
+      expect(cmd.cardId).toBe("G8");
+    }
+  });
+
+  it("AC2 (point card protected): 0-pt 1-card suit chosen over point-valued 1-card suit", () => {
+    // S holds R10 (Red, 1 card, 10-pt), G8 (Green, 1 card, 0-pt), B9, B10 (Black, 2 cards, 0-pt).
+    // Trump=Yellow. Opponent leads trump.
+    // Red has 1 card but R10 is a point card → not a 0-pt candidate.
+    // Green has 1 card, G8 is 0-pt → qualifies.
+    // Slice 7: shortest suit with 0-pt card = Green (1 card) → discard G8, NOT R10.
+    const state = makeDiscardToVoidState({
+      followerSeat: "S",
+      followerHand: ["R10", "G8", "B9", "B10"],
+      bidderSeat: "N",
+      leadCard: "Y7",
+      leadSeat: "E",
+      trump: "Yellow",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // G8 (Green, 1 card, 0-pt) wins over R10 (Red, 1 card, point card)
+      expect(cmd.cardId).toBe("G8");
+    }
+  });
+
+  it("AC3 (prefer shorter suit): 2-card 0-pt suit chosen over 3-card 0-pt suit", () => {
+    // S holds G8, G9 (Green, 2 cards, 0-pt), B7, B8, B9 (Black, 3 cards, 0-pt).
+    // Trump=Yellow. Opponent leads trump. S is void in trump.
+    // Both suits are 0-pt. Green is shorter (2 < 3).
+    // Slice 7: prefer Green → discard from Green using cheapestLeadInSuit.
+    const state = makeDiscardToVoidState({
+      followerSeat: "S",
+      followerHand: ["G8", "G9", "B7", "B8", "B9"],
+      bidderSeat: "N",
+      leadCard: "Y7",
+      leadSeat: "E",
+      trump: "Yellow",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Green (2 cards) is shorter than Black (3 cards); cheapest in Green by offSuitRank = G8
+      const card = cardFromId(cmd.cardId);
+      expect(card.kind).toBe("regular");
+      if (card.kind === "regular") {
+        expect(card.color).toBe("Green");
+      }
+    }
+  });
+
+  it("AC4 (no 0-pt suits — fall through): all non-trump cards are point-valued → uses existing logic", () => {
+    // S holds R10 (Red, 10-pt), G1 (Green, 15-pt), B14 (Black, 10-pt). Trump=Yellow. Opponent leads trump.
+    // No 0-pt non-trump cards → Slice 7 does not fire.
+    // Existing chooseLowestCard picks the card with lowest pointValue (R10/B14 tied at 10, then G1 at 15).
+    const state = makeDiscardToVoidState({
+      followerSeat: "S",
+      followerHand: ["R10", "G1", "B14"],
+      bidderSeat: "N",
+      leadCard: "Y7",
+      leadSeat: "E",
+      trump: "Yellow",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      // Slice 7 does not fire (no 0-pt suits). Bot falls through to chooseLowestCard.
+      // G1 has 15-pt; R10 and B14 have 10-pt → bot picks one of the 10-pt cards, NOT G1.
+      expect(cmd.cardId).not.toBe("G1");
+    }
+  });
+
+  it("AC5 (equal-size suits): one card per suit, both 0-pt → bot picks one of them (not a point card)", () => {
+    // S holds G8 (Green, 1 card, 0-pt), B9 (Black, 1 card, 0-pt). Trump=Yellow. Opponent leads trump.
+    // Both suits are equal size (1 card each) and both have 0-pt cards.
+    // Slice 7: either could be chosen. Verify the bot picks one of G8 or B9 (not a point card).
+    const state = makeDiscardToVoidState({
+      followerSeat: "S",
+      followerHand: ["G8", "B9"],
+      bidderSeat: "N",
+      leadCard: "Y7",
+      leadSeat: "E",
+      trump: "Yellow",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(["G8", "B9"]).toContain(cmd.cardId);
+    }
+  });
+
+  it("AC6 (bidding team): same golden path — bidder also prefers G8 over Black suit cards", () => {
+    // Same scenario as AC1 but S is on the bidding team (bidderSeat=S).
+    // Slice 7 must work equally for bidding and defending teams.
+    const state = makeDiscardToVoidState({
+      followerSeat: "S",
+      followerHand: ["B12", "R10", "B8", "G8", "B10", "B9", "B11"],
+      bidderSeat: "S",
+      leadCard: "Y7",
+      leadSeat: "E",
+      trump: "Yellow",
+    });
+    const profile = { ...BOT_PRESETS[5], playAccuracy: 1.0 };
+    const cmd = botChooseCommand(state, "S", profile);
+    expect(cmd.type).toBe("PlayCard");
+    if (cmd.type === "PlayCard") {
+      expect(cmd.cardId).toBe("G8");
+    }
+  });
+});
