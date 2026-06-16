@@ -99,17 +99,18 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ---
 
-### Slice 8: Fix replay score display to show post-trick totals
-**Scope:** The score displayed in replay/analyze-game output at trick 10 (E perspective) shows EW 150, but the final settled score is EW 185. The 35-point gap (20 most-cards bonus + 15 pts from the last trick's point cards) indicates the score is captured from `state.scores` before the final trick's points are tallied. Identify where replay perspective snapshots are written and ensure scores reflect the post-trick state rather than the pre-trick state. No changes to game logic, bot logic, or simulation output.
-**Status:** not started
-**Commit:** —
-**Evidence:** game-0000 (seed 12345), trick 10, E perspective. Score shown: EW 150. Actual final score: EW 185. Difference: 35 pts (20 most-cards bonus + 15 pts from trick 10 point cards). Score appears to be snapshotted from `state.scores` at trick start rather than after trick resolution.
+### Slice 8: Fix replay score display and show discards on last trick
+**Scope:** Two related fixes to the replay/analyze-game output for trick 10: (1) The score is captured from `state.scores` before the final trick's points are tallied — fix the snapshot timing so trick 10 reflects the fully settled score (trick points + most-cards bonus + nest bonus). (2) Display the bidder's discarded nest cards alongside trick 10 regardless of perspective, so viewers can see why the score jumps (the nest cards join the last-trick winner's pile). Scores for tricks 1–9 should also reflect post-trick totals. No changes to game logic, bot logic, or the simulation NDJSON output format.
+**Status:** ✅ done
+**Commit:** 17be04f
+**Evidence:** game-0000 (seed 12345), trick 10, E perspective. Score shown: EW 150. Actual final score: EW 185. Difference: 35 pts (20 most-cards bonus + 15 pts from trick 10 point cards + nest bonus). Score appears to be snapshotted from `state.scores` at trick start. The discards are not shown, making the point jump unexplained.
 **Acceptance Criteria:**
-- [ ] Score shown in replay perspective at the final trick reflects the fully settled score (including that trick's points and any end-of-hand bonuses)
-- [ ] Scores shown mid-game (tricks 1–9) accurately reflect points scored in all completed tricks up to and including the displayed trick
-- [ ] No change to simulation output format, game logic, or bot logic
-- [ ] `pnpm --filter engine test` passes with no regressions
-**Needs Architect:** no — isolated to replay snapshot logic; investigate where perspective state is serialized to identify the off-by-one in score capture timing
+- [x] Score shown in replay perspective at the final trick reflects the fully settled score (trick points + nest bonus + most-cards bonus)
+- [x] Scores shown mid-game (tricks 1–9) accurately reflect points scored in all completed tricks up to and including the displayed trick
+- [x] Bidder's discarded nest cards are displayed alongside trick 10 in replay, regardless of which seat's perspective is shown
+- [x] No change to simulation NDJSON output format, game logic, or bot logic
+- [x] `pnpm --filter web test --run` passes with no regressions
+**Needs Architect:** no — isolated to replay snapshot and display logic; investigate where perspective state is serialized and where trick 10 is rendered
 
 ---
 
