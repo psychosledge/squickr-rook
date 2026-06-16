@@ -85,10 +85,10 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 ---
 
 ## UAT Checklist
-(Complete after all slices are implemented and committed)
+✅ UAT accepted 2026-06-15
 
 ### Defender void-lead (Slice 1)
-- [ ] Run `pnpm --filter engine simulate --games 500 --seed 12345`; load results in `/replay`
-- [ ] Find a game where the defender leads after an opponent trumped an off-suit trick; confirm the bot leads the voided suit rather than an unrelated off-suit card
-- [ ] Confirm the bot still leads highest trump when pulling trump (Phase 1 Slice 1 regression check)
-- [ ] `pnpm --filter engine test` passes
+- [x] Run `pnpm --filter engine simulate --games 500 --seed 12345`; load results in `/replay`
+- [x] Find a game where the defender leads after an opponent trumped an off-suit trick; confirm the bot leads the voided suit rather than an unrelated off-suit card
+- [x] Confirm the bot still leads highest trump when pulling trump (Phase 1 Slice 1 regression check)
+- [x] `pnpm --filter engine test` passes
