@@ -20,13 +20,14 @@ export function computeRemainingPoints(
   transcript: TrickSnapshot[],
   discarded: CardId[],
   trickIndex: number,
+  mostCardsBonus: number,
 ): number {
   if (trickIndex === transcript.length - 1) {
     return 0;
   }
   const nestBonus = discarded.reduce((sum, c) => sum + pointValue(c), 0);
   const futurePoints = transcript.slice(trickIndex + 1).reduce((sum, t) => sum + t.pointsInTrick, 0);
-  return futurePoints + nestBonus;
+  return futurePoints + nestBonus + mostCardsBonus;
 }
 
 export function computeOriginalHand(
@@ -386,7 +387,8 @@ export default function ReplayPage() {
   }
 
   const { nsScore, ewScore } = computeDisplayScores(trick, game.outcome, isLastTrick);
-  const remainingPoints = computeRemainingPoints(game.transcript, game.outcome.discarded, trickIndex);
+  const mostCardsBonus = game.outcome.nsMostCardsBonus + game.outcome.ewMostCardsBonus;
+  const remainingPoints = computeRemainingPoints(game.transcript, game.outcome.discarded, trickIndex, mostCardsBonus);
 
   const bidder = game.outcome.bidder;
   const bidAmount = game.outcome.bidAmount;

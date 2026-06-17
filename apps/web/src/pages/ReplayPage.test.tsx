@@ -172,17 +172,17 @@ describe("computeRemainingPoints", () => {
     // Arrange: 10-trick game, viewing trick 10 (index 9)
     const transcript = makeTranscript(10);
     // discarded has no point cards — nestBonus = 0
-    const result = computeRemainingPoints(transcript, [], 9);
+    const result = computeRemainingPoints(transcript, [], 9, 20);
     expect(result).toBe(0);
   });
 
-  it("on non-last trick returns sum of future trick points plus nest bonus", () => {
+  it("on non-last trick returns sum of future trick points plus nest bonus plus most-cards bonus", () => {
     // Arrange: 10-trick game, viewing trick 8 (index 7), tricks 9 and 10 are future = 30 pts
-    // Discarded cards: R10 (10 pts) and G5 (5 pts) = 15 pts nest bonus
+    // Discarded cards: R10 (10 pts) and G5 (5 pts) = 15 pts nest bonus; most-cards bonus = 20
     const transcript = makeTranscript(10);
-    const result = computeRemainingPoints(transcript, ["R10", "G5"], 7);
-    // futurePoints = 15 + 15 = 30; nestBonus = 15; total = 45
-    expect(result).toBe(45);
+    const result = computeRemainingPoints(transcript, ["R10", "G5"], 7, 20);
+    // futurePoints = 15 + 15 = 30; nestBonus = 15; mostCardsBonus = 20; total = 65
+    expect(result).toBe(65);
   });
 
   it("correctly excludes the current trick's points from remaining", () => {
@@ -192,9 +192,9 @@ describe("computeRemainingPoints", () => {
       { ...trickFixture, trickNumber: 2, pointsInTrick: 10 },
       { ...trickFixture, trickNumber: 3, pointsInTrick: 5 },
     ];
-    // No discards; future from index 0 is tricks at index 1 and 2 = 10 + 5 = 15
-    const result = computeRemainingPoints(transcript, [], 0);
+    // No discards; future from index 0 is tricks at index 1 and 2 = 10 + 5 = 15; mostCardsBonus = 20
+    const result = computeRemainingPoints(transcript, [], 0, 20);
     // trick at index 0 (20 pts) must NOT be included in remaining
-    expect(result).toBe(15);
+    expect(result).toBe(35);
   });
 });
