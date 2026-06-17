@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rook — Art Placement & Variant Brief</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #12151f;
+      color: #ddd8cc;
+      font-family: 'Georgia', serif;
+      padding: 48px 40px;
+      max-width: 940px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #252b40;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #e8dfc8;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      color: #6a7a9a;
+      margin-top: 8px;
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+
+    .brief {
+      background: #1a1e2e;
+      border-left: 3px solid #3a4a70;
+      padding: 18px 22px;
+      margin-bottom: 48px;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.88rem;
+      line-height: 1.75;
+      color: #9aa0b8;
+    }
+
+    .brief strong { color: #ddd8cc; }
+    .brief em { color: #c9a84c; font-style: normal; }
+
+    /* Section headers */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      margin-top: 48px;
+    }
+
+    .section-header:first-of-type {
+      margin-top: 0;
+    }
+
+    .section-header h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-family: sans-serif;
+      white-space: nowrap;
+    }
+
+    .section-header.existing h2 { color: #5a8a7a; }
+    .section-header.commission h2 { color: #9a7a3a; }
+
+    .section-header .rule {
+      flex: 1;
+      height: 1px;
+    }
+
+    .section-header.existing .rule { background: #253830; }
+    .section-header.commission .rule { background: #3a3018; }
+
+    /* Cards */
+    .card {
+      display: flex;
+      gap: 0;
+      margin-bottom: 28px;
+      background: #1a1e2e;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #252b40;
+    }
+
+    .mockup {
+      flex: 0 0 280px;
+      background: #141824;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 200px;
+      padding: 24px 20px;
+    }
+
+    .mockup.table {
+      background: radial-gradient(ellipse at center, #182030 0%, #0e1220 100%);
+    }
+
+    .mockup.lobby {
+      background: #141824;
+    }
+
+    .mockup.title-page {
+      background: #111520;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .mockup.fullscreen {
+      background: #0e1018;
+      padding: 0;
+      overflow: hidden;
+      min-height: 240px;
+    }
+
+    /* Existing art badge */
+    .badge-existing {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #1e3830;
+      color: #5aaa8a;
+      border: 1px solid #2a5040;
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-family: sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+
+    /* Variant letter badge */
+    .badge-variant {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #c9a84c;
+      color: #0e1018;
+      font-weight: bold;
+      font-size: 1rem;
+      font-family: 'Georgia', serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    .info {
+      flex: 1;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+      border-left: 1px solid #252b40;
+    }
+
+    .context-label {
+      font-size: 0.72rem;
+      color: #5a6a8a;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-family: sans-serif;
+    }
+
+    .card-title {
+      font-size: 1.2rem;
+      color: #e8dfc8;
+      letter-spacing: 0.02em;
+    }
+
+    .mood-tag {
+      display: inline-block;
+      background: #222840;
+      color: #7a90c0;
+      padding: 3px 11px;
+      border-radius: 12px;
+      font-size: 0.74rem;
+      font-family: sans-serif;
+      letter-spacing: 0.06em;
+      margin-top: 2px;
+    }
+
+    .description {
+      font-size: 0.87rem;
+      line-height: 1.72;
+      color: #9aa0b8;
+    }
+
+    .notes {
+      font-size: 0.77rem;
+      color: #5a6a8a;
+      font-style: italic;
+      border-top: 1px solid #252b40;
+      padding-top: 10px;
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+
+    /* Table sub-elements */
+    .seat {
+      position: absolute;
+      width: 38px;
+      height: 18px;
+      background: #222840;
+      border-radius: 3px;
+      font-size: 8px;
+      color: #6a7a9a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      letter-spacing: 0.08em;
+    }
+
+    .seat.active {
+      background: #2a3858;
+      color: #aab8d0;
+    }
+
+    .table-oval {
+      position: absolute;
+      top: 34px; left: 24px; right: 24px; bottom: 14px;
+      border: 1px solid #1e3050;
+      border-radius: 50%;
+      background: #111c2a;
+      opacity: 0.7;
+    }
+
+    footer {
+      margin-top: 52px;
+      padding-top: 24px;
+      border-top: 1px solid #252b40;
+      text-align: center;
+      font-size: 0.74rem;
+      color: #3a4560;
+      font-family: sans-serif;
+      letter-spacing: 0.07em;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Rook — Art Placement & Variant Brief</h1>
+    <p class="subtitle">Reference for Jae &nbsp;·&nbsp; June 2026</p>
+  </header>
+
+  <div class="brief">
+    <strong>Two parts to this doc.</strong> The first shows where your <em>existing five images</em> are already placed in the app — each one has a home. The second shows the <em>new bird variants</em> we'd love to commission from you, using rook5 as a placeholder to show the size, position, and mood we're after.<br><br>
+    <strong>The concept:</strong> Dark and cartoonish — Poe's <em>The Raven</em>, but the raven has a personality. The bird is the character of the app; the chess piece rook is the world it lives in. The bird reacts to different moments in the game — small beats of life that reward players who notice them.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section-header existing">
+    <h2>Existing Art — Placed</h2>
+    <div class="rule"></div>
+  </div>
+
+
+  <!-- rook3: Lobby / Title Page -->
+  <div class="card">
+    <div class="mockup title-page" style="min-height: 220px;">
+      <div class="badge-existing">rook3</div>
+      <div style="display: flex; width: 100%; height: 100%; min-height: 220px;">
+        <!-- rook3 as left-side hero -->
+        <div style="flex: 0 0 120px; overflow: hidden; position: relative;">
+          <img src="rook3.png" style="width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; opacity: 0.9;">
+        </div>
+        <!-- content area -->
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 20px 18px; gap: 12px; background: #0e1220;">
+          <div style="font-size: 1.3rem; color: #e8dfc8; letter-spacing: 0.18em; font-family: 'Georgia', serif; text-transform: uppercase;">Rook</div>
+          <div style="width: 40px; height: 1px; background: #2a3858;"></div>
+          <div style="font-size: 0.72rem; color: #5a6a8a; font-family: sans-serif; letter-spacing: 0.1em;">4-PLAYER CARD GAME</div>
+          <div style="margin-top: 8px; background: #1e2a40; border: 1px solid #2a3858; border-radius: 4px; padding: 7px 16px; font-size: 0.75rem; color: #8899cc; font-family: sans-serif; letter-spacing: 0.08em;">PLAY</div>
+        </div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">Title Page / Lobby</div>
+      <div class="card-title">rook3 — World Anchor</div>
+      <span class="mood-tag">watchful &nbsp;·&nbsp; composed</span>
+      <p class="description">The app's opening image — the bird perched and still, the world established before the game begins. Sits as a side-panel hero flanking the title and entry point. Sets the tone for everything that follows.</p>
+      <p class="notes">Used full-height on the left side of the title screen. The dark fractured background bleeds to the edge; a gradient softens the transition to the content panel.</p>
+    </div>
+  </div>
+
+
+  <!-- rook4: App Icon + Card Table Watermark -->
+  <div class="card">
+    <div class="mockup table" style="flex-direction: column; gap: 16px; min-height: 220px;">
+      <div class="badge-existing">rook4</div>
+      <!-- App icon in a tiny nav bar -->
+      <div style="width: 100%; background: #0e1220; border-radius: 4px; padding: 7px 10px; display: flex; align-items: center; gap: 8px;">
+        <img src="rook4.png" style="width: 24px; height: 24px; object-fit: contain;">
+        <div style="font-size: 8px; color: #5a6a8a; font-family: sans-serif; letter-spacing: 0.12em; text-transform: uppercase;">Rook</div>
+        <div style="margin-left: auto; font-size: 8px; color: #3a4a60; font-family: sans-serif;">≡</div>
+      </div>
+      <!-- Table surface with faint watermark -->
+      <div style="position: relative; width: 200px; height: 120px;">
+        <div style="position: absolute; inset: 0; border: 1px solid #1e3050; border-radius: 50%; background: #111c2a; opacity: 0.8;"></div>
+        <img src="rook4.png" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: auto; opacity: 0.07;">
+        <div style="position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 7px; color: #2a3850; font-family: sans-serif; letter-spacing: 0.1em; white-space: nowrap;">subtle table watermark</div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">App Icon &amp; Card Table Surface</div>
+      <div class="card-title">rook4 — Clean Asset</div>
+      <span class="mood-tag">versatile &nbsp;·&nbsp; isolated</span>
+      <p class="description">The cleanest, most portable piece — no background context, just the subject. Used in two places: as the app icon / favicon in the navigation, and as a very faint watermark centered on the card table felt surface.</p>
+      <p class="notes">The watermark opacity is intentionally very low (~7–10%) — texture, not image. Should feel like a design decision rather than a visible illustration.</p>
+    </div>
+  </div>
+
+
+  <!-- rook1: Win Screen -->
+  <div class="card">
+    <div class="mockup fullscreen">
+      <div class="badge-existing">rook1</div>
+      <div style="position: relative; width: 100%; height: 100%; min-height: 240px; display: flex; align-items: center; justify-content: center;">
+        <img src="rook1.png" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; opacity: 0.85;">
+        <div style="position: relative; z-index: 1; text-align: center; background: rgba(10,12,20,0.55); padding: 16px 24px; border-radius: 6px;">
+          <div style="font-size: 0.65rem; color: #c9a84c; font-family: sans-serif; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 6px;">Game Over</div>
+          <div style="font-size: 1.4rem; color: #e8dfc8; font-family: 'Georgia', serif; letter-spacing: 0.08em;">Victory</div>
+          <div style="font-size: 0.72rem; color: #8899cc; font-family: sans-serif; margin-top: 6px;">Team scored 120 pts</div>
+        </div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">End of Game — Win Screen</div>
+      <div class="card-title">rook1 — Victory</div>
+      <span class="mood-tag">triumphant &nbsp;·&nbsp; dramatic</span>
+      <p class="description">Full-screen win state. Wings spread wide — the most intense and celebratory image in the set. The score overlay sits centered over the image. The drama of the piece does the heavy lifting; the text just confirms what happened.</p>
+      <p class="notes">Used as full-bleed background. The existing dark blue and fractured stone give it a gothic grandeur that fits the win moment without feeling garish.</p>
+    </div>
+  </div>
+
+
+  <!-- rook2: Loss Screen -->
+  <div class="card">
+    <div class="mockup fullscreen">
+      <div class="badge-existing">rook2</div>
+      <div style="position: relative; width: 100%; height: 100%; min-height: 240px; display: flex; align-items: center; justify-content: center;">
+        <img src="rook2.png" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; opacity: 0.8;">
+        <div style="position: relative; z-index: 1; text-align: center; background: rgba(10,12,20,0.55); padding: 16px 24px; border-radius: 6px;">
+          <div style="font-size: 0.65rem; color: #6a7a9a; font-family: sans-serif; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 6px;">Game Over</div>
+          <div style="font-size: 1.4rem; color: #aaa8a0; font-family: 'Georgia', serif; letter-spacing: 0.08em;">Defeat</div>
+          <div style="font-size: 0.72rem; color: #5a6a7a; font-family: sans-serif; margin-top: 6px;">Opponents scored 120 pts</div>
+        </div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">End of Game — Loss Screen</div>
+      <div class="card-title">rook2 — Defeat</div>
+      <span class="mood-tag">deflated &nbsp;·&nbsp; drained</span>
+      <p class="description">The same composition as rook1 — wings spread, same pose — but the color is gone. Muted and gray where rook1 was vivid and intense. The pair works because the defeat feels like the victory with the life sucked out of it.</p>
+      <p class="notes">Used as full-bleed background, same treatment as rook1. The tonal contrast between the two end screens is the design — no extra work needed to sell the difference.</p>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="section-header commission" style="margin-top: 56px;">
+    <h2>New Variants — Commission Brief</h2>
+    <div class="rule"></div>
+  </div>
+
+  <div class="brief" style="margin-bottom: 32px; border-left-color: #5a4a20;">
+    <strong>rook5 shown as placeholder</strong> in all mockups below — it already captures the right energy and may serve as Variant A directly. The letter labels (A–D) are just reference shorthand so we can talk about "Variant B" without describing it each time. The mood and context notes are the actual brief; the art direction is yours.
+  </div>
+
+
+  <!-- Variant A: Turn Indicator -->
+  <div class="card">
+    <div class="mockup table" style="min-height: 240px;">
+      <div class="badge-variant">A</div>
+      <!-- Four-corner layout: bird sits in each corner looking toward its player's seat -->
+      <div style="position: relative; width: 230px; height: 190px;">
+
+        <!-- Table felt -->
+        <div style="position: absolute; top: 32px; left: 32px; right: 32px; bottom: 32px; border: 1px solid #1e3050; border-radius: 50%; background: #111c2a; opacity: 0.7;"></div>
+
+        <!-- Player seat labels at cardinal edges -->
+        <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-size: 7px; color: #4a5a78; font-family: sans-serif; letter-spacing: 0.1em;">N</div>
+        <div style="position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); font-size: 7px; color: #4a5a78; font-family: sans-serif; letter-spacing: 0.1em;">YOU</div>
+        <div style="position: absolute; top: 50%; left: 8px; transform: translateY(-50%); font-size: 7px; color: #4a5a78; font-family: sans-serif; letter-spacing: 0.1em;">W</div>
+        <div style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 7px; color: #4a5a78; font-family: sans-serif; letter-spacing: 0.1em;">E</div>
+
+        <!-- TOP-RIGHT corner: N's bird — active, looking left toward N seat -->
+        <img src="rook5.png" title="N's bird" style="position: absolute; top: 2px; right: 2px; width: 34px; height: auto; opacity: 0.92;">
+
+        <!-- BOTTOM-RIGHT corner: E's bird — inactive, looking up toward E seat -->
+        <img src="rook5.png" title="E's bird" style="position: absolute; bottom: 2px; right: 2px; width: 28px; height: auto; opacity: 0.18; transform: rotate(-90deg);">
+
+        <!-- BOTTOM-LEFT corner: YOU's bird — inactive, looking right toward YOU seat -->
+        <img src="rook5.png" title="S's bird" style="position: absolute; bottom: 2px; left: 2px; width: 28px; height: auto; opacity: 0.18; transform: scaleX(-1);">
+
+        <!-- TOP-LEFT corner: W's bird — inactive, looking down toward W seat -->
+        <img src="rook5.png" title="W's bird" style="position: absolute; top: 2px; left: 2px; width: 28px; height: auto; opacity: 0.18; transform: rotate(90deg);">
+
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">Active Gameplay — persistent</div>
+      <div class="card-title">A &nbsp;·&nbsp; Turn Indicator</div>
+      <span class="mood-tag">alert &nbsp;·&nbsp; attentive</span>
+      <p class="description">One small bird per player, tucked into the corner diagonally adjacent to their seat — top-right looks toward N, bottom-right looks toward E, and so on. Only the active player's bird is visible; the other three are hidden or very dim.</p>
+      <p class="notes">~30–35px. The mockup shows N's turn active (top-right). Orientation: a single pose rotated/flipped in code to face each player. rook5's leaning stance should survive rotation — confirm it reads at small size.</p>
+    </div>
+  </div>
+
+
+  <!-- Variant B: Trick Won -->
+  <div class="card">
+    <div class="mockup table">
+      <div class="badge-variant">B</div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <img src="rook5.png" style="width: 82px; height: auto; opacity: 0.9;">
+        <div style="font-size: 8px; color: #c9a84c; font-family: sans-serif; letter-spacing: 0.14em; text-transform: uppercase;">trick taken</div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">Active Gameplay — brief flash</div>
+      <div class="card-title">B &nbsp;·&nbsp; Trick Won</div>
+      <span class="mood-tag">smug &nbsp;·&nbsp; satisfied</span>
+      <p class="description">Pops up briefly over the trick pile after your team takes a trick, then fades — gone in about a second. Puffed up and pleased with itself. A tiny moment of personality that rewards noticing.</p>
+      <p class="notes">~80px. Short-lived appearance. Good candidate for a subtle animation later — a self-satisfied ruffle or a proud little bob before it disappears.</p>
+    </div>
+  </div>
+
+
+  <!-- Variant C: Skeptical Bid -->
+  <div class="card">
+    <div class="mockup table">
+      <div class="badge-variant">C</div>
+      <div style="display: flex; align-items: center; gap: 18px;">
+        <div style="background: #141e2c; border: 1px solid #2a3a52; border-radius: 6px; padding: 10px 16px; text-align: center;">
+          <div style="font-size: 8px; color: #5a6a8a; font-family: sans-serif; letter-spacing: 0.1em; margin-bottom: 5px;">BID</div>
+          <div style="font-size: 1.6rem; color: #e8dfc8; font-family: 'Georgia', serif; line-height: 1;">110</div>
+        </div>
+        <img src="rook5.png" style="width: 60px; height: auto; opacity: 0.85;">
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">Bidding Phase — brief appearance</div>
+      <div class="card-title">C &nbsp;·&nbsp; Skeptical Observer</div>
+      <span class="mood-tag">side-eye &nbsp;·&nbsp; unimpressed</span>
+      <p class="description">Appears beside the bid display when an opponent makes a bold bid. The bird looks sideways at the number — quietly unimpressed. A comic beat that doesn't interrupt the game.</p>
+      <p class="notes">~60px. Lives right next to the bid number. Position relative to the number is part of the joke — it should look like the bird is literally staring at it.</p>
+    </div>
+  </div>
+
+
+  <!-- Variant D: Lobby Idle -->
+  <div class="card">
+    <div class="mockup lobby">
+      <div class="badge-variant">D</div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px;">
+        <img src="rook5.png" style="width: 112px; height: auto; opacity: 0.78;">
+        <div style="font-size: 8px; color: #3a4a6a; font-family: sans-serif; letter-spacing: 0.12em; text-transform: uppercase;">waiting for players…</div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="context-label">Lobby — ambient, persistent</div>
+      <div class="card-title">D &nbsp;·&nbsp; Idle / Waiting</div>
+      <span class="mood-tag">patient &nbsp;·&nbsp; curious</span>
+      <p class="description">Ambient presence in the lobby while waiting for other players to join. Head tilted, unhurried. The world before anything has happened yet — the bird is just here, watching.</p>
+      <p class="notes">~110px. Good candidate for a gentle idle animation later: a slow blink, a small head tilt, something that makes it feel alive without demanding attention.</p>
+    </div>
+  </div>
+
+
+
+
+  <footer>
+    Rook card game &nbsp;·&nbsp; art by Jae &nbsp;·&nbsp; placement reference only — not a design spec
+  </footer>
+
+</body>
+</html>
