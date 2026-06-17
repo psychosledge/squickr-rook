@@ -114,6 +114,19 @@ Each slice here traces back to a specific observed game/trick. New slices are ad
 
 ---
 
+### Slice 9: Fix "pts left" display to include most-cards bonus
+**Scope:** In `apps/web/src/pages/ReplayPage.tsx`, `computeRemainingPoints` omitted the 20-pt most-cards bonus from the remaining-points tally, causing the header to show 165 pts left on trick 1 instead of 185. Add a `mostCardsBonus` parameter (sourced from `outcome.nsMostCardsBonus + outcome.ewMostCardsBonus`) so all non-last tricks account for the full 200-pt pool. No changes to game logic, bot logic, or the simulation NDJSON output format.
+**Status:** ✅ done
+**Commit:** 2546233
+**Evidence:** game-0000 (seed 12345), trick 1, S perspective. Header showed "165 pts left"; correct value is 185 (200 total − 15 pts already scored by EW in trick 1). The 20-pt most-cards bonus was excluded from the remaining-points sum.
+**Acceptance Criteria:**
+- [x] "pts left" on non-last tricks reflects the full point pool: future trick card-points + nest bonus + most-cards bonus
+- [x] "pts left" on the last trick continues to show 0
+- [x] `pnpm --filter web test --run` passes with no regressions
+**Needs Architect:** no — isolated to `computeRemainingPoints` in `ReplayPage.tsx`
+
+---
+
 ## UAT Checklist
 ✅ UAT accepted 2026-06-15
 
