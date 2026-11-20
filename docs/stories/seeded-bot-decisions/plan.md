@@ -5,21 +5,21 @@ Tier: core
 
 ### Slice 1: Bot decisions draw from a caller-supplied random source
 **Scope:** Every chance-driven bot decision reads randomness from a source the caller can pass in, falling back to `Math.random` when none is passed. Covers all 8 `Math.random` sites in `packages/engine/src/bot.ts`: the fishing roll (L67), opening fraction (L69), jump-probability roll (L88, missing from the story's list of 7), jump fraction (L90), hand-valuation noise in `estimateHandValueWithNoise` (L184), the L1 25% opening branch (L396), the `playAccuracy` slip roll (L482), and `pickRandom` (L1477, reached from random discard, random trump, the accuracy slip, and L1/L2 play in `chooseBestPlay`). Tests use a scripted source to force specific outcomes. Web (`apps/web/src/store/gameStore.ts`) and server (`packages/server/src/room.ts`) call sites are not changed. The simulator is not changed in this slice and keeps its `Math.random` patch until Slice 2.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 59e1c31
 **Acceptance Criteria:**
-- [ ] `botChooseCommand` accepts an optional random source as a trailing parameter. The existing 3-argument calls in `gameStore.ts` (`_botChooseCommandWithLog`) and `room.ts` compile and run unchanged.
-- [ ] The exported helpers that consume randomness, `estimateHandValueWithNoise` and `computeBidCeiling`, accept the same optional source. Their existing calls in `gameStore.ts` (bot-decision annotation) compile unchanged.
-- [ ] With no source supplied, bot decisions draw from `Math.random` (test observes `Math.random` being consulted on the default path).
-- [ ] With a source supplied, `botChooseCommand` never calls `Math.random` across bidding, nest, trump, and playing phases (test spies on `Math.random` and asserts zero calls).
-- [ ] `packages/engine/src/bot.ts` contains no `Math.random` reference outside the default-source fallback.
-- [ ] A scripted source forces an L3+ opening bot to fish (bids the minimum), and a different script forces a non-fishing open at a specific, predictable amount.
-- [ ] A scripted source forces an L3+ raising bot to jump-bid to a specific, predictable amount, and a different script forces a minimum raise.
-- [ ] A scripted source forces a play-accuracy slip, and the bot plays the card the script selects from its legal plays. A script that passes the accuracy roll yields the same card as the bot's best-play choice.
-- [ ] A scripted source forces the L1 opening branch both ways (opens at the minimum, passes).
-- [ ] A scripted source drives `estimateHandValueWithNoise` to a predictable noisy value.
-- [ ] Each scripted-source test gives the same result on every run (no reliance on `Math.random` or loop-over-trials statistics).
-- [ ] Full suite passes (`pnpm -r test`).
+- [x] `botChooseCommand` accepts an optional random source as a trailing parameter. The existing 3-argument calls in `gameStore.ts` (`_botChooseCommandWithLog`) and `room.ts` compile and run unchanged.
+- [x] The exported helpers that consume randomness, `estimateHandValueWithNoise` and `computeBidCeiling`, accept the same optional source. Their existing calls in `gameStore.ts` (bot-decision annotation) compile unchanged.
+- [x] With no source supplied, bot decisions draw from `Math.random` (test observes `Math.random` being consulted on the default path).
+- [x] With a source supplied, `botChooseCommand` never calls `Math.random` across bidding, nest, trump, and playing phases (test spies on `Math.random` and asserts zero calls).
+- [x] `packages/engine/src/bot.ts` contains no `Math.random` reference outside the default-source fallback.
+- [x] A scripted source forces an L3+ opening bot to fish (bids the minimum), and a different script forces a non-fishing open at a specific, predictable amount.
+- [x] A scripted source forces an L3+ raising bot to jump-bid to a specific, predictable amount, and a different script forces a minimum raise.
+- [x] A scripted source forces a play-accuracy slip, and the bot plays the card the script selects from its legal plays. A script that passes the accuracy roll yields the same card as the bot's best-play choice.
+- [x] A scripted source forces the L1 opening branch both ways (opens at the minimum, passes).
+- [x] A scripted source drives `estimateHandValueWithNoise` to a predictable noisy value.
+- [x] Each scripted-source test gives the same result on every run (no reliance on `Math.random` or loop-over-trials statistics).
+- [x] Full suite passes (`pnpm -r test`).
 **Files:** `packages/engine/src/bot.ts`, `packages/engine/src/__tests__/bot.test.ts`, possibly a new `packages/engine/src/rng.ts` and `packages/engine/src/index.ts` (export), `apps/web/src/store/gameStore.ts` and `packages/server/src/room.ts` (read only, to confirm unchanged calls)
 **Needs Architect:** yes. Decides the random-source type and where it lives (new engine module vs `bot.ts`), how it threads through the private helpers (`chooseBidAmount`, `pickRandom`, `chooseBestPlay`, `estimateHandValueWithNoise`, `computeBidCeiling`), and whether the seeded generator now private to `simulate.ts` (`makeXorshift32`) moves into the engine for reuse by Slice 2 and tests. That placement has real alternatives with different blast radius: a public engine export vs a script-local helper.
 **Scaffolding for:** Slice 2: Simulator seeds each game without patching Math.random. Creates the injection seam the simulator passes its per-game seeded source through.
