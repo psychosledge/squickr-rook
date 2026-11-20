@@ -27,17 +27,17 @@ Tier: core
 
 ### Slice 2: Simulator seeds each game without patching Math.random
 **Scope:** `packages/engine/scripts/simulate.ts` builds one seeded random source per game from that game's `dealSeed` and passes it to every `botChooseCommand` call in `simulateGame`. `seedMathRandom` and the `(Math as any).random = rng` assignment are removed. The simulator gains a test seam so determinism is checked by Vitest (the script has no tests today and runs `main()` on import). CLI flags and NDJSON record shape are unchanged. Output for an existing seed may change once.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 011ae41
 **Acceptance Criteria:**
-- [ ] `simulate.ts` contains no assignment to `Math.random`; `seedMathRandom` is gone.
-- [ ] `Math.random` is the same function before and after simulating games (test).
-- [ ] Simulating the same base seed twice produces identical game records (test compares serialized output).
-- [ ] Simulating two different base seeds produces different game records (test).
-- [ ] Drawing from `Math.random` between or during simulated games does not change the records produced for a seed (test interleaves `Math.random` calls).
-- [ ] A per-game seed of 0, a base seed whose mixed per-game seed is 0 (base seed `0xdeadbeef`, since the mix is `dealSeed ^ 0xdeadbeef`), and a negative base seed each still produce a varied random stream (the existing xorshift zero-state guard is kept wherever the generator now lives).
-- [ ] Each line the simulator emits parses as JSON with the `GameRecord` fields (test). Loading it in `/replay` is a walkthrough check.
-- [ ] Full suite passes (`pnpm -r test`).
+- [x] `simulate.ts` contains no assignment to `Math.random`; `seedMathRandom` is gone.
+- [x] `Math.random` is the same function before and after simulating games (test).
+- [x] Simulating the same base seed twice produces identical game records (test compares serialized output).
+- [x] Simulating two different base seeds produces different game records (test).
+- [x] Drawing from `Math.random` between or during simulated games does not change the records produced for a seed (test interleaves `Math.random` calls).
+- [x] A per-game seed of 0, a base seed whose mixed per-game seed is 0 (base seed `0xdeadbeef`, since the mix is `dealSeed ^ 0xdeadbeef`), and a negative base seed each still produce a varied random stream (the existing xorshift zero-state guard is kept wherever the generator now lives).
+- [x] Each line the simulator emits parses as JSON with the `GameRecord` fields (test). Loading it in `/replay` is a walkthrough check.
+- [x] Full suite passes (`pnpm -r test`).
 **Files:** `packages/engine/scripts/simulate.ts`, a new simulator test (location set by the architect, for example `packages/engine/scripts/__tests__/simulate.test.ts`), possibly `packages/engine/src/rng.ts` if Slice 1 moved the generator there, `packages/engine/package.json` (only if the script entry changes)
 **Needs Architect:** yes, unless the Slice 1 ADR already settles it. Decides the simulator's test seam: whether `simulateGame` moves into an importable module with `main()` kept as a thin CLI entry, or `main()` is guarded so the file can be imported by a test.
 
