@@ -4,6 +4,20 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.9.0] — 2026-06-16
+
+### Bot Improvements
+- **Trump pull leads high** — the bidding team now leads its highest non-ROOK trump when pulling trump, forcing opponents to spend their high trumps (reverses the v1.2.0 low-probe behaviour)
+- **Forcing out the bidder's trump** — Medium and Hard defenders lead a suit a bidding-team player is known to be void in, using the cheapest card in that suit, so the bidder has to spend trump to win it
+- **Protecting point cards on leads** — Medium and Hard bots lead a cheap card instead of a point card when a higher card in that suit is still out
+- **Protecting point cards when following** — Medium and Hard bots follow with a cheap card when the top card in the suit hasn't been played yet
+- **Shortening suits to create voids** — Medium and Hard defenders lead from short, pointless suits so they can trump that suit sooner; Hard bots also discard from their shortest pointless suit when they can't follow
+
+### Bug Fixes
+- **ROOK lead treated as trump** — a trick led with the ROOK now counts as a trump lead
+
+---
+
 ## [v1.8.1] — 2026-03-28
 
 ### Bug Fixes
