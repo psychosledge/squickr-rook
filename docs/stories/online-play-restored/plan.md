@@ -76,3 +76,51 @@ Tier: core
 - [ ] Open a room link for a room code that was never created; the app behaves as it did before the move (joins an empty lobby).
 - [ ] Start an offline game against bots and play a hand; it behaves as before.
 - [ ] Follow the deployment guide's local dev steps on a clean checkout and play a local online game.
+
+## ADR: Room server hosting shape
+Added: slice 1 of online-play-restored, 2026-11-20
+
+### Context
+Hosted PartyKit is gone. `room.ts` has to run as a Durable Object on a Cloudflare Worker through PartyServer 0.5.10, and its scenario tests must keep their assertions.
+
+### Decision 1: Room route
+| Option | Summary | Key cost |
+|---|---|---|
+| A: Adopt PartyServer's route | Client uses `/parties/room-server/<code>`. Worker calls `routePartykitRequest` | One-line client change |
+| B: Map `/party/<code>` in the Worker | Worker parses the path and calls `getServerByName` | Hand-written routing to maintain |
+
+**Chosen: A.** Old bundles point at the dead `partykit.dev` host, so keeping the old path buys nothing. The Durable Object class and binding are both `RoomServer`, which makes the party `room-server`.
+
+### Decision 2: Test harness and Durable Object shape
+| Option | Summary | Key cost |
+|---|---|---|
+| A: Logic class plus thin Durable Object adapter | `RookRoom` stays a plain class taking a `RoomHost` port. `RoomServer extends Server` passes calls through. Tests stay in Node with the same mocks | One extra small file |
+| B: `RookRoom extends Server`, tests in Node | Tests stub `cloudflare:workers` and patch PartyServer internals | Breaks on PartyServer upgrades |
+| C: Tests in the Workers runtime via `@cloudflare/vitest-pool-workers` | Real sockets through the Worker | Race scenarios still need mocks; needs vitest ^4.1 |
+
+**Chosen: A.** `room.ts` imports only types from `partyserver`. If room logic later needs storage or alarms, the `RoomHost` port grows.
+
+### Decision 3: Hibernation
+**Off**, set explicitly with `static options = { hibernate: false }`. State stays in memory, as on PartyKit. Hibernation would require persisting all room state and moving bot delays to alarms.
+
+### Decision 4: Wrangler config
+`wrangler.jsonc`, Worker name `squickr-rook`, `main: src/index.ts`, `compatibility_date: 2026-11-01`, Durable Object binding `RoomServer`, migration `v1` with `new_sqlite_classes: ["RoomServer"]`, `dev.port: 1999`.
+
+### Decision 5: Requests outside the room route
+The Worker returns `404` unless the path starts with `/parties/room-server/` followed by a non-empty room code. A non-WebSocket request on the room route gets PartyServer's `404`.
+
+### Implementation shape
+- `packages/server/src/room.ts`: type-only imports of `Connection`, `ConnectionContext`, `WSMessage` from `partyserver`. Exports `RoomHost` (`id`, `getConnection`, `getConnections`). Constructor takes `RoomHost`. Keeps `onMessage(message, sender)`. `sendTo` keeps the literal `1` for OPEN and drops the `any` cast.
+- `packages/server/src/server.ts`: `Env` with `RoomServer: DurableObjectNamespace<RoomServer>`. `RoomServer extends Server<Env>` builds a `RookRoom` whose `RoomHost` reads `this.name`, `this.getConnection`, `this.getConnections` on each call. Forwards `onConnect`, `onMessage(conn, msg)` as `onMessage(msg, conn)`, and `onClose`.
+- `packages/server/src/routes.ts` and `routes.test.ts`: `ROOM_PARTY = "room-server"` and `isRoomRoute(pathname)`.
+- `packages/server/src/index.ts`: re-exports `RoomServer`. `fetch` returns 404 outside the room route, otherwise `(await routePartykitRequest(request, env)) ?? 404`.
+- `packages/server/package.json`: `dev` is `wrangler dev`, `ship` is `wrangler deploy`. Deps `partyserver@0.5.10`; dev deps `wrangler@4.158.0`, `@cloudflare/workers-types@5.20261104.1`. `partykit` removed.
+- `packages/server/tsconfig.json`: `lib: ["ES2022"]`, `types: ["@cloudflare/workers-types"]`.
+- `packages/server/partykit.json` deleted. `.gitignore` swaps `.partykit/` for `.wrangler/`.
+- `room.test.ts`: only type casts change (`partyserver` `Connection`, `RoomHost`).
+- Web: URL is `${proto}://${host}/parties/room-server/${roomCode}`. Store tests cover the default host (`ws://localhost:1999/parties/room-server/ABCD`) and a workers.dev host (`wss://...`). `vite-env.d.ts` unchanged.
+
+### Consequences
+- Room logic is tested in Node. The `RoomServer` adapter and Worker routing are checked by hand at the slice gate.
+- Each open room keeps its Durable Object running and counts against the free plan's daily duration limit.
+- If `pnpm install` skips `workerd` or `esbuild` builds, add `onlyBuiltDependencies` to `pnpm-workspace.yaml`. If the bundle needs Node built-ins, add the `nodejs_compat` flag.
