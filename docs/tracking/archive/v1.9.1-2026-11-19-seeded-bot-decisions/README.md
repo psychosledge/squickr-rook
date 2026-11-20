@@ -8,6 +8,7 @@
 
 | Item | Status | Next step |
 |---|---|---|
-| Seeded bot decisions ([story](../../stories/seeded-bot-decisions/story.md)) | slices done, 2/2 | walkthrough, then `/ship` |
 
 ## Closed items (not carried forward — see previous directory for full history)
+
+- Seeded bot decisions ([story](../../../stories/archive/seeded-bot-decisions/story.md)): released v1.9.1
