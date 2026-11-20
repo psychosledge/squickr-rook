@@ -4,6 +4,13 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.9.1] — 2026-11-20
+
+### Improvements
+- **Repeatable bot test games** — simulated bot games now replay identically from the same seed, so bot mistakes found in testing can be reproduced and fixed reliably. Bots play the same way they did before.
+
+---
+
 ## [v1.9.0] — 2026-06-16
 
 ### Bot Improvements
