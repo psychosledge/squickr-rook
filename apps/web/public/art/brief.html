@@ -7,6 +7,15 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    @media print {
+      body { padding: 24px 28px; background: #12151f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .card { break-inside: avoid; page-break-inside: avoid; }
+      .brief { break-inside: avoid; page-break-inside: avoid; }
+      .section-header { break-after: avoid; page-break-after: avoid; }
+      .section-header.commission { break-before: page; page-break-before: always; }
+      footer { break-inside: avoid; page-break-inside: avoid; }
+    }
+
     body {
       background: #12151f;
       color: #ddd8cc;
