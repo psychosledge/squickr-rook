@@ -10,6 +10,6 @@
 
 | Item | Status | Next step |
 |---|---|---|
-| Online play restored ([story](../../stories/online-play-restored/story.md)) | story drafted | `/plan` |
+| Online play restored ([story](../../stories/online-play-restored/story.md), [plan](../../stories/online-play-restored/plan.md)) | planned, 0/2 slices | Slice 1: room server runs on PartyServer locally |
 
 ## Closed items (not carried forward — see previous directory for full history)
