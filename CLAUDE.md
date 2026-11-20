@@ -66,7 +66,7 @@ apps/
 - **Tests first.** Red-Green-Refactor, always.
 - **The engine stays pure.** Game state changes go through `applyEvent` in `packages/engine/src/reducer.ts`; the engine has no UI or network code.
 - **No commits without the full suite passing** (`pnpm -r test`).
-- **Never generate artwork.** All art is Jae's, placed from `apps/web/public/art/`.
+- **Never generate artwork.** All art is Jae's. Originals and the commission brief live in `docs/art/`, outside every build. Copy an asset into `apps/web/public/` only when a screen uses it.
 
 ## Common Commands
 
