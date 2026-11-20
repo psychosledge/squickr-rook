@@ -79,16 +79,16 @@ Failure-mode sweep, core tier. Covered/deferred calls are the human's to confirm
 ## Walkthrough Checklist
 (Complete after all slices are implemented and committed)
 
-- [ ] Run `pnpm --filter @rook/engine simulate --games 20 --seed 12345 --out <a>` twice to two files; confirm the files are byte-identical.
-- [ ] Run with `--seed 12346`; confirm the output differs from the 12345 run.
-- [ ] Run with `--seed 0`; confirm it completes and bids vary across games (not every bot opening at the minimum).
-- [ ] Search `packages/engine/scripts/simulate.ts` for `Math.random`; confirm no assignment remains.
-- [ ] Load a fresh simulator NDJSON in `/replay` (dev); confirm games and tricks render.
-- [ ] Open `packages/engine/src/__tests__/bot.test.ts`; confirm tests force fishing, a jump bid, and a play-accuracy slip with a scripted source, and run `pnpm --filter @rook/engine test` twice with identical results.
-- [ ] Play an offline game against bots in `pnpm dev` for two hands; confirm bots bid and play normally and opening bids differ between hands or games.
-- [ ] Start a second offline game; confirm bot bids and card choices are not a repeat of the first game.
-- [ ] Play an online room with bots against `pnpm server:dev`; confirm bots bid and play normally and their choices vary between games.
-- [ ] `pnpm -r test` passes.
+- [x] Run `pnpm --filter @rook/engine simulate --games 20 --seed 12345 --out <a>` twice to two files; confirm the files are byte-identical.
+- [x] Run with `--seed 12346`; confirm the output differs from the 12345 run.
+- [x] Run with `--seed 0`; confirm it completes and bids vary across games (not every bot opening at the minimum).
+- [x] Search `packages/engine/scripts/simulate.ts` for `Math.random`; confirm no assignment remains.
+- [x] Load a fresh simulator NDJSON in `/replay` (dev); confirm games and tricks render.
+- [x] Open `packages/engine/src/__tests__/bot.test.ts`; confirm tests force fishing, a jump bid, and a play-accuracy slip with a scripted source, and run `pnpm --filter @rook/engine test` twice with identical results.
+- [x] Play an offline game against bots in `pnpm dev` for two hands; confirm bots bid and play normally and opening bids differ between hands or games.
+- [x] Start a second offline game; confirm bot bids and card choices are not a repeat of the first game.
+- [x] Play an online room with bots against `pnpm server:dev`; confirm bots bid and play normally and their choices vary between games.
+- [x] `pnpm -r test` passes.
 
 ## ADR: Bot random source and simulator test seam
 Added: Slice 1, 2026-11-19

@@ -35,3 +35,4 @@ nul
 
 # Simulation harness output
 packages/engine/scripts/output/*.ndjson
+.partykit/
