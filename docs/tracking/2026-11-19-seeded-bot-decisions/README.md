@@ -8,6 +8,6 @@
 
 | Item | Status | Next step |
 |---|---|---|
-| Seeded bot decisions ([story](../../stories/seeded-bot-decisions/story.md)) | story drafted | `/plan` |
+| Seeded bot decisions ([story](../../stories/seeded-bot-decisions/story.md)) | planned, 0/2 slices | `/slice` 1 |
 
 ## Closed items (not carried forward — see previous directory for full history)
