@@ -1,9 +1,9 @@
 # Deployment Guide
 
-**Last Updated:** 2026-03-01
-**Current Platform:** GitHub Pages
+**Last Updated:** 2026-11-19
+**Current Platform:** GitHub Pages (web), PartyKit (online rooms server)
 **Domain:** rook.squickr.com
-**Status:** 🚧 Pipeline configured — DNS pending
+**Status:** ✅ Live. Releases ship via `/ship`; the server deploys with `pnpm server:ship`.
 
 ---
 

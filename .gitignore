@@ -27,8 +27,8 @@ Thumbs.db
 sw.js
 workbox-*.js
 
-# OpenCode internal agent tooling
-.opencode/
+# Claude Code worktrees
+.claude/worktrees/
 
 # Windows artifacts
 nul
