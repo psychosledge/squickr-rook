@@ -7,4 +7,5 @@ export * from "./reducer.js";
 export * from "./validator.js";
 export * from "./scoring.js";
 export * from "./bot.js";
+export * from "./rng.js";
 export * from "./mask.js";

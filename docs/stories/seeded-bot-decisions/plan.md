@@ -89,3 +89,20 @@ Failure-mode sweep, core tier. Covered/deferred calls are the human's to confirm
 - [ ] Start a second offline game; confirm bot bids and card choices are not a repeat of the first game.
 - [ ] Play an online room with bots against `pnpm server:dev`; confirm bots bid and play normally and their choices vary between games.
 - [ ] `pnpm -r test` passes.
+
+## ADR: Bot random source and simulator test seam
+Added: Slice 1, 2026-11-19
+
+**Context:** `bot.ts` draws from `Math.random` at 8 sites and the simulator patches `Math.random` for repeatable runs. The engine's `pure-rand` use in `deal.ts` is the immutable-generator API, with nothing in the `() => number` shape to reuse.
+
+**Decision 1, type and module:** new `packages/engine/src/rng.ts`, re-exported from `index.ts`, holding `type Rng = () => number` (values in [0, 1)), `defaultRng: Rng = () => Math.random()`, and `makeXorshift32(seed): Rng` moved unchanged from `simulate.ts` with its zero-state guard. `defaultRng` is the single `Math.random` fallback for bot decisions. It is a wrapper so `vi.spyOn(Math, "random")` observes default-path draws.
+
+**Decision 2, threading:** `botChooseCommand`, `estimateHandValueWithNoise`, and `computeBidCeiling` take a trailing `rng: Rng = defaultRng`. Private helpers that draw (`chooseBidAmount`, `pickRandom`, `chooseBestPlay`) take `rng: Rng` as a required trailing parameter. Helpers that don't draw keep their signatures. `gameStore.ts` and `room.ts` calls are unchanged.
+
+**Decision 3, generator home:** `makeXorshift32` lives in the engine. Slice 1 adds and exports it and leaves the copy in `simulate.ts`. Slice 2 deletes the script copy and imports the engine one. The scripted test source stays inline in `bot.test.ts`.
+
+**Decision 4, simulator seam (settles Slice 2's architect step):** `packages/engine/scripts/simulation.ts` exports `simulateGame(gameIndex, dealSeed, rng: Rng): GameRecord` and `simulateGames(games, baseSeed): GameRecord[]`, with per-game `dealSeed = baseSeed + k` and bot source `makeXorshift32(dealSeed ^ 0xdeadbeef)`. `scripts/simulate.ts` keeps arg parsing, file output, summary, and the `main()` call. Tests go in `packages/engine/scripts/__tests__/simulation.test.ts`. `package.json` is unchanged.
+
+**Decision 5, default path:** each former `Math.random()` call becomes one `rng()` draw at the same point, so draw order and count are unchanged. Slice 1 does not change simulator output.
+
+**Revisit if:** bot code draws randomness outside `botChooseCommand`'s call tree, or callers need one stream shared across games.

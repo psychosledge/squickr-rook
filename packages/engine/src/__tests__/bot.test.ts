@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { botChooseCommand, computeBidCeiling } from "../bot.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { botChooseCommand, computeBidCeiling, estimateHandValueWithNoise } from "../bot.js";
+import { makeXorshift32, type Rng } from "../rng.js";
 import { applyEvent, INITIAL_STATE } from "../reducer.js";
 import { legalCommands } from "../validator.js";
 import { trumpRank, cardFromId } from "../deck.js";
@@ -4675,5 +4676,173 @@ describe("botChooseCommand - Slice 7 (discard-to-void: prefer 0-pt from shortest
     if (cmd.type === "PlayCard") {
       expect(cmd.cardId).toBe("G8");
     }
+  });
+});
+
+function scriptedRng(...values: number[]): Rng {
+  let next = 0;
+  return () => {
+    if (next >= values.length) throw new Error("scripted rng exhausted");
+    return values[next++]!;
+  };
+}
+
+describe("bot random source", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const strongOpeningState = () => makeBiddingStateWithHand("E", ADR009_STRONG_HAND);
+  const strongRaiseState = () => ({
+    ...makeBiddingStateWithHand("E", ADR009_STRONG_HAND),
+    currentBid: DEFAULT_RULES.minimumBid,
+  });
+  const exactL3Bidder = { ...BOT_PRESETS[3], handValuationAccuracy: 1, canShootMoon: false };
+
+  it("draws from Math.random when no source is supplied", () => {
+    const spy = vi.spyOn(Math, "random");
+    const state = stateAfterGameStarted();
+
+    botChooseCommand(state, leftOf(state.dealer), BOT_PRESETS[1]);
+
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("never calls Math.random across bidding, nest, trump, and playing when a source is supplied", () => {
+    const spy = vi.spyOn(Math, "random");
+    const rng = makeXorshift32(7);
+    const opening = stateAfterGameStarted();
+    const nest = stateAfterNestTaken();
+    const trump = stateAfterAllDiscards();
+    const playing = stateAfterTrumpSelected();
+
+    botChooseCommand(opening, leftOf(opening.dealer), BOT_PRESETS[1], rng);
+    botChooseCommand(opening, leftOf(opening.dealer), BOT_PRESETS[3], rng);
+    botChooseCommand(strongRaiseState(), "E", BOT_PRESETS[5], rng);
+    for (const level of [1, 2] as BotDifficulty[]) {
+      botChooseCommand(nest, leftOf(nest.dealer), BOT_PRESETS[level], rng);
+      botChooseCommand(trump, leftOf(trump.dealer), BOT_PRESETS[level], rng);
+    }
+    for (const level of [1, 5] as BotDifficulty[]) {
+      botChooseCommand(playing, playing.activePlayer!, BOT_PRESETS[level], rng);
+    }
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("L1 opens at the minimum bid when the opening roll is under 0.25", () => {
+    const state = stateAfterGameStarted();
+
+    const cmd = botChooseCommand(state, leftOf(state.dealer), BOT_PRESETS[1], scriptedRng(0.1));
+
+    expect(cmd).toEqual({ type: "PlaceBid", seat: leftOf(state.dealer), amount: DEFAULT_RULES.minimumBid });
+  });
+
+  it("L1 passes when the opening roll is 0.25 or more", () => {
+    const state = stateAfterGameStarted();
+
+    const cmd = botChooseCommand(state, leftOf(state.dealer), BOT_PRESETS[1], scriptedRng(0.25));
+
+    expect(cmd).toEqual({ type: "PassBid", seat: leftOf(state.dealer) });
+  });
+
+  it("L3 opener fishes at the minimum bid when the fishing roll is under its fishing probability", () => {
+    const cmd = botChooseCommand(strongOpeningState(), "E", exactL3Bidder, scriptedRng(0.1));
+
+    expect(cmd).toEqual({ type: "PlaceBid", seat: "E", amount: DEFAULT_RULES.minimumBid });
+  });
+
+  it("L3 opener opens at the fraction the script selects when it does not fish", () => {
+    const cmd = botChooseCommand(strongOpeningState(), "E", exactL3Bidder, scriptedRng(0.5, 0.75));
+
+    expect(cmd).toEqual({ type: "PlaceBid", seat: "E", amount: 165 });
+  });
+
+  it("L3 raiser jump-bids to the fraction the script selects when the jump roll succeeds", () => {
+    const cmd = botChooseCommand(strongRaiseState(), "E", exactL3Bidder, scriptedRng(0.1, 0.75));
+
+    expect(cmd).toEqual({ type: "PlaceBid", seat: "E", amount: 145 });
+  });
+
+  it("L3 raiser makes the minimum raise when the jump roll fails", () => {
+    const cmd = botChooseCommand(strongRaiseState(), "E", exactL3Bidder, scriptedRng(0.9));
+
+    expect(cmd).toEqual({ type: "PlaceBid", seat: "E", amount: 105 });
+  });
+
+  describe("partner override", () => {
+    const partnerHoldsBidState = (): GameState => {
+      const base = makeBiddingStateWithHand("E", ["ROOK", "B1", "B14", "B10", "B9", "B8", "B7", "R2", "G3", "Y2"]);
+      return { ...base, bidder: "W", currentBid: 115, bids: { ...base.bids, W: 115 } };
+    };
+
+    it("L3 passes when the scripted noise keeps its raw ceiling within the margin over partner's bid", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0.99);
+
+      const cmd = botChooseCommand(partnerHoldsBidState(), "E", BOT_PRESETS[3], scriptedRng(0.1));
+
+      expect(cmd).toEqual({ type: "PassBid", seat: "E" });
+    });
+
+    it("L3 overrides partner when the scripted noise lifts its raw ceiling past the margin", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+
+      const cmd = botChooseCommand(partnerHoldsBidState(), "E", BOT_PRESETS[3], scriptedRng(0.9, 0.5));
+
+      expect(cmd).toEqual({ type: "PlaceBid", seat: "E", amount: 120 });
+    });
+  });
+
+  describe("play accuracy", () => {
+    const playState = () => makePlayingState({
+      activePlayer: "S",
+      hands: { S: ["B5", "R7", "G9", "Y2"] },
+      trump: "Black",
+      bidder: "N",
+    });
+    const profile = BOT_PRESETS[3];
+    const bestPlay = () => botChooseCommand(playState(), "S", { ...profile, playAccuracy: 1 }, scriptedRng(0.99));
+
+    it("plays the legal card the script selects when the accuracy roll slips", () => {
+      const state = playState();
+      const legalPlays = legalCommands(state, "S").filter(c => c.type === "PlayCard");
+
+      const cmd = botChooseCommand(state, "S", profile, scriptedRng(0.9, 0.5));
+
+      expect(cmd).toEqual(legalPlays[2]);
+      expect(cmd).not.toEqual(bestPlay());
+    });
+
+    it("L1 plays the legal card the script selects when the accuracy roll passes", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const state = playState();
+      const legalPlays = legalCommands(state, "S").filter(c => c.type === "PlayCard");
+
+      const cmd = botChooseCommand(state, "S", BOT_PRESETS[1], scriptedRng(0.1, 0.5));
+
+      expect(cmd).toEqual(legalPlays[2]);
+    });
+
+    it("plays its best card when the accuracy roll passes", () => {
+      const cmd = botChooseCommand(playState(), "S", profile, scriptedRng(0.3));
+
+      expect(cmd).toEqual(bestPlay());
+    });
+  });
+
+  it("estimateHandValueWithNoise adds noise scaled by the source's draw", () => {
+    const spy = vi.spyOn(Math, "random");
+
+    expect(estimateHandValueWithNoise(ADR009_STRONG_HAND, 0.5, scriptedRng(0.75))).toBe(140);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("computeBidCeiling values the hand with the supplied source", () => {
+    const profile = { ...BOT_PRESETS[3], handValuationAccuracy: 0 };
+
+    const spy = vi.spyOn(Math, "random");
+
+    expect(computeBidCeiling(ADR009_STRONG_HAND, strongOpeningState(), "E", profile, scriptedRng(0))).toBe(150);
+    expect(spy).not.toHaveBeenCalled();
   });
 });

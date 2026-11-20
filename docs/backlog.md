@@ -13,3 +13,4 @@ Types: bug, feature, ux, debt.
 Not scheduled. Fixed only when work in the affected area needs it.
 
 - #6 debt, bot tooling: The dev-only bot-decision annotation in apps/web/src/store/gameStore.ts calls estimateHandValueWithNoise and computeBidCeiling itself, so the estimate and ceiling it logs for L2 to L4 bots differ from the values the bot used. Affects bid tuning in packages/engine/src/bot.ts that relies on the dev or coaching log. Found while planning seeded-bot-decisions (2026-11-19)
+- #7 debt, bot: packages/engine/src/bot.ts and packages/engine/src/__tests__/bot.test.ts are past the verifier's file-size thresholds, and botChooseCommand is past its function-length threshold. Natural split: bidding, nest and trump, and card play, each with its own test file. Split when work adds a new responsibility to bot.ts, not when it only threads a parameter through. Found in seeded-bot-decisions Slice 1 review (2026-11-20)

@@ -4,6 +4,7 @@ import { pointValue } from "./scoring.js";
 import { legalCommands } from "./validator.js";
 import type { BotProfile, CardId, Color, GameState, Seat } from "./types.js";
 import { DEFAULT_RULES, SEAT_TEAM } from "./types.js";
+import { defaultRng, type Rng } from "./rng.js";
 
 const COLORS: Color[] = ["Black", "Red", "Green", "Yellow"];
 
@@ -39,16 +40,6 @@ const RAISE_PARAMS: Record<number, RaiseParams> = {
   5: { jumpThreshold: 15, jumpFractionCenter: 0.65, jumpFractionSpread: 0.10, jumpProbability: 0.80 },
 };
 
-/**
- * Choose the actual bid amount for a bot.
- * - On opening (isOpening=true, minNextBid=minimumBid): uses fraction-based natural open (L3–L5)
- *   or minimum (L1–L2). Includes fishing mechanic.
- * - On raise (isOpening=false): may jump toward ceiling (L3–L5) or just raise minimum (L1–L2).
- * Always returns a value that is:
- *   - A multiple of rules.bidIncrement
- *   - In [minNextBid, ceiling]
- *   - Present in the legal PlaceBid commands (fallback to minNextBid if not)
- */
 function chooseBidAmount(
   minNextBid: number,
   ceiling: number,
@@ -56,41 +47,34 @@ function chooseBidAmount(
   isOpening: boolean,
   legal: GameCommand[],
   rules: { minimumBid: number; bidIncrement: number },
+  rng: Rng,
 ): number {
   const diff = profile.difficulty;
 
   if (isOpening) {
     const params = OPENING_PARAMS[diff] ?? OPENING_PARAMS[1]!;
-    // L1/L2: always minimum
     if (diff <= 2) return minNextBid;
-    // Fishing mechanic: pretend to be weak
-    if (Math.random() < params.fishingProbability) return minNextBid;
-    // Fraction-based open
-    const fraction = params.fractionCenter + (Math.random() * 2 - 1) * params.fractionSpread;
+    if (rng() < params.fishingProbability) return minNextBid;
+    const fraction = params.fractionCenter + (rng() * 2 - 1) * params.fractionSpread;
     const rawBid = minNextBid + fraction * (ceiling - minNextBid);
     const snapped = Math.round(rawBid / rules.bidIncrement) * rules.bidIncrement;
     const amount = Math.max(minNextBid, Math.min(snapped, ceiling));
-    // Snap to legal bid
     const legalCmd = legal.find(c => c.type === "PlaceBid" && c.amount === amount);
     if (legalCmd) return amount;
-    // Fallback: find nearest legal bid
     const bids = legal.filter(c => c.type === "PlaceBid").map(c => (c as { type: "PlaceBid"; amount: number }).amount);
     if (bids.length === 0) return minNextBid;
     return bids.reduce((best, b) => Math.abs(b - amount) < Math.abs(best - amount) ? b : best);
   }
 
-  // Raise path
   const params = RAISE_PARAMS[diff] ?? RAISE_PARAMS[1]!;
   if (diff <= 2) return minNextBid;
   const gap = ceiling - minNextBid;
   if (gap < params.jumpThreshold) return minNextBid;
 
-  if (Math.random() >= params.jumpProbability) return minNextBid;
-  // Jump!
-  const fraction = params.jumpFractionCenter + (Math.random() * 2 - 1) * params.jumpFractionSpread;
+  if (rng() >= params.jumpProbability) return minNextBid;
+  const fraction = params.jumpFractionCenter + (rng() * 2 - 1) * params.jumpFractionSpread;
   const rawJump = Math.round((gap * fraction) / rules.bidIncrement) * rules.bidIncrement;
   const amount = Math.max(minNextBid, Math.min(minNextBid + rawJump, ceiling));
-  // Verify in legal commands; fallback to minNextBid
   const legalCmd = legal.find(c => c.type === "PlaceBid" && c.amount === amount);
   if (legalCmd) return amount;
   return minNextBid;
@@ -173,15 +157,11 @@ export function estimateHandValue(hand: CardId[]): number {
   return strength;
 }
 
-/**
- * Hand strength with noise scaled by (1 - accuracy) * 40.
- * accuracy=1 → perfect (no noise). accuracy=0 → ±40 random noise.
- */
-export function estimateHandValueWithNoise(hand: CardId[], accuracy: number): number {
+export function estimateHandValueWithNoise(hand: CardId[], accuracy: number, rng: Rng = defaultRng): number {
   const trueStrength = estimateHandValue(hand);
   if (accuracy >= 1.0) return trueStrength;
   const noiseRange = (1 - accuracy) * 40;
-  const noise = (Math.random() - 0.5) * 2 * noiseRange;
+  const noise = (rng() - 0.5) * 2 * noiseRange;
   return Math.max(0, trueStrength + noise);
 }
 
@@ -218,8 +198,9 @@ export function computeBidCeiling(
   state: GameState,
   seat: Seat,
   profile: BotProfile,
+  rng: Rng = defaultRng,
 ): number {
-  const strength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy);
+  const strength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy, rng);
   let ceiling = baseBidCeiling(strength);
   if (ceiling === 0) return 0;
 
@@ -368,13 +349,11 @@ function evaluateMoonShoot(
 //   Phase 6:               endgameCardAwareness
 //   Phase 7:               contextualMoonShoot (evaluateMoonShoot)
 
-/**
- * Choose the best command for a bot player.
- */
 export function botChooseCommand(
   state: GameState,
   seat: Seat,
   profile: BotProfile,
+  rng: Rng = defaultRng,
 ): GameCommand {
   const legal = legalCommands(state, seat);
 
@@ -391,9 +370,9 @@ export function botChooseCommand(
         ? rules.minimumBid
         : state.currentBid + rules.bidIncrement;
 
-      // ── Level 1 (Beginner): 25% chance to open at minimum; never raises ──
+      // ── Level 1 ───────────────────────────────────────────────────────────
       if (profile.difficulty === 1) {
-        if (state.currentBid === 0 && Math.random() < 0.25) {
+        if (state.currentBid === 0 && rng() < 0.25) {
           const openCmd = legal.find(c => c.type === "PlaceBid" && c.amount === rules.minimumBid);
           if (openCmd) return openCmd;
         }
@@ -401,28 +380,22 @@ export function botChooseCommand(
       }
 
       // ── Level 2+ ──────────────────────────────────────────────────────────
-
-      // Guard: if partner already holds the bid, only override with a dramatically stronger hand
       if (
         profile.scoreContextAwareness &&
         state.bidder !== null &&
         state.bidder === partnerOf(seat) &&
         state.currentBid > 0
       ) {
-        const rawStrength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy);
+        const rawStrength = estimateHandValueWithNoise(hand, profile.handValuationAccuracy, rng);
         const rawCeiling = baseBidCeiling(rawStrength);
-        // L4/L5: require 45pt raw-ceiling advantage over partner's current bid.
-        // L3 and below: keep existing 25pt margin.
         const PARTNER_OVERRIDE_MARGIN = (profile.difficulty >= 4) ? 45 : 25;
         if (rawCeiling <= state.currentBid + PARTNER_OVERRIDE_MARGIN) {
           return { type: "PassBid", seat };
         }
-        // Hand is strong enough to justify taking the contract — fall through to normal bidding
       }
 
       // ── Phase 7: Moon-shoot check (contextual for expert) ─────────────────
-      // Compute ceiling first — moon-shoot is gated on a full ceiling
-      const ceiling = computeBidCeiling(hand, state, seat, profile);
+      const ceiling = computeBidCeiling(hand, state, seat, profile, rng);
       if (evaluateMoonShoot(hand, state, seat, profile)) {
         const shootCmd = legal.find(c => c.type === "ShootMoon");
         if (shootCmd) return shootCmd;
@@ -430,11 +403,10 @@ export function botChooseCommand(
 
       // Decide whether to bid
       if (shouldBid(minNextBid, ceiling, profile, state)) {
-        // NEW: never bid above our ceiling — even with bluff budget
         if (minNextBid > ceiling) return { type: "PassBid", seat };
 
         const isOpening = state.currentBid === 0;
-        const bidAmount = chooseBidAmount(minNextBid, ceiling, profile, isOpening, legal, rules);
+        const bidAmount = chooseBidAmount(minNextBid, ceiling, profile, isOpening, legal, rules, rng);
         const bidCmd = legal.find(c => c.type === "PlaceBid" && c.amount === bidAmount);
         if (bidCmd) return bidCmd;
       }
@@ -455,8 +427,7 @@ export function botChooseCommand(
       }
 
       if (profile.difficulty <= 2) {
-        // Beginner/Easy: random discard
-        return pickRandom(discardCommands);
+        return pickRandom(discardCommands, rng);
       }
 
       // Normal+: discard lowest-point non-trump cards first; keep 1s, 14s, trump
@@ -468,7 +439,7 @@ export function botChooseCommand(
       if (selectCommands.length === 0) return legal[0]!;
 
       if (profile.difficulty <= 2) {
-        return pickRandom(selectCommands);
+        return pickRandom(selectCommands, rng);
       }
 
       return chooseBestTrump(selectCommands, state, seat, profile);
@@ -478,12 +449,11 @@ export function botChooseCommand(
       const playCommands = legal.filter((c) => c.type === "PlayCard");
       if (playCommands.length === 0) return legal[0]!;
 
-      // Accuracy check: if random fails, play randomly
-      if (Math.random() > profile.playAccuracy) {
-        return pickRandom(playCommands);
+      if (rng() > profile.playAccuracy) {
+        return pickRandom(playCommands, rng);
       }
 
-      return chooseBestPlay(playCommands, state, seat, profile);
+      return chooseBestPlay(playCommands, state, seat, profile, rng);
     }
 
     default:
@@ -650,11 +620,12 @@ function chooseBestPlay(
   state: GameState,
   seat: Seat,
   profile: BotProfile,
+  rng: Rng,
 ): GameCommand {
   const isLeading = state.currentTrick.length === 0;
 
   if (profile.difficulty <= 2) {
-    return pickRandom(playCommands);
+    return pickRandom(playCommands, rng);
   }
 
   if (isLeading) {
@@ -1473,7 +1444,7 @@ function chooseLowestCard(playCommands: GameCommand[]): GameCommand {
   });
 }
 
-function pickRandom<T>(arr: T[]): T {
-  const idx = Math.floor(Math.random() * arr.length);
+function pickRandom<T>(arr: T[], rng: Rng): T {
+  const idx = Math.floor(rng() * arr.length);
   return arr[idx]!;
 }
