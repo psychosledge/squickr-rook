@@ -106,3 +106,8 @@ Added: Slice 1, 2026-11-19
 **Decision 5, default path:** each former `Math.random()` call becomes one `rng()` draw at the same point, so draw order and count are unchanged. Slice 1 does not change simulator output.
 
 **Revisit if:** bot code draws randomness outside `botChooseCommand`'s call tree, or callers need one stream shared across games.
+
+## Deferred findings
+
+- `packages/engine/scripts/` (all files): never typechecked; engine tsconfig includes only `src` and `@types/node` is missing. Deferred: tsconfig and CI config outside this diff, affects every script. → backlog #8
+- `packages/engine/scripts/simulation.ts` `simulateGame`: past the function-length threshold. Deferred: a structural split is wider than this slice, which only moved the function. → backlog #9
