@@ -5,19 +5,19 @@ Tier: core
 
 ### Slice 1: Room server runs on PartyServer locally
 **Scope:** The room server moves off the `partykit` package onto PartyServer, packaged as a Cloudflare Worker with a Durable Object per room, and runs locally. The web app in dev mode connects to the local server and a full online game works end to end on one machine. Room protocol messages, lobby rules, reconnect, and bot replacement behave exactly as before. No production deploy, no production host change, no deployment-guide rewrite.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** 67856fd
 **Acceptance Criteria:**
-- [ ] `pnpm server:dev` starts the room server locally on the Cloudflare Workers runtime.
-- [ ] `pnpm dev` with no host configured connects to the local room server: one browser creates a room, a second browser opens the room link and joins, both see each other and claim seats.
-- [ ] Locally, the host fills empty seats with bots, sets their difficulty, starts the game, and the table plays from bidding through game over with both browsers showing the same table.
-- [ ] Locally, refreshing one browser mid-game returns that player to their seat and the game continues.
-- [ ] Locally, closing one browser mid-game lets the host replace that seat with a bot and the game continues.
-- [ ] Every scenario in `packages/server/src/room.test.ts` runs against the ported server and passes, with no scenario removed or weakened.
-- [ ] The `partykit` dependency and `packages/server/partykit.json` are gone; the server package typechecks.
-- [ ] The web app builds its room connection URL to match the new server's route, using `ws` for a local host and `wss` otherwise (existing: apps/web/src/store/onlineGameStore.ts), and the online store tests cover the URL it builds.
-- [ ] A request to the Worker outside the room route gets a `404`.
-- [ ] Offline play is unchanged: the web test suite passes and `pnpm -r test` passes.
+- [x] `pnpm server:dev` starts the room server locally on the Cloudflare Workers runtime.
+- [x] `pnpm dev` with no host configured connects to the local room server: one browser creates a room, a second browser opens the room link and joins, both see each other and claim seats.
+- [x] Locally, the host fills empty seats with bots, sets their difficulty, starts the game, and the table plays from bidding through game over with both browsers showing the same table.
+- [x] Locally, refreshing one browser mid-game returns that player to their seat and the game continues.
+- [x] Locally, closing one browser mid-game lets the host replace that seat with a bot and the game continues.
+- [x] Every scenario in `packages/server/src/room.test.ts` runs against the ported server and passes, with no scenario removed or weakened.
+- [x] The `partykit` dependency and `packages/server/partykit.json` are gone; the server package typechecks.
+- [x] The web app builds its room connection URL to match the new server's route, using `ws` for a local host and `wss` otherwise (existing: apps/web/src/store/onlineGameStore.ts), and the online store tests cover the URL it builds.
+- [x] A request to the Worker outside the room route gets a `404`.
+- [x] Offline play is unchanged: the web test suite passes and `pnpm -r test` passes.
 **Files:** packages/server/src/room.ts, packages/server/src/room.test.ts, packages/server/src/ (Worker entry), packages/server/package.json, packages/server/wrangler config, packages/server/partykit.json (removed), packages/server/tsconfig.json, packages/server/vitest.config.ts, package.json, pnpm-lock.yaml, apps/web/src/store/onlineGameStore.ts, apps/web/src/store/__tests__/onlineGameStore.test.ts, apps/web/src/vite-env.d.ts
 **Needs Architect:** yes. New hosting pattern (Worker entry plus Durable Object binding). Where room routing lives has a real alternative: the client adopts PartyServer's route path, or the Worker maps the existing `/party/<code>` path; each choice changes a different package. The test harness for the ported tests is also open (mocked connections as today, or the Workers runtime).
 **Architect decides:** the room route and, if the client adopts PartyServer's route, the Durable Object class and party names; the test harness; the wrangler config format (`wrangler.toml` or `wrangler.jsonc`) and Worker name, which Slice 2 deploys under; the Worker entry file and export shape, and whether `room.ts` becomes the Durable Object class; whether hibernation is on. With hibernation on, the room's state must be persisted to Durable Object storage so it survives between messages; with it off, in-memory state is acceptable. `room.ts` relies on `conn.id`, per-connection state (`setState`/`state`), and `room.getConnections()`, and the port keeps all three working.
