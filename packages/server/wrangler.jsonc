@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "squickr-rook",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "durable_objects": {
+    "bindings": [{ "name": "RoomServer", "class_name": "RoomServer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomServer"] }],
+  "dev": {
+    "port": 1999
+  }
+}

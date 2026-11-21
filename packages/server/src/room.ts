@@ -1,4 +1,4 @@
-import type * as Party from "partykit/server";
+import type { Connection, ConnectionContext, WSMessage } from "partyserver";
 import {
   applyEvent,
   botChooseCommand,
@@ -120,20 +120,25 @@ type PlayerReconnected = {
 
 type ServerMessage = Welcome | LobbyUpdated | EventBatch | CommandError | PlayerDisconnected | PlayerReconnected;
 
-// Typed connection alias for convenience
-type Conn = Party.Connection<ConnectionState>;
+const WEBSOCKET_OPEN = 1;
 
-function getState(conn: Party.Connection): ConnectionState | null {
-  return (conn as Conn).state;
+export type RoomHost = {
+  readonly id: string;
+  getConnection(id: string): Connection | undefined;
+  getConnections(): Iterable<Connection>;
+};
+
+function getState(conn: Connection): ConnectionState | null {
+  return (conn as Connection<ConnectionState>).state;
 }
 
-function setState(conn: Party.Connection, state: ConnectionState): void {
-  (conn as Conn).setState(state);
+function setState(conn: Connection, state: ConnectionState): void {
+  (conn as Connection<ConnectionState>).setState(state);
 }
 
 // ── RookRoom ──────────────────────────────────────────────────────────────────
 
-export default class RookRoom implements Party.Server {
+export default class RookRoom {
   private phase: "lobby" | "playing" = "lobby";
   private hostConnId: string | null = null;
   private joinOrder: string[] = [];
@@ -144,13 +149,13 @@ export default class RookRoom implements Party.Server {
   private gamePaused = false;
   private botDifficulties: Map<Seat, BotDifficulty> = new Map();
 
-  constructor(readonly room: Party.Room) {}
+  constructor(readonly room: RoomHost) {}
 
-  async onConnect(conn: Party.Connection, _ctx: Party.ConnectionContext): Promise<void> {
+  async onConnect(conn: Connection, _ctx: ConnectionContext): Promise<void> {
     console.log(`[RookRoom] connection ${conn.id} opened`);
   }
 
-  async onMessage(message: string | ArrayBuffer, sender: Party.Connection): Promise<void> {
+  async onMessage(message: WSMessage, sender: Connection): Promise<void> {
     let msg: ClientMessage;
     try {
       msg = JSON.parse(typeof message === "string" ? message : "") as ClientMessage;
@@ -192,7 +197,7 @@ export default class RookRoom implements Party.Server {
     }
   }
 
-  async onClose(conn: Party.Connection): Promise<void> {
+  async onClose(conn: Connection): Promise<void> {
     const state = getState(conn);
 
     // Remove from join order
@@ -265,7 +270,7 @@ export default class RookRoom implements Party.Server {
 
   // ── Private handlers ────────────────────────────────────────────────────────
 
-  private async handleJoinRoom(msg: JoinRoom, conn: Party.Connection): Promise<void> {
+  private async handleJoinRoom(msg: JoinRoom, conn: Connection): Promise<void> {
     // ── Reconnect path ────────────────────────────────────────────────────────
     // Check if this player was disconnected mid-game and is rejoining.
     const reconnectEntry = [...this.disconnectedSeats.entries()]
@@ -317,8 +322,7 @@ export default class RookRoom implements Party.Server {
         this.gamePaused = false;
       }
 
-      // Broadcast PlayerReconnected to all connections (including the rejoining player)
-      for (const c of this.room.getConnections<ConnectionState>()) {
+      for (const c of this.room.getConnections()) {
         this.sendTo(c, {
           type: "PlayerReconnected",
           seat: disconnectedSeat,
@@ -387,7 +391,7 @@ export default class RookRoom implements Party.Server {
         this.gamePaused = false;
         const seatEntry = this.seatedPlayers.get(seat);
         const displayName = seatEntry?.displayName ?? msg.displayName;
-        for (const c of this.room.getConnections<ConnectionState>()) {
+        for (const c of this.room.getConnections()) {
           this.sendTo(c, {
             type: "PlayerReconnected",
             seat,
@@ -415,7 +419,7 @@ export default class RookRoom implements Party.Server {
     }
   }
 
-  private async handleClaimSeat(msg: ClaimSeat, conn: Party.Connection): Promise<void> {
+  private async handleClaimSeat(msg: ClaimSeat, conn: Connection): Promise<void> {
     if (this.phase !== "lobby") {
       this.sendError(conn, "Cannot claim seat: game already started");
       return;
@@ -449,7 +453,7 @@ export default class RookRoom implements Party.Server {
     this.broadcastLobbyUpdated();
   }
 
-  private async handleLeaveSeat(_msg: LeaveSeat, conn: Party.Connection): Promise<void> {
+  private async handleLeaveSeat(_msg: LeaveSeat, conn: Connection): Promise<void> {
     if (this.phase !== "lobby") {
       this.sendError(conn, "Cannot leave seat: game already started");
       return;
@@ -466,7 +470,7 @@ export default class RookRoom implements Party.Server {
     this.broadcastLobbyUpdated();
   }
 
-  private async handleStartGame(_msg: StartGame, conn: Party.Connection): Promise<void> {
+  private async handleStartGame(_msg: StartGame, conn: Connection): Promise<void> {
     if (this.phase !== "lobby") {
       this.sendError(conn, "Game already started");
       return;
@@ -515,7 +519,7 @@ export default class RookRoom implements Party.Server {
     this.processBotTurns();
   }
 
-  private async handleUpdateName(msg: UpdateName, conn: Party.Connection): Promise<void> {
+  private async handleUpdateName(msg: UpdateName, conn: Connection): Promise<void> {
     const trimmed = msg.displayName.trim();
     if (!trimmed) return;
 
@@ -535,7 +539,7 @@ export default class RookRoom implements Party.Server {
     this.broadcastLobbyUpdated();
   }
 
-  private async handleSendCommand(msg: SendCommand, conn: Party.Connection): Promise<void> {
+  private async handleSendCommand(msg: SendCommand, conn: Connection): Promise<void> {
     if (this.phase !== "playing") {
       this.sendError(conn, "Game is not in progress");
       return;
@@ -569,7 +573,7 @@ export default class RookRoom implements Party.Server {
     this.processBotTurns();
   }
 
-  private async handleReplaceWithBot(msg: ReplaceWithBot, conn: Party.Connection): Promise<void> {
+  private async handleReplaceWithBot(msg: ReplaceWithBot, conn: Connection): Promise<void> {
     const state = getState(conn);
     if (state?.playerId !== this.getHostPlayerId()) {
       this.sendError(conn, "Only the host can replace a player with a bot");
@@ -601,7 +605,7 @@ export default class RookRoom implements Party.Server {
     await this.processBotTurns();
   }
 
-  private async handleSetBotDifficulty(msg: SetBotDifficulty, conn: Party.Connection): Promise<void> {
+  private async handleSetBotDifficulty(msg: SetBotDifficulty, conn: Connection): Promise<void> {
     if (this.phase !== "lobby") {
       this.sendError(conn, "Cannot change bot difficulty: game already started");
       return;
@@ -698,13 +702,12 @@ export default class RookRoom implements Party.Server {
     }
   }
 
-  private sendError(conn: Party.Connection, reason: string): void {
+  private sendError(conn: Connection, reason: string): void {
     this.sendTo(conn, { type: "CommandError", reason } satisfies CommandError);
   }
 
-  private sendTo(conn: Party.Connection, msg: ServerMessage): void {
-    // Party.Connection doesn't expose readyState in its TS interface; cast to access the underlying WS property
-    if ((conn as any).readyState !== 1 /* WebSocket.OPEN */) return;
+  private sendTo(conn: Connection, msg: ServerMessage): void {
+    if (conn.readyState !== WEBSOCKET_OPEN) return;
     try {
       conn.send(JSON.stringify(msg));
     } catch (err) {
@@ -762,8 +765,7 @@ export default class RookRoom implements Party.Server {
     return null;
   }
 
-  /** Returns the live connection for a given seat, or undefined if not connected. */
-  private connForSeat(seat: Seat): Party.Connection | undefined {
+  private connForSeat(seat: Seat): Connection | undefined {
     const entry = this.seatedPlayers.get(seat);
     if (entry === undefined) return undefined;
     return this.room.getConnection(entry.connId);

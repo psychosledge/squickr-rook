@@ -281,6 +281,11 @@ export default function OnlineGamePage() {
     }
   }, [gameState, isReconnecting, code, navigate, lobbyPhase]);
 
+  const [showLastTrick, setShowLastTrick] = useState(false);
+  const handNumber = gameState?.handNumber;
+
+  useEffect(() => { setShowLastTrick(false); }, [handNumber]);
+
   const hasMidGameFlag = globalThis.sessionStorage?.getItem(MID_GAME_ROOM_KEY) === code;
 
   if (!gameState) {
@@ -317,12 +322,6 @@ export default function OnlineGamePage() {
       difficultyLabels[player.seat] = BOT_DIFFICULTY_LABELS[player.botProfile.difficulty];
     }
   }
-
-  const [showLastTrick, setShowLastTrick] = useState(false);
-  const handNumber = gameState.handNumber;
-
-  // Reset last trick overlay when a new hand begins
-  useEffect(() => { setShowLastTrick(false); }, [handNumber]);
 
   const canShowLastTrick =
     gameState.completedTricks.length > 0 &&

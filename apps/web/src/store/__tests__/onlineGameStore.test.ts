@@ -1938,6 +1938,43 @@ describe("onlineGameStore", () => {
     });
   });
 
+  describe("connect() room URL", () => {
+    const openedUrls: string[] = [];
+
+    beforeEach(() => {
+      openedUrls.length = 0;
+      vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+      vi.stubGlobal("sessionStorage", { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+      vi.stubGlobal("WebSocket", class {
+        constructor(url: string) { openedUrls.push(url); }
+        close() {}
+        send() {}
+      });
+      resetStore();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    });
+
+    it("connects to the local room server over ws when no host is configured", () => {
+      vi.stubEnv("VITE_PARTYKIT_HOST", undefined);
+
+      useOnlineGameStore.getState().connect("ABCD");
+
+      expect(openedUrls).toEqual(["ws://localhost:1999/parties/room-server/ABCD"]);
+    });
+
+    it("connects to a workers.dev host over wss", () => {
+      vi.stubEnv("VITE_PARTYKIT_HOST", "squickr-rook.example.workers.dev");
+
+      useOnlineGameStore.getState().connect("ABCD");
+
+      expect(openedUrls).toEqual(["wss://squickr-rook.example.workers.dev/parties/room-server/ABCD"]);
+    });
+  });
+
   // ── PlayerReconnected overlay resume ──────────────────────────────────────
   describe("PlayerReconnected handling — overlay resumes", () => {
     it("calls _updateOverlayAfterBatch after PlayerReconnected — overlay resumes for active player", () => {

@@ -120,10 +120,9 @@ export const useOnlineGameStore = create<OnlineStore>((set, get) => ({
       _pendingBatch: [],
     });
 
-    // Determine WebSocket protocol
     const host = import.meta.env.VITE_PARTYKIT_HOST ?? "localhost:1999";
     const proto = host.startsWith("localhost") ? "ws" : "wss";
-    const url = `${proto}://${host}/party/${roomCode}`;
+    const url = `${proto}://${host}/parties/room-server/${roomCode}`;
 
     const ws = new WebSocket(url);
 

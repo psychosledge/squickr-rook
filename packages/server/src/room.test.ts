@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import RookRoom from "./room.js";
+import type { RoomHost } from "./room.js";
+import type { Connection } from "partyserver";
 import type { Seat } from "@rook/engine";
 
-// ── Minimal PartyKit mocks ───────────────────────────────────────────────────
+// ── Minimal PartyServer mocks ─────────────────────────────────────────────────
 
 type MockConnState = {
   playerId: string;
@@ -10,7 +12,6 @@ type MockConnState = {
   seat: Seat | null;
 };
 
-/** Create a mock PartyKit Connection */
 function makeMockConn(id: string, initialReadyState: number = 1) {
   let _state: MockConnState | null = null;
   const sent: string[] = [];
@@ -29,13 +30,11 @@ function makeMockConn(id: string, initialReadyState: number = 1) {
     _sent: sent,
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return conn as any as import("partykit/server").Connection<MockConnState> & { _sent: string[]; readyState: number; setReadyState(rs: number): void };
+  return conn as any as Connection<MockConnState> & { _sent: string[]; readyState: number; setReadyState(rs: number): void };
 }
 
 type MockConn = ReturnType<typeof makeMockConn>;
 
-/** Build a minimal mock Room */
 function makeMockRoom(id = "ROOM1") {
   const connections = new Map<string, MockConn>();
 
@@ -56,8 +55,7 @@ function makeMockRoom(id = "ROOM1") {
     },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return room as any as import("partykit/server").Room & {
+  return room as any as RoomHost & {
     addConn(c: MockConn): void;
     removeConn(id: string): void;
   };
@@ -904,42 +902,34 @@ describe("RookRoom — reconnect race condition fixes", () => {
   describe("Fix 4: onClose does not crash when connection closes before JoinRoom (state.playerId is null/undefined)", () => {
 
     it("onClose on a never-joined connection during playing phase does not throw and does not add to disconnectedSeats", async () => {
-      // Arrange: start a game with 4 players
       const conns = await setupFourPlayerLobby(rookRoom, room);
       await sendStartGame(rookRoom, conns.N);
 
-      // A new connection arrives but never sends JoinRoom (e.g., browser opened URL
-      // then immediately closed). Its state.playerId will be null/undefined.
+      // A new connection arrives but never sends JoinRoom (e.g., browser opened URL then immediately closed).
       const neverJoinedConn = makeMockConn("never-joined", 1);
       neverJoinedConn.setState({ playerId: null as unknown as string, displayName: "", seat: null });
       room.addConn(neverJoinedConn);
 
-      // Act: connection closes without ever sending JoinRoom
       room.removeConn("never-joined");
-      // Should NOT throw a TypeError / non-null assertion error
       await expect(
-        rookRoom.onClose(neverJoinedConn as unknown as import("partykit/server").Connection),
+        rookRoom.onClose(neverJoinedConn as unknown as Connection),
       ).resolves.toBeUndefined();
 
-      // Assert: nothing added to disconnectedSeats
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const internal = rookRoom as any;
       expect(internal.disconnectedSeats.size).toBe(0);
     });
 
     it("onClose on a connection with null state during playing phase does not throw", async () => {
-      // Arrange: start a game with 4 players
       const conns = await setupFourPlayerLobby(rookRoom, room);
       await sendStartGame(rookRoom, conns.N);
 
-      // A connection with completely null state (makeMockConn returns null state by default)
       const nullStateConn = makeMockConn("null-state-conn", 1);
-      // state is already null (not set)
       room.addConn(nullStateConn);
 
       room.removeConn("null-state-conn");
       await expect(
-        rookRoom.onClose(nullStateConn as unknown as import("partykit/server").Connection),
+        rookRoom.onClose(nullStateConn as unknown as Connection),
       ).resolves.toBeUndefined();
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

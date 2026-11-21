@@ -124,3 +124,8 @@ The Worker returns `404` unless the path starts with `/parties/room-server/` fol
 - Room logic is tested in Node. The `RoomServer` adapter and Worker routing are checked by hand at the slice gate.
 - Each open room keeps its Durable Object running and counts against the free plan's daily duration limit.
 - If `pnpm install` skips `workerd` or `esbuild` builds, add `onlyBuiltDependencies` to `pnpm-workspace.yaml`. If the bundle needs Node built-ins, add the `nodejs_compat` flag.
+
+## Deferred findings
+
+- `packages/server/src/room.ts` (792 lines; `handleJoinRoom` ~273-422, `onClose` ~200-270) and `packages/server/src/room.test.ts`: past the file- and function-length thresholds. Deferred: splitting the room by concern is a refactor wider than this slice, which only retyped signatures. (new entry: docs/backlog.md #23)
+- `apps/web/src/store/onlineGameStore.ts` (`connect()` ~75-165) and `apps/web/src/store/__tests__/onlineGameStore.test.ts`: past the file- and function-length thresholds. Deferred: splitting `connect()` is a store refactor this one-line URL change doesn't justify. (new entry: docs/backlog.md #24)
