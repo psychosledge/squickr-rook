@@ -10,6 +10,7 @@
 
 | Item | Status | Next step |
 |---|---|---|
-| Online play restored ([story](../../stories/online-play-restored/story.md), [plan](../../stories/online-play-restored/plan.md)) | Shipped in v1.9.2 | Run the walkthrough checklist on rook.squickr.com |
 
 ## Closed items (not carried forward — see previous directory for full history)
+
+- Online play restored ([story](../../../stories/archive/online-play-restored/story.md), [plan](../../../stories/archive/online-play-restored/plan.md)): released v1.9.2

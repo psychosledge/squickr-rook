@@ -65,6 +65,8 @@ Tier: core
 ## Walkthrough Checklist
 (Complete after all slices are committed and `/ship` has deployed the web app)
 
+Waived: accepted as complete after the v1.9.2 release without running the checklist. Playtesting continues, and fixes come in as new bugs.
+
 - [ ] On rook.squickr.com, create an online room and copy its room link.
 - [ ] Open the room link in a second browser or device; both players see each other in the lobby.
 - [ ] Each player claims a seat; claiming a seat someone else holds is refused.
