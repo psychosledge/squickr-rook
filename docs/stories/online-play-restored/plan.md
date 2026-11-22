@@ -32,16 +32,17 @@ Tier: core
 
 ### Slice 2: Production room server live and the web app pointed at it
 **Scope:** The ported server is deployed to the existing Cloudflare account (free Workers plan, SQLite-backed Durable Objects) on its `*.workers.dev` hostname, production web builds point at it, and the release process and deployment guide describe the new setup. The web app reaches players on rook.squickr.com through the normal `/ship` release after code review.
-**Status:** not started
-**Commit:** —
+**Status:** ✅ done
+**Commit:** ed539b0
 **Acceptance Criteria:**
-- [ ] `pnpm server:ship` deploys the room server from a local machine after `wrangler login` to its `*.workers.dev` hostname.
-- [ ] A WebSocket connection to the deployed server for a new room code, sending `JoinRoom`, receives a `Welcome` message.
-- [ ] `VITE_PARTYKIT_HOST` in `apps/web/.env.production` names the new hostname, and a production `pnpm build` embeds it with no reference to `partykit.dev` left in `apps/web/dist`.
-- [ ] `.claude/commands/ship.md` Step 7 deploys the Cloudflare room server and names it accurately.
-- [ ] `docs/deployment-guide.md` describes the Cloudflare one-time setup, local server dev, server deploy, and server monitoring, and has no remaining instructions for hosted PartyKit.
-- [ ] No Cloudflare credential or API token is committed to the repo.
-- [ ] `pnpm -r test` passes.
+- [x] `pnpm server:ship` deploys the room server from a local machine after `wrangler login` to its `*.workers.dev` hostname.
+- [x] A WebSocket connection to the deployed server for a new room code, sending `JoinRoom`, receives a `Welcome` message.
+- [x] `VITE_PARTYKIT_HOST` in `apps/web/.env.production` names the new hostname, and a production `pnpm build` embeds it with no reference to `partykit.dev` left in `apps/web/dist`.
+- [x] `.claude/commands/ship.md` Step 7 deploys the Cloudflare room server and names it accurately.
+- [x] `docs/deployment-guide.md` describes the Cloudflare one-time setup, local server dev, server deploy, and server monitoring, and has no remaining instructions for hosted PartyKit.
+- [x] No Cloudflare credential or API token is committed to the repo.
+- [x] `pnpm -r test` passes.
+**Notes:** Deployed `squickr-rook` to `squickr-rook.rook-server.workers.dev`. Smoke check: `JoinRoom` on room `SMKWGPT` received `Welcome`; `/` returns `404`.
 **Files:** packages/server/wrangler config, packages/server/package.json, apps/web/.env.production, .claude/commands/ship.md, docs/deployment-guide.md
 **Needs Architect:** no. No new code pattern.
 **Settled:**
