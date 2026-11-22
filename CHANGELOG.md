@@ -4,6 +4,13 @@ All notable changes to Squickr Rook are documented here.
 
 ---
 
+## [v1.9.2] — 2026-11-21
+
+### Bug Fixes
+- **Online play is back** — online rooms connect again after our previous room host shut down. Creating a room, sharing its link, filling seats with bots, reconnecting after a refresh, and replacing a dropped player with a bot all work as before. If an installed app can't connect, accept the update prompt and try again.
+
+---
+
 ## [v1.9.1] — 2026-11-20
 
 ### Improvements
