@@ -57,11 +57,13 @@ The tag must point at this commit and match the root `package.json` version; the
 git diff v<PREVIOUS_VERSION> v<NEW_VERSION> --name-only -- packages/server/ packages/engine/src/
 ```
 
-If anything is listed, ask whether to deploy the PartyKit server. On a yes, bump `packages/server/package.json` (patch unless told otherwise), commit it as `chore(server): bump version to <SERVER_VERSION>`, push, and run:
+If anything is listed, ask whether to deploy the Cloudflare room server. On a yes, bump `packages/server/package.json` (patch unless told otherwise), commit it as `chore(server): bump version to <SERVER_VERSION>`, push, and run:
 
 ```bash
 pnpm server:ship
 ```
+
+This runs `wrangler deploy` for the `squickr-rook` Worker. It needs a prior `wrangler login` on this machine. If wrangler reports it is not authenticated, stop and ask the user to run `pnpm --filter @rook/server exec wrangler login`. Deploy when no one is playing, since a redeploy drops every open room.
 
 Otherwise skip and note that the server was not redeployed.
 

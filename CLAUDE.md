@@ -48,7 +48,7 @@ Each bug slice starts with a failing regression test.
 ## Tech Stack
 
 - React 19 + TypeScript + Vite, React Router, Zustand
-- PartyKit for online rooms (`packages/server`, deployed separately with `pnpm server:ship`)
+- PartyServer on a Cloudflare Worker for online rooms (`packages/server`, deployed separately with `pnpm server:ship`)
 - Vitest (strict TDD)
 
 ## Package Structure
@@ -56,7 +56,7 @@ Each bug slice starts with a failing regression test.
 ```
 packages/
 ├── engine/   # Pure game rules, reducer, bots, simulation harness (scripts/simulate.ts)
-└── server/   # PartyKit room server
+└── server/   # Room server (PartyServer Durable Object on a Cloudflare Worker)
 apps/
 └── web/      # React PWA, including the dev-only /replay route
 ```
@@ -73,7 +73,7 @@ apps/
 ```bash
 pnpm -r test                                        # all tests across packages
 pnpm dev                                            # web dev server
-pnpm server:dev                                     # PartyKit dev server
+pnpm server:dev                                     # local room server (wrangler dev, port 1999)
 pnpm build                                          # engine + web production build
 pnpm --filter @rook/engine simulate --games 100 --seed 12345   # bot-vs-bot NDJSON for /replay
 ```
